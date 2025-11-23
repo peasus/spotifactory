@@ -10,7 +10,9 @@ authors = [ { name = "Joseph Pease", email = "you@example.com" } ]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "spotipy>=2.22.0",
+]
 
 [project.optional-dependencies]
 dev = [
