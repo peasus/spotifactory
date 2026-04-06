@@ -23,12 +23,17 @@ class DisplaySim:
         if selected:
             self.canvas.create_rectangle(
                 0, y * self.scale, self.width * self.scale, (y + 10) * self.scale,
-                outline="white", width=1
+                fill="white", outline=""
             )
-        self.canvas.create_text(
-            x * self.scale, y * self.scale, anchor="nw",
-            text=text, fill="white", font=("Courier", 10 * self.scale // 6)
-        )
+            self.canvas.create_text(
+                x * self.scale, y * self.scale, anchor="nw",
+                text=text, fill="black", font=("Courier", 10 * self.scale // 6)
+            )
+        else:
+            self.canvas.create_text(
+                x * self.scale, y * self.scale, anchor="nw",
+                text=text, fill="white", font=("Courier", 10 * self.scale // 6)
+            )
 
     def update(self):
         self.root.update_idletasks()
