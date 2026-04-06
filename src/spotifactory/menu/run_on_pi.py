@@ -1,40 +1,45 @@
-from menu import Menu, MenuItem
-from renderer_oled import DisplayOLED
-from input_buttons import ButtonInput
+# run_on_pi.py — Raspberry Pi hardware runner
+
 import time
 
-display = DisplayOLED()
-buttons = ButtonInput()
+from spotifactory.menu.menus import build_menu
+from spotifactory.menu.renderer_oled import DisplayOLED
+from spotifactory.menu.input_buttons import ButtonInput
 
-# --- same menu definitions here ---
-current_menu = main_menu
 
-while True:
-    action = buttons.read()
+def main():
+    display = DisplayOLED()
+    buttons = ButtonInput()
+    current_menu = build_menu()
 
-    if action == "Up":
-        current_menu.move_up()
-    elif action == "Down":
-        current_menu.move_down()
-    elif action == "Select":
-        result = current_menu.select()
-        if result:
-            current_menu = result
-    elif action == "Back":
-        if current_menu.parent:
-            current_menu = current_menu.parent
+    while True:
+        action = buttons.read()
 
-    # draw menu
-    display.clear()
-    y = 12
-    display.draw_text(2, 0, current_menu.title)
+        if action == "Up":
+            current_menu.move_up()
+        elif action == "Down":
+            current_menu.move_down()
+        elif action == "Select":
+            result = current_menu.select()
+            if result:
+                current_menu = result
+        elif action == "Back":
+            if current_menu.parent:
+                current_menu = current_menu.parent
 
-    visible = current_menu.items[current_menu.scroll_offset : current_menu.scroll_offset + current_menu.visible_rows]
+        display.clear()
+        display.draw_text(2, 0, current_menu.title)
+        y = 12
+        visible = current_menu.items[
+            current_menu.scroll_offset : current_menu.scroll_offset + current_menu.visible_rows
+        ]
+        for i, item in enumerate(visible):
+            actual_idx = i + current_menu.scroll_offset
+            display.draw_text(2, y, item.label, selected=(actual_idx == current_menu.selected_index))
+            y += 11
+        display.update()
+        time.sleep(0.1)
 
-    for i, item in enumerate(visible):
-        actual_idx = i + current_menu.scroll_offset
-        display.draw_text(2, y, item.label, selected=(actual_idx == current_menu.selected_index))
-        y += 11
 
-    display.update()
-    time.sleep(0.1)
+if __name__ == "__main__":
+    main()

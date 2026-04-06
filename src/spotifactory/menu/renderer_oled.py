@@ -20,9 +20,10 @@ class DisplayOLED:
 
     def draw_text(self, x, y, text, selected=False):
         if selected:
-            self.draw.rectangle((0, y, self.display.width, y + 10), outline=255, fill=0)
-
-        self.draw.text((x, y), text, font=self.font, fill=255)
+            self.draw.rectangle((0, y, self.display.width, y + 10), fill=255)
+            self.draw.text((x, y), text, font=self.font, fill=0)
+        else:
+            self.draw.text((x, y), text, font=self.font, fill=255)
 
     def update(self):
         self.display.image(self.image)
