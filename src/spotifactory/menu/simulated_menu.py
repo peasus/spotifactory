@@ -1,43 +1,32 @@
-# simulated_menu.py — desktop simulator runner
-
-from spotifactory.menu.menus import build_menu
+from spotifactory.menu.catalog import MENUS
 from spotifactory.menu.renderer_sim import DisplaySim
+from spotifactory.runner import Runner
 
 
-def main():
+def main() -> None:
     display = DisplaySim(scale=6)
-    current_menu = [build_menu()]  # list so the closure can rebind it
-
-    def redraw():
-        menu = current_menu[0]
-        display.clear()
-        display.draw_text(2, 0, menu.title)
-        y = 14
-        visible = menu.items[menu.scroll_offset : menu.scroll_offset + menu.visible_rows]
-        for idx, item in enumerate(visible):
-            actual_index = menu.scroll_offset + idx
-            display.draw_text(2, y, item.label, selected=(actual_index == menu.selected_index))
-            y += 12
-        display.update()
+    runner = Runner(display, MENUS)
 
     def on_key(event):
-        menu = current_menu[0]
         key = event.keysym
         if key == "Up":
-            menu.move_up()
+            runner.handle_up()
         elif key == "Down":
-            menu.move_down()
+            runner.handle_down()
         elif key == "Return":
-            result = menu.select()
-            if result:
-                current_menu[0] = result
+            runner.handle_select()
         elif key in ("BackSpace", "Escape"):
-            if menu.parent:
-                current_menu[0] = menu.parent
-        redraw()
+            runner.handle_back()
+        runner.render()
+
+    def poll():
+        runner.tick()
+        runner.render()
+        display.root.after(100, poll)
 
     display.root.bind("<Key>", on_key)
-    redraw()
+    runner.render()
+    display.root.after(100, poll)
     display.root.mainloop()
 
 
