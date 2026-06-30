@@ -1,43 +1,61 @@
 from spotifactory import version
-from spotifactory.menu.menu import Menu, MenuItem
-from spotifactory.menu.menus import build_menu
+from spotifactory.menu.definitions import ItemDef, MenuDef
+from spotifactory.menu.navigation import NavStack
 
 
 def test_version():
     assert isinstance(version, str)
 
 
-def test_menu_navigation():
-    menu = build_menu()
-    assert menu.selected_index == 0
-    menu.move_down()
-    assert menu.selected_index == 1
-    menu.move_up()
-    assert menu.selected_index == 0
+def test_nav_initial_state():
+    menu = MenuDef("Main", [ItemDef("A"), ItemDef("B"), ItemDef("C")])
+    nav = NavStack(menu)
+    assert nav.current.selected_index == 0
+    assert nav.current.menu.title == "Main"
 
 
-def test_menu_select_submenu():
-    menu = build_menu()
-    # "Settings" is at index 1
-    menu.move_down()
-    result = menu.select()
-    assert result is not None
-    assert result.title == "Settings"
-    assert result.parent is menu
+def test_nav_move():
+    menu = MenuDef("Main", [ItemDef("A"), ItemDef("B"), ItemDef("C")])
+    nav = NavStack(menu)
+    nav.current.move_down()
+    assert nav.current.selected_index == 1
+    nav.current.move_up()
+    assert nav.current.selected_index == 0
 
 
-def test_menu_go_back():
-    menu = build_menu()
-    menu.move_down()
-    submenu = menu.select()
-    assert submenu.go_back() is menu
-
-
-def test_menu_bounds():
-    menu = build_menu()
+def test_nav_bounds():
+    menu = MenuDef("Main", [ItemDef("A"), ItemDef("B"), ItemDef("C")])
+    nav = NavStack(menu)
     for _ in range(100):
-        menu.move_up()
-    assert menu.selected_index == 0
+        nav.current.move_up()
+    assert nav.current.selected_index == 0
     for _ in range(100):
-        menu.move_down()
-    assert menu.selected_index == len(menu.items) - 1
+        nav.current.move_down()
+    assert nav.current.selected_index == 2
+
+
+def test_nav_push_pop():
+    root = MenuDef("Root", [ItemDef("A")])
+    sub = MenuDef("Sub", [ItemDef("B")])
+    nav = NavStack(root)
+    nav.push(sub)
+    assert nav.current.menu.title == "Sub"
+    assert nav.depth == 2
+    nav.pop()
+    assert nav.current.menu.title == "Root"
+    assert nav.depth == 1
+
+
+def test_nav_no_pop_at_root():
+    root = MenuDef("Root", [ItemDef("A")])
+    nav = NavStack(root)
+    assert nav.pop() is False
+    assert nav.depth == 1
+
+
+def test_catalog_structure():
+    from spotifactory.menu.catalog import MENUS
+    assert "main" in MENUS
+    assert "settings" in MENUS
+    assert any(item.task is not None for item in MENUS["main"].items)
+    assert any(item.submenu == "settings" for item in MENUS["main"].items)

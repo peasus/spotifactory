@@ -1,44 +1,30 @@
-# run_on_pi.py — Raspberry Pi hardware runner
-
 import time
 
-from spotifactory.menu.menus import build_menu
-from spotifactory.menu.renderer_oled import DisplayOLED
+from spotifactory.menu.catalog import MENUS
 from spotifactory.menu.input_buttons import ButtonInput
+from spotifactory.menu.renderer_oled import DisplayOLED
+from spotifactory.runner import Runner
 
 
-def main():
+def main() -> None:
     display = DisplayOLED()
     buttons = ButtonInput()
-    current_menu = build_menu()
+    runner = Runner(display, MENUS)
 
     while True:
         action = buttons.read()
-
         if action == "Up":
-            current_menu.move_up()
+            runner.handle_up()
         elif action == "Down":
-            current_menu.move_down()
+            runner.handle_down()
         elif action == "Select":
-            result = current_menu.select()
-            if result:
-                current_menu = result
+            runner.handle_select()
         elif action == "Back":
-            if current_menu.parent:
-                current_menu = current_menu.parent
+            runner.handle_back()
 
-        display.clear()
-        display.draw_text(2, 0, current_menu.title)
-        y = 12
-        visible = current_menu.items[
-            current_menu.scroll_offset : current_menu.scroll_offset + current_menu.visible_rows
-        ]
-        for i, item in enumerate(visible):
-            actual_idx = i + current_menu.scroll_offset
-            display.draw_text(2, y, item.label, selected=(actual_idx == current_menu.selected_index))
-            y += 11
-        display.update()
-        time.sleep(0.1)
+        runner.tick()
+        runner.render()
+        time.sleep(0.05)
 
 
 if __name__ == "__main__":
