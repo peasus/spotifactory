@@ -1,15 +1,21 @@
+from io import BytesIO
+
 from spotifactory.vendor.instax.instax_ble import InstaxBLE
 from spotifactory.vendor.instax import LedPatterns
 
 
-def print_image(image_path: str) -> None:
-    """Connect to the nearest Instax Square Link and print an image."""
+def print_image(image: str | BytesIO) -> None:
+    """Connect to the nearest Instax Square Link and print an image.
+
+    Args:
+        image: path to an image file, or a BytesIO containing image bytes.
+    """
     instax = InstaxBLE(print_enabled=True, quiet=False)
     try:
         instax.connect()
         instax.send_led_pattern(LedPatterns.rainbow, when=1)
         instax.send_led_pattern(LedPatterns.pulseGreen, when=2)
-        instax.print_image(image_path)
+        instax.print_image(image)
         instax.wait_one_minute()
     finally:
         instax.disconnect()
