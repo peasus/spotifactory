@@ -15,6 +15,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "pyserial>=3.5",
     "nfcpy>=1.0",
+    "simplepyble>=0.7.0",
 ]
 
 [tool.setuptools.packages.find]
