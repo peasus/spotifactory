@@ -299,7 +299,11 @@ class Runner:
         state = self.nav.current
         self.display.clear()
         self.display.draw_text(2, 0, state.menu.title)
-        y = 14
+        if state.menu.subtitle:
+            self.display.draw_text(2, 11, state.menu.subtitle)
+            y = 24
+        else:
+            y = 14
         for idx, item in state.visible_items:
             self.display.draw_text(
                 2, y, item.label, selected=(idx == state.selected_index)

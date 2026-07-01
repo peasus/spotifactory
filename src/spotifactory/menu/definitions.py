@@ -17,3 +17,4 @@ class MenuDef:
     title: str
     items: list[ItemDef] = field(default_factory=list)
     visible_rows: int = 5
+    subtitle: str | None = None

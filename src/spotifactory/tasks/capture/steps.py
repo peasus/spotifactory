@@ -15,12 +15,12 @@ from spotifactory.tasks.base import (
 )
 
 
-def _confirm_menu(album_name: str):
+def _confirm_menu(album_name: str, artist_name: str):
     from spotifactory.menu.definitions import ItemDef, MenuDef
     return MenuDef(album_name, [
         ItemDef("Yes", action="confirm"),
         ItemDef("No",  action="cancel"),
-    ], visible_rows=2)
+    ], visible_rows=2, subtitle=artist_name)
 
 
 def _printer_off_menu():
@@ -47,7 +47,7 @@ class ConfirmStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         info = ctx.data["info"]
         return PushMenu(
-            menu=_confirm_menu(info.album_name),
+            menu=_confirm_menu(info.album_name, info.artist_name),
             on_confirm=Continue(),
             on_cancel=Cancel(),
         )
