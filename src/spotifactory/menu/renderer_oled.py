@@ -53,6 +53,9 @@ class DisplayOLED:
     def draw_line(self, x1: int, y1: int, x2: int, y2: int) -> None:
         self.draw.line([(x1, y1), (x2, y2)], fill=255)
 
+    def draw_circle(self, cx: int, cy: int, r: int) -> None:
+        self.draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=255)
+
     def update(self):
         self.display.image(self.image)
         self.display.show()

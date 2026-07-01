@@ -247,6 +247,7 @@ class Runner:
         step = self._task.current_step
         song = step.status
         artist = getattr(step, "artist", "")
+        shuffle = getattr(step, "shuffle_active", False)
 
         self.display.clear()
         self.display.draw_text(2, 0, song)
@@ -254,16 +255,16 @@ class Runner:
             self.display.draw_text(2, 14, artist)
 
         # Bottom legend:  <<  [shuffle]  >>
-        self.display.draw_text(2, 54, "<<")
-        self._draw_shuffle_icon(64, 58)
-        self.display.draw_text(114, 54, ">>")
+        # cy=52 keeps the icon and its dot (at cy+hh+5=61) within the 64px display.
+        self.display.draw_text(2, 50, "<<")
+        self._draw_shuffle_icon(64, 52, active=shuffle)
+        self.display.draw_text(114, 50, ">>")
         self.display.update()
 
-    def _draw_shuffle_icon(self, cx: int, cy: int) -> None:
-        """Spotify-style shuffle icon: two horizontal arrows that cross.
+    def _draw_shuffle_icon(self, cx: int, cy: int, active: bool = False) -> None:
+        """Spotify-style shuffle icon: two crossing arrows with an active dot.
 
-        Each arrow enters from the left stub, passes through the X crossing,
-        then exits on the right stub with an arrowhead.
+        A small filled dot is drawn below the icon when shuffle is on.
         """
         hw, hh = 8, 4   # half-width / half-height of the X cross
 
@@ -284,6 +285,10 @@ class Runner:
         self.display.draw_line(cx + hw + 2, cy - hh + 2, cx + hw + 4, cy - hh)
         self.display.draw_line(cx + hw + 2, cy + hh - 2, cx + hw + 4, cy + hh)
         self.display.draw_line(cx + hw + 2, cy + hh + 2, cx + hw + 4, cy + hh)
+
+        # Active indicator: filled dot centred below the icon
+        if active:
+            self.display.draw_circle(cx, cy + hh + 5, 2)
 
     def _render_status(self, text: str) -> None:
         self.display.clear()
