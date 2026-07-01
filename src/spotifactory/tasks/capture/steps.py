@@ -17,7 +17,7 @@ from spotifactory.tasks.base import (
 
 def _confirm_menu(album_name: str):
     from spotifactory.menu.definitions import ItemDef, MenuDef
-    return MenuDef(album_name[:18], [
+    return MenuDef(album_name, [
         ItemDef("Yes", action="confirm"),
         ItemDef("No",  action="cancel"),
     ], visible_rows=2)
