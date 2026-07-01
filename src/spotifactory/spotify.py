@@ -22,6 +22,7 @@ class NowPlayingInfo:
     album_name: str
     album_uri: str
     artwork_url: str
+    shuffle_active: bool = False
 
 
 def get_client() -> spotipy.Spotify:
@@ -51,7 +52,7 @@ def toggle_shuffle() -> None:
 
 def get_now_playing() -> NowPlayingInfo | None:
     sp = get_client()
-    playback = sp.currently_playing()
+    playback = sp.current_playback()
     if not playback or not playback.get("is_playing") or playback.get("item") is None:
         return None
     item = playback["item"]
@@ -62,4 +63,5 @@ def get_now_playing() -> NowPlayingInfo | None:
         album_name=album["name"],
         album_uri=album["uri"],
         artwork_url=album["images"][0]["url"],
+        shuffle_active=bool(playback.get("shuffle_state", False)),
     )

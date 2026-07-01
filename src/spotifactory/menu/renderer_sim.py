@@ -68,6 +68,13 @@ class DisplaySim:
             fill="white",
         )
 
+    def draw_circle(self, cx: int, cy: int, r: int) -> None:
+        self.canvas.create_oval(
+            (cx - r) * self.scale, (cy - r) * self.scale,
+            (cx + r) * self.scale, (cy + r) * self.scale,
+            fill="white", outline="",
+        )
+
     def update(self):
         self.root.update_idletasks()
         self.root.update()

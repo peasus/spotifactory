@@ -34,6 +34,7 @@ class HomeScanStep(Step):
         self._cancel = threading.Event()
         self._sim_tag: str | None = None
         self.artist: str = ""
+        self.shuffle_active: bool = False
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -47,6 +48,7 @@ class HomeScanStep(Step):
         self._sim_tag = None
         self.status = "Place tag..."
         self.artist = ""
+        self.shuffle_active = False
         last_poll = 0.0
 
         def on_poll() -> None:
@@ -61,9 +63,11 @@ class HomeScanStep(Step):
                 if info:
                     self.status = info.track_name
                     self.artist = info.artist_name
+                    self.shuffle_active = info.shuffle_active
                 else:
                     self.status = "Place tag..."
                     self.artist = ""
+                    self.shuffle_active = False
             except Exception:
                 pass
 
