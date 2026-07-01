@@ -1,5 +1,8 @@
 import argparse
 
+from dotenv import load_dotenv
+load_dotenv()
+
 
 def _is_raspberry_pi() -> bool:
     try:

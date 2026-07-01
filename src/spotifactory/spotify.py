@@ -34,6 +34,21 @@ def get_client() -> spotipy.Spotify:
     return spotipy.Spotify(auth_manager=auth)
 
 
+def prev_track() -> None:
+    get_client().previous_track()
+
+
+def next_track() -> None:
+    get_client().next_track()
+
+
+def toggle_shuffle() -> None:
+    sp = get_client()
+    state = sp.current_playback()
+    if state:
+        sp.shuffle(not state["shuffle_state"])
+
+
 def get_now_playing() -> NowPlayingInfo | None:
     sp = get_client()
     playback = sp.currently_playing()

@@ -1,11 +1,12 @@
 from spotifactory.menu.catalog import MENUS
 from spotifactory.menu.renderer_sim import DisplaySim
 from spotifactory.runner import Runner
+from spotifactory.tasks.home import HomeTask
 
 
 def main() -> None:
     display = DisplaySim()
-    runner = Runner(display, MENUS)
+    runner = Runner(display, MENUS, dry_run=False, printer_dry_run=True, home_task_class=HomeTask)
 
     def on_key(event):
         key = event.keysym
@@ -13,10 +14,16 @@ def main() -> None:
             runner.handle_up()
         elif key == "Down":
             runner.handle_down()
+        elif key == "Left":
+            runner.handle_left()
+        elif key == "Right":
+            runner.handle_right()
         elif key == "Return":
             runner.handle_select()
         elif key in ("BackSpace", "Escape"):
             runner.handle_back()
+        elif key in ("t", "T"):
+            runner.handle_tag_scan_sim()
         runner.render()
 
     def poll():

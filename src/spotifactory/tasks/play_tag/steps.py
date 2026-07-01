@@ -5,11 +5,23 @@ import spotipy
 from spotifactory.tasks.base import Continue, Done, Step, StepOutcome, TaskContext
 
 
+_SIM_URI = "spotify:album:5Z9iiGl2FcIfa3BMiv6OIw"
+
+
 class ScanStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.rfid import read_card
         self.status = "Place tag..."
-        card = read_card()
+        if ctx.dry_run:
+            import time
+            time.sleep(1.0)
+            ctx.data["uri"] = _SIM_URI
+            return Continue()
+        try:
+            from spotifactory.rfid import read_card
+            card = read_card()
+        except Exception as exc:
+            self.show_for(f"RFID error: {type(exc).__name__}", 3.0)
+            return Done()
         if not card or "uri" not in card:
             self.show_for("No URI on tag", 3.0)
             return Done()

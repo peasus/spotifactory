@@ -1,19 +1,11 @@
 from spotifactory.menu.definitions import ItemDef, MenuDef
 from spotifactory.tasks.capture import CaptureTask
-from spotifactory.tasks.play_tag import PlayTagTask
 
 MENUS: dict[str, MenuDef] = {
     "main": MenuDef("Main Menu", [
         ItemDef("Print Now Playing", task=CaptureTask),
-        ItemDef("Play Tag",          task=PlayTagTask),
-        ItemDef("Status"),
-        ItemDef("Settings",  submenu="settings"),
-        ItemDef("Reboot",    action="reboot"),
-        ItemDef("Shutdown",  action="shutdown"),
-    ]),
-    "settings": MenuDef("Settings", [
-        ItemDef("WiFi"),
-        ItemDef("Brightness"),
-        ItemDef("Back", action="back"),
+        ItemDef("Scan Tag",          action="home"),
+        ItemDef("Reboot",            action="reboot"),
+        ItemDef("Shutdown",          action="shutdown"),
     ]),
 }
