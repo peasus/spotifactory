@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
     from spotifactory.menu.definitions import MenuDef
@@ -36,7 +36,7 @@ class Cancel:
     pass
 
 
-StepOutcome = Continue | PushMenu | Done | Cancel
+StepOutcome = Union[Continue, PushMenu, Done, Cancel]
 
 
 # ---------------------------------------------------------------------------
