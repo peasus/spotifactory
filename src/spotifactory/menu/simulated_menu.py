@@ -4,7 +4,7 @@ from spotifactory.runner import Runner
 
 
 def main() -> None:
-    display = DisplaySim(scale=6)
+    display = DisplaySim()
     runner = Runner(display, MENUS)
 
     def on_key(event):
