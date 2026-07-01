@@ -70,8 +70,12 @@ class FetchArtStep(Step):
 class PrintStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotifactory.printer import print_image
-        self.status = "Printing..."
-        result = print_image(ctx.data["image"], dry_run=ctx.dry_run)
+        self.status = "Connecting..."
+        result = print_image(
+            ctx.data["image"],
+            dry_run=ctx.printer_dry_run,
+            on_progress=lambda msg: setattr(self, "status", msg),
+        )
         ctx.data["print_result"] = result
 
         if not result.printer_found:
@@ -81,7 +85,8 @@ class PrintStep(Step):
                 on_cancel=Cancel(),
             )
         if not result.success and not ctx.dry_run:
-            self.show_for("Print failed", 3.0)
+            msg = result.error or "Print failed"
+            self.show_for(msg, 3.0)
             return Done()
         return Continue()
 

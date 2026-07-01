@@ -28,9 +28,9 @@ class ButtonInput:
         if not self.btn_down.value:
             return "Down"
         if not self.btn_left.value:
-            return "Back"
+            return "Left"
         if not self.btn_right.value:
-            return None
+            return "Right"
         if not self.btn_select.value:
             return "Select"
         return None

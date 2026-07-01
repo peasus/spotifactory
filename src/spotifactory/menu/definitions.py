@@ -9,7 +9,7 @@ class ItemDef:
     label: str
     task: Any = None          # Task subclass to instantiate and run
     submenu: str | None = None  # key in the menus catalog
-    action: str | None = None   # "back", "reboot", "shutdown", "confirm", "cancel"
+    action: str | None = None   # "back", "home", "reboot", "shutdown", "confirm", "cancel"
 
 
 @dataclass

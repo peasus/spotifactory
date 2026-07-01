@@ -47,6 +47,7 @@ StepOutcome = Union[Continue, PushMenu, Done, Cancel]
 class TaskContext:
     display: Any = None
     dry_run: bool = True
+    printer_dry_run: bool = False
     data: dict = field(default_factory=dict)
 
 
@@ -84,7 +85,16 @@ class Step(ABC):
         self._thread.start()
 
     def _execute(self, ctx: TaskContext) -> None:
-        self._outcome = self.run(ctx)
+        import traceback
+        print(f"[step] START {type(self).__name__}", flush=True)
+        try:
+            self._outcome = self.run(ctx)
+            print(f"[step] DONE  {type(self).__name__} → {type(self._outcome).__name__}", flush=True)
+        except Exception as exc:
+            print(f"[step] CRASH {type(self).__name__}: {exc}", flush=True)
+            traceback.print_exc()
+            self._status = f"Error: {type(exc).__name__}"
+            self._outcome = Done()
 
     @property
     def is_done(self) -> bool:
