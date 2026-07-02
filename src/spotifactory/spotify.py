@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from dotenv import load_dotenv
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth, SpotifyOAuthError
+from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 
 load_dotenv()
 
@@ -52,7 +52,7 @@ def _with_auth_retry(fn):
     def wrapper(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except SpotifyOAuthError:
+        except SpotifyOauthError:
             _invalidate_client()
             return fn(*args, **kwargs)
     return wrapper
