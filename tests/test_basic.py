@@ -90,26 +90,32 @@ def test_play_tag_scan_step_dry_run():
 
 
 def test_home_scan_step_simulate_scan():
-    """HomeScanStep advances with Continue when simulate_scan() is called.
+    """HomeScanStep processes a simulated tag and keeps running.
 
-    HomeScanStep always tries real hardware first; in CI/Mac without a reader
-    it falls back to a soft-wait loop.  simulate_scan() unblocks either path.
+    The step is now a continuous poll loop — it never completes on its own.
+    After simulate_scan() the step should still be alive (not done) and the
+    sim tag should have been cleared (processed). Cancelling exits cleanly.
     """
-    from spotifactory.tasks.base import Continue, TaskContext
+    from spotifactory.tasks.base import Cancel, TaskContext
     from spotifactory.tasks.home.steps import HomeScanStep
 
     sim_uri = "spotify:album:test_simulate"
-    ctx = TaskContext(dry_run=False, data={})
+    ctx = TaskContext(dry_run=True, data={})
     step = HomeScanStep()
     step.start(ctx)
 
-    time.sleep(0.2)  # let the step reach the wait loop (after hardware attempt)
+    time.sleep(0.3)  # let the step reach the soft-wait loop
     assert not step.is_done
 
     step.simulate_scan(sim_uri)
-    assert _wait_for_done(step, timeout=3.0), "HomeScanStep timed out after simulate_scan"
-    assert isinstance(step.outcome, Continue)
-    assert ctx.data.get("uri") == sim_uri
+    time.sleep(0.3)  # let the loop consume the tag
+
+    assert not step.is_done, "step should still be running after tag scan"
+    assert step._sim_tag is None, "sim tag should have been consumed"
+
+    step.cancel()
+    assert _wait_for_done(step, timeout=3.0), "HomeScanStep timed out on cancel"
+    assert isinstance(step.outcome, Cancel)
 
 
 def test_home_scan_step_cancel():

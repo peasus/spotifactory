@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-import threading
 from typing import Callable
 
 import ndef
@@ -49,60 +48,62 @@ def _default_port() -> str:
 PORT = os.environ.get("NFC_PORT") or _default_port()
 
 
+def _parse_tag(tag) -> dict:
+    entry = {"uid": tag.identifier.hex().upper()}
+    if tag.ndef and tag.ndef.records:
+        for record in tag.ndef.records:
+            if isinstance(record, ndef.UriRecord):
+                entry["uri"] = record.uri
+                break
+    return entry
+
+
+def watch_tags(
+    on_place: "Callable[[dict], None]",
+    on_remove: "Callable[[dict], None] | None" = None,
+    terminate: "Callable[[], bool] | None" = None,
+    port: str = PORT,
+) -> None:
+    """Block until terminate() returns True, firing on_place/on_remove as tags enter/leave.
+
+    Uses nfcpy supervision mode (on-connect returns True) so the PN532 handles
+    presence detection natively — no application-level polling needed.
+
+    on_place(card) — tag entered the field; card has 'uid' and optionally 'uri'
+    on_remove(card) — same card dict, tag has left the field
+    terminate() — called periodically; return True to stop
+    """
+    _current: list[dict] = []
+
+    def on_connect(tag) -> bool:
+        card = _parse_tag(tag)
+        _current.clear()
+        _current.append(card)
+        on_place(card)
+        return True  # enter supervision mode: nfcpy monitors presence until tag leaves
+
+    def on_release(tag) -> None:
+        if on_remove and _current:
+            on_remove(_current[0])
+        _current.clear()
+
+    with nfc.ContactlessFrontend(port) as clf:
+        clf.connect(
+            rdwr={"on-connect": on_connect, "on-release": on_release},
+            terminate=terminate,
+        )
+
+
 def read_card(port: str = PORT) -> dict | None:
     """Block until a card is scanned. Returns dict with uid and uri (if written)."""
     result = []
 
     def on_connect(tag):
-        entry = {"uid": tag.identifier.hex().upper()}
-        if tag.ndef and tag.ndef.records:
-            for record in tag.ndef.records:
-                if isinstance(record, ndef.UriRecord):
-                    entry["uri"] = record.uri
-                    break
-        result.append(entry)
+        result.append(_parse_tag(tag))
         return False
 
     with nfc.ContactlessFrontend(port) as clf:
         clf.connect(rdwr={"on-connect": on_connect})
-
-    return result[0] if result else None
-
-
-def read_card_cancellable(
-    cancel_event: "threading.Event",
-    on_poll: "Callable[[], None] | None" = None,
-    also_stop: "Callable[[], bool] | None" = None,
-    port: str = PORT,
-) -> dict | None:
-    """Block until a card is scanned, cancel_event is set, or also_stop() returns True.
-
-    on_poll is called on each terminate-check interval so the caller can update
-    status text (e.g. with current song info).  also_stop lets callers inject a
-    second termination condition (e.g. a simulated tag scan).
-    """
-    result = []
-
-    def on_connect(tag):
-        entry = {"uid": tag.identifier.hex().upper()}
-        if tag.ndef and tag.ndef.records:
-            for record in tag.ndef.records:
-                if isinstance(record, ndef.UriRecord):
-                    entry["uri"] = record.uri
-                    break
-        result.append(entry)
-        return False
-
-    def terminate():
-        if on_poll:
-            try:
-                on_poll()
-            except Exception:
-                pass
-        return cancel_event.is_set() or (also_stop is not None and also_stop())
-
-    with nfc.ContactlessFrontend(port) as clf:
-        clf.connect(rdwr={"on-connect": on_connect}, terminate=terminate)
 
     return result[0] if result else None
 
