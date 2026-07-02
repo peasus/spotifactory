@@ -75,6 +75,8 @@ class Runner:
     def handle_right(self) -> None:
         if self._in_home_mode():
             self._next_track()
+        else:
+            self.handle_select()
 
     def handle_select(self) -> None:
         item = self.nav.current.selected_item

@@ -79,19 +79,27 @@ class HomeScanStep(Step):
             if not uri:
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
+            _active_uri = uri  # set regardless so on_remove can pause if needed
             if ctx.dry_run:
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
-            else:
-                try:
-                    from spotifactory.spotify import get_client
-                    get_client().start_playback(context_uri=uri)
-                except Exception as e:
-                    print(f"[home] start_playback error: {e}", flush=True)
-            _active_uri = uri
+                return
+            try:
+                from spotifactory.spotify import get_now_playing, get_client
+                info = get_now_playing()
+                if info and info.album_uri == uri:
+                    print(f"[home] already playing {uri}, skipping start_playback", flush=True)
+                    return
+                get_client().start_playback(context_uri=uri)
+            except Exception as e:
+                print(f"[home] start_playback error: {e}", flush=True)
 
         def on_remove(card: dict) -> None:
             nonlocal _active_uri
             if not _active_uri:
+                return
+            if self._cancel.is_set():
+                # user navigated away — nfcpy fires on_release as it exits, ignore it
+                _active_uri = None
                 return
             print(f"[home] tag removed {card['uid']}", flush=True)
             if not ctx.dry_run:
