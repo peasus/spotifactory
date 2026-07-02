@@ -77,6 +77,17 @@ def toggle_shuffle() -> None:
 
 
 @_with_auth_retry
+def get_devices() -> list[dict]:
+    result = get_client().devices()
+    return result.get("devices", [])
+
+
+@_with_auth_retry
+def transfer_playback(device_id: str) -> None:
+    get_client().transfer_playback(device_id, force_play=False)
+
+
+@_with_auth_retry
 def get_now_playing() -> NowPlayingInfo | None:
     sp = get_client()
     playback = sp.current_playback()

@@ -81,6 +81,8 @@ class Runner:
 
         if self._pushed_menu is not None:
             if item.action == "confirm":
+                if item.data is not None and self._task is not None:
+                    self._task.ctx.data["selected"] = item.data
                 self._resolve(self._pushed_menu.on_confirm)
             elif item.action == "cancel":
                 self._resolve(self._pushed_menu.on_cancel)
