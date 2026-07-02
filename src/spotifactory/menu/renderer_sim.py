@@ -61,11 +61,11 @@ class DisplaySim:
             if scroll_px > 0:
                 self.canvas.create_rectangle(0, sy, sx, sy + row_h, fill="black", outline="")
 
-    def draw_line(self, x1: int, y1: int, x2: int, y2: int) -> None:
+    def draw_line(self, x1: int, y1: int, x2: int, y2: int, width: float = 1) -> None:
         self.canvas.create_line(
             x1 * self.scale, y1 * self.scale,
             x2 * self.scale, y2 * self.scale,
-            fill="white",
+            fill="white", width=width * self.scale,
         )
 
     def draw_circle(self, cx: int, cy: int, r: int) -> None:

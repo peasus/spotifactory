@@ -273,22 +273,22 @@ class Runner:
         hw, hh = 8, 4   # half-width / half-height of the X cross
 
         # Incoming horizontal stubs (left side)
-        self.display.draw_line(cx - hw - 4, cy - hh, cx - hw, cy - hh)
-        self.display.draw_line(cx - hw - 4, cy + hh, cx - hw, cy + hh)
+        self.display.draw_line(cx - hw - 4, cy - hh, cx - hw, cy - hh, width=1.05)
+        self.display.draw_line(cx - hw - 4, cy + hh, cx - hw, cy + hh, width=1.05)
 
         # Crossing diagonals
-        self.display.draw_line(cx - hw, cy - hh, cx + hw, cy + hh)
-        self.display.draw_line(cx - hw, cy + hh, cx + hw, cy - hh)
+        self.display.draw_line(cx - hw, cy - hh, cx + hw, cy + hh, width=1.05)
+        self.display.draw_line(cx - hw, cy + hh, cx + hw, cy - hh, width=1.05)
 
         # Outgoing horizontal stubs (right side)
-        self.display.draw_line(cx + hw, cy - hh, cx + hw + 4, cy - hh)
-        self.display.draw_line(cx + hw, cy + hh, cx + hw + 4, cy + hh)
+        self.display.draw_line(cx + hw, cy - hh, cx + hw + 4, cy - hh, width=1.05)
+        self.display.draw_line(cx + hw, cy + hh, cx + hw + 4, cy + hh, width=1.05)
 
         # Arrowheads at right exits (> shape on each)
-        self.display.draw_line(cx + hw + 2, cy - hh - 2, cx + hw + 4, cy - hh)
-        self.display.draw_line(cx + hw + 2, cy - hh + 2, cx + hw + 4, cy - hh)
-        self.display.draw_line(cx + hw + 2, cy + hh - 2, cx + hw + 4, cy + hh)
-        self.display.draw_line(cx + hw + 2, cy + hh + 2, cx + hw + 4, cy + hh)
+        self.display.draw_line(cx + hw + 2, cy - hh - 2, cx + hw + 4, cy - hh, width=1.05)
+        self.display.draw_line(cx + hw + 2, cy - hh + 2, cx + hw + 4, cy - hh, width=1.05)
+        self.display.draw_line(cx + hw + 2, cy + hh - 2, cx + hw + 4, cy + hh, width=1.05)
+        self.display.draw_line(cx + hw + 2, cy + hh + 2, cx + hw + 4, cy + hh, width=1.05)
 
         # Active indicator: filled dot centred below the icon
         if active:
