@@ -1,0 +1,15 @@
+[Unit]
+Description=Spotifactory
+After=network.target bluetooth.target
+
+[Service]
+Type=simple
+User=spotifactory
+WorkingDirectory=/home/spotifactory/spotifactory
+ExecStart=/home/spotifactory/spotifactory/.venv/bin/python -m spotifactory.startup
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
