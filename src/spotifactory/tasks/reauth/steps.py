@@ -21,7 +21,7 @@ def _make_qr(url: str):
 class QRAuthStep(Step):
     """Shows a scannable QR code + shortened URL for the PKCE relay auth flow.
 
-    The runner renders this step's qr_image + short_url as a full-screen QR
+    The runner renders this step's qr_image + session_url as a full-screen QR
     display. Pressing Up cancels and returns to the main menu.
     """
 
@@ -62,7 +62,7 @@ class QRAuthStep(Step):
         self.session_url = session_url
         self.qr_image = _make_qr(session_url)
 
-        print(f"[reauth] visit {self.short_url}", flush=True)
+        print(f"[reauth] visit {self.session_url}", flush=True)
 
         code = _poll_for_code(
             relay_url,
