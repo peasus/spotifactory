@@ -62,4 +62,6 @@ dev = [
     "black>=23.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "Pillow>=9.0",
+    "qrcode[pil]>=7.4",
 ]
