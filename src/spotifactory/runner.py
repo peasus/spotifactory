@@ -281,7 +281,7 @@ class Runner:
             col = 21
             for i, chunk in enumerate([url[j:j + col] for j in range(0, len(url), col)]):
                 self.display.draw_text(2, 14 + i * 12, chunk)
-            self.display.draw_text(2, 52, "< Cancel  v Toggle")
+            self.display.draw_text(2, 52, "< Cancel  > QR Code")
         else:
             # QR view — QR on left, labels on right
             qr = step.qr_image
