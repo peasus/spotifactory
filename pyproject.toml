@@ -45,6 +45,7 @@ ignore_missing_imports = true  # needed for optional RPi/Adafruit deps
 [project.scripts]
 spotifactory = "spotifactory.main:main"
 spotifactory-pi = "spotifactory.startup:main"
+spotifactory-seengreat = "spotifactory.menu.run_on_seengreat:main"
 
 [project.optional-dependencies]
 gui = [
@@ -56,6 +57,8 @@ rpi = [
     "qrcode[pil]>=7.4",
     "Adafruit-Blinka>=8.0.0",
     "adafruit-circuitpython-ssd1306>=4.0.0",
+    "luma.oled>=3.8",
+    "RPi.GPIO>=0.7",
 ]
 dev = [
     "pytest>=7.0",
