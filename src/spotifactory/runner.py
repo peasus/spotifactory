@@ -284,9 +284,7 @@ class Runner:
             qr = step.qr_image
             self.display.draw_image(0, 3, qr)
             x = qr.width + 4
-            self.display.draw_text(x, 8, "Scan QR")
-            self.display.draw_text(x, 20, "code")
-            self.display.draw_text(x, 38, "v URL")
+            self.display.draw_text(x, 8, "Scan Code")
             self.display.draw_text(x, 50, "< Cancel")
 
         self.display.update()
