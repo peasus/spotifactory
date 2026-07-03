@@ -51,10 +51,13 @@ class HomeScanStep(Step):
         self.shuffle_active = False
 
         _active_uri: str | None = None
+        _device_error: bool = False
         last_poll = 0.0
 
         def on_poll() -> None:
             nonlocal last_poll
+            if _device_error:
+                return  # keep error visible until next successful scan
             now = time.monotonic()
             if now - last_poll < _POLL_INTERVAL_SECS:
                 return
@@ -74,7 +77,7 @@ class HomeScanStep(Step):
                 pass
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri
+            nonlocal _active_uri, _device_error
             uri = card.get("uri")
             if not uri:
                 return
@@ -90,8 +93,14 @@ class HomeScanStep(Step):
                     print(f"[home] already playing {uri}, skipping start_playback", flush=True)
                     return
                 get_client().start_playback(context_uri=uri)
+                _device_error = False
             except Exception as e:
-                print(f"[home] start_playback error: {e}", flush=True)
+                if getattr(e, "reason", None) == "NO_ACTIVE_DEVICE":
+                    _device_error = True
+                    self.status = "No active device"
+                    self.artist = "Go to Choose Speaker"
+                else:
+                    print(f"[home] start_playback error: {e}", flush=True)
 
         def on_remove(card: dict) -> None:
             nonlocal _active_uri
