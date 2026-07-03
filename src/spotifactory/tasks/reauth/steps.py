@@ -78,8 +78,9 @@ class QRAuthStep(Step):
         self.status = "Connecting..."
         auth.get_access_token(code, as_dict=False, check_cache=False)
 
-        from spotifactory.spotify import _invalidate_client
-        _invalidate_client()
+        import spotipy as _spotipy
+        from spotifactory.spotify import _set_client
+        _set_client(_spotipy.Spotify(auth_manager=auth))
 
         self.show_for("Spotify connected!", 2.0)
         return Done()

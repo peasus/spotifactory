@@ -61,6 +61,11 @@ def _invalidate_client() -> None:
     _client = None
 
 
+def _set_client(sp: spotipy.Spotify) -> None:
+    global _client
+    _client = sp
+
+
 def _with_auth_retry(fn):
     """Reset the cached client and retry once if the OAuth token is rejected."""
     @functools.wraps(fn)
