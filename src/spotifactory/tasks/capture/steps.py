@@ -69,6 +69,15 @@ class FetchArtStep(Step):
 
 class PrintStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
+        if ctx.printer_dry_run:
+            try:
+                from PIL import Image
+                buf = ctx.data["image"]
+                buf.seek(0)
+                Image.open(buf).show()
+            except Exception as e:
+                print(f"[print] artwork preview failed: {e}", flush=True)
+
         from spotifactory.printer import print_image
         self.status = "Connecting..."
         result = print_image(
