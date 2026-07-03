@@ -50,7 +50,7 @@ class Runner:
     # ------------------------------------------------------------------
 
     def handle_up(self) -> None:
-        if self._in_home_scan() or self._in_qr_auth():
+        if self._in_home_scan():
             self._task.current_step.cancel()
             return
         if self._accepting_nav_input:
@@ -67,6 +67,9 @@ class Runner:
             self.nav.current.move_down()
 
     def handle_left(self) -> None:
+        if self._in_qr_auth():
+            self._task.current_step.cancel()
+            return
         if self._in_home_mode():
             self._prev_track()
             return
@@ -269,19 +272,22 @@ class Runner:
         self.display.clear()
 
         if getattr(step, "_show_url", False):
-            # URL view — full URL split across lines, ↓ to go back
+            # URL text view — full URL split across lines
             url = step.session_url.replace("https://", "").replace("http://", "")
-            self.display.draw_text(2, 0, "URL (↑ Cancel):")
-            col = 21  # chars per line at 6px/char on 128px
+            self.display.draw_text(2, 0, "Visit:")
+            col = 21
             for i, chunk in enumerate([url[j:j + col] for j in range(0, len(url), col)]):
                 self.display.draw_text(2, 14 + i * 12, chunk)
+            self.display.draw_text(2, 52, "< Cancel  v Toggle")
         else:
-            # QR view — centred QR, minimal text, ↓ to show URL
+            # QR view — QR on left, labels on right
             qr = step.qr_image
-            qx = (128 - qr.width) // 2
-            self.display.draw_image(qx, 6, qr)
-            self.display.draw_text(2, 0, "Scan QR")
-            self.display.draw_text(88, 0, "^ Cancel")
+            self.display.draw_image(0, 3, qr)
+            x = qr.width + 4
+            self.display.draw_text(x, 8, "Scan QR")
+            self.display.draw_text(x, 20, "code")
+            self.display.draw_text(x, 38, "v URL")
+            self.display.draw_text(x, 50, "< Cancel")
 
         self.display.update()
 
