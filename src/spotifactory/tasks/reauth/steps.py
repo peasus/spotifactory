@@ -28,16 +28,20 @@ class QRAuthStep(Step):
     def __init__(self) -> None:
         super().__init__()
         self._cancel = threading.Event()
+        self._show_url: bool = False
         self.qr_image = None   # PIL Image — set once QR is ready, read by runner
-        self.short_url: str = ""
+        self.session_url: str = ""
 
     def cancel(self) -> None:
         self._cancel.set()
 
+    def toggle_url(self) -> None:
+        self._show_url = not self._show_url
+
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotipy.oauth2 import SpotifyPKCE
         from spotifactory.spotify import SCOPES
-        from spotifactory.auth_server import _poll_for_code, _post_register, _shorten_url
+        from spotifactory.auth_server import _poll_for_code, _post_register
 
         self.status = "Preparing..."
         relay_url = os.environ["RELAY_URL"].rstrip("/")
@@ -54,11 +58,9 @@ class QRAuthStep(Step):
 
         session_url = f"{relay_url}/{session_id}"
 
-        self.status = "Shortening URL..."
-        self.short_url = _shorten_url(session_url)
-
         self.status = "Scan QR to connect"
-        self.qr_image = _make_qr(self.short_url)
+        self.session_url = session_url
+        self.qr_image = _make_qr(session_url)
 
         print(f"[reauth] visit {self.short_url}", flush=True)
 
