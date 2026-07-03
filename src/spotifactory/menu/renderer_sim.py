@@ -24,9 +24,11 @@ class DisplaySim:
             bg="black",
         )
         self.canvas.pack()
+        self._photo_refs: list = []  # keep ImageTk references alive
 
     def clear(self):
         self.canvas.delete("all")
+        self._photo_refs.clear()
 
     def draw_text(self, x, y, text, selected=False):
         sx, sy = x * self.scale, y * self.scale
@@ -60,6 +62,16 @@ class DisplaySim:
             self.canvas.create_text(draw_sx, sy, anchor="nw", text=text, fill="white", font=self._font)
             if scroll_px > 0:
                 self.canvas.create_rectangle(0, sy, sx, sy + row_h, fill="black", outline="")
+
+    def draw_image(self, x: int, y: int, image) -> None:
+        from PIL import Image, ImageTk
+        scaled = image.convert("L").resize(
+            (image.width * self.scale, image.height * self.scale),
+            Image.NEAREST,
+        )
+        photo = ImageTk.PhotoImage(scaled)
+        self._photo_refs.append(photo)
+        self.canvas.create_image(x * self.scale, y * self.scale, anchor="nw", image=photo)
 
     def draw_line(self, x1: int, y1: int, x2: int, y2: int, width: float = 1) -> None:
         self.canvas.create_line(
