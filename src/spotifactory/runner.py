@@ -50,8 +50,7 @@ class Runner:
     # ------------------------------------------------------------------
 
     def handle_up(self) -> None:
-        if self._in_home_scan():
-            # Cancel the home scan and surface the main menu
+        if self._in_home_scan() or self._in_qr_auth():
             self._task.current_step.cancel()
             return
         if self._accepting_nav_input:
@@ -140,6 +139,10 @@ class Runner:
     # ------------------------------------------------------------------
 
     def render(self) -> None:
+        if self._in_qr_auth():
+            self._render_qr_auth()
+            return
+
         if self._in_home_scan():
             self._render_home()
             return
@@ -164,6 +167,17 @@ class Runner:
             self._home_task_class is not None
             and isinstance(self._task, self._home_task_class)
             and self._pushed_menu is None
+        )
+
+    def _in_qr_auth(self) -> bool:
+        """True while QRAuthStep is showing its QR code (qr_image is set)."""
+        from spotifactory.tasks.reauth.steps import QRAuthStep
+        return (
+            self._task is not None
+            and self._task.current_step is not None
+            and isinstance(self._task.current_step, QRAuthStep)
+            and not self._task.current_step.is_done
+            and getattr(self._task.current_step, "qr_image", None) is not None
         )
 
     def _in_home_scan(self) -> bool:
@@ -246,6 +260,26 @@ class Runner:
                 self.nav.pop()
                 self._pushed_menu = None
             self._return_home()
+
+    def _render_qr_auth(self) -> None:
+        step = self._task.current_step
+        qr = step.qr_image
+        url = step.short_url
+
+        # Strip protocol: "tinyurl.com/xxxxxxx"
+        short = url.replace("https://", "").replace("http://", "")
+        slash = short.rfind("/")
+        line1 = short[:slash + 1] if slash >= 0 else short   # "tinyurl.com/"
+        line2 = short[slash + 1:] if slash >= 0 else ""       # "xxxxxxx"
+
+        x = qr.width + 4  # 4px gap between QR and text
+
+        self.display.clear()
+        self.display.draw_image(0, 7, qr)  # vertically centred in 64px
+        self.display.draw_text(x, 4, line1)
+        self.display.draw_text(x, 16, line2)
+        self.display.draw_text(x, 50, "^ Cancel")
+        self.display.update()
 
     def _render_home(self) -> None:
         step = self._task.current_step

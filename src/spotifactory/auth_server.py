@@ -16,9 +16,10 @@ from __future__ import annotations
 import json
 import os
 import time
-import uuid
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
 from typing import Callable, Optional
 
 POLL_INTERVAL = 1.5   # seconds between relay polls
@@ -80,9 +81,13 @@ def _poll_for_code(
     relay_url: str,
     session_id: str,
     timeout: float = POLL_TIMEOUT,
+    terminate: Optional[Callable[[], bool]] = None,
 ) -> Optional[str]:
+    """Poll the relay until the auth code arrives, timeout expires, or terminate() is True."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if terminate is not None and terminate():
+            return None
         try:
             resp = urllib.request.urlopen(
                 f"{relay_url}/poll/{session_id}", timeout=5
@@ -95,3 +100,16 @@ def _poll_for_code(
             else:
                 raise
     return None
+
+
+def _shorten_url(url: str) -> str:
+    """Shorten a URL via TinyURL. Falls back to the original on any error."""
+    try:
+        api = "https://tinyurl.com/api-create.php?url=" + urllib.parse.quote(url, safe="")
+        resp = urllib.request.urlopen(api, timeout=10)
+        short = resp.read().decode().strip()
+        if short.startswith("http"):
+            return short
+    except Exception as e:
+        print(f"[auth] URL shortening failed: {e}", flush=True)
+    return url

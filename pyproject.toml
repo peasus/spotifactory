@@ -49,9 +49,11 @@ spotifactory-pi = "spotifactory.startup:main"
 [project.optional-dependencies]
 gui = [
     "Pillow>=9.0",
+    "qrcode[pil]>=7.4",
 ]
 rpi = [
     "Pillow>=9.0",
+    "qrcode[pil]>=7.4",
     "Adafruit-Blinka>=8.0.0",
     "adafruit-circuitpython-ssd1306>=4.0.0",
 ]

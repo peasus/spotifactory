@@ -50,6 +50,9 @@ class DisplayOLED:
         except AttributeError:
             return self.font.getsize(text)[0]  # Pillow < 9.2
 
+    def draw_image(self, x: int, y: int, image) -> None:
+        self.image.paste(image.convert("1"), (x, y))
+
     def draw_line(self, x1: int, y1: int, x2: int, y2: int, width: float = 1) -> None:
         self.draw.line([(x1, y1), (x2, y2)], fill=255, width=round(width))
 
