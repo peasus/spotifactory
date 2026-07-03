@@ -1,23 +1,12 @@
 """Tests for startup.py and auth_server.py."""
 from __future__ import annotations
 
-import threading
+import json
 import urllib.error
 import urllib.request
-from http.server import HTTPServer
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """urllib opener that treats redirects as errors so we can inspect them."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
 
 
 # ---------------------------------------------------------------------------
@@ -62,41 +51,13 @@ class TestStartupMain:
     All hardware and external calls are mocked so these run on Mac.
     """
 
-    def _run_main(self, *, network=True, token=True, extra_patches=None):
-        """Run startup.main() with the given network/token state."""
-        display = MagicMock()
-        patches = [
-            patch("spotifactory.startup._has_network", return_value=network),
-            patch("spotifactory.startup._has_valid_token", return_value=token),
-            patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display),
-            patch("spotifactory.menu.run_on_pi.main"),
-            patch("spotifactory.auth_server.run_auth_server"),
-            patch("subprocess.run"),
-            patch("dotenv.load_dotenv"),
-        ]
-        if extra_patches:
-            patches.extend(extra_patches)
-
-        mocks = {}
-        ctx = {}
-        for p in patches:
-            m = p.start()
-            ctx[p] = m
-        try:
-            from spotifactory import startup
-            startup.main()
-        finally:
-            for p in patches:
-                p.stop()
-        return ctx
-
     def test_runs_pi_when_network_and_token_present(self):
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=True), \
              patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
              patch("spotifactory.menu.run_on_pi.main") as mock_run_pi, \
-             patch("spotifactory.auth_server.run_auth_server") as mock_auth, \
+             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):
             from spotifactory import startup
@@ -111,7 +72,7 @@ class TestStartupMain:
              patch("spotifactory.startup._has_valid_token", return_value=True), \
              patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
              patch("spotifactory.menu.run_on_pi.main"), \
-             patch("spotifactory.auth_server.run_auth_server"), \
+             patch("spotifactory.auth_server.run_pkce_auth"), \
              patch("subprocess.run") as mock_sub, \
              patch("dotenv.load_dotenv"):
             from spotifactory import startup
@@ -130,26 +91,26 @@ class TestStartupMain:
             from spotifactory import startup
             startup.main()
 
-    def test_launches_auth_server_when_no_token(self):
+    def test_launches_pkce_auth_when_no_token(self):
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=False), \
              patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
              patch("spotifactory.menu.run_on_pi.main"), \
-             patch("spotifactory.auth_server.run_auth_server") as mock_auth, \
+             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):
             from spotifactory import startup
             startup.main()
         mock_auth.assert_called_once()
 
-    def test_skips_auth_server_when_token_present(self):
+    def test_skips_auth_when_token_present(self):
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=True), \
              patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
              patch("spotifactory.menu.run_on_pi.main"), \
-             patch("spotifactory.auth_server.run_auth_server") as mock_auth, \
+             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):
             from spotifactory import startup
@@ -158,84 +119,83 @@ class TestStartupMain:
 
 
 # ---------------------------------------------------------------------------
-# auth_server._Handler
+# auth_server — PKCE relay flow
 # ---------------------------------------------------------------------------
 
-class TestAuthServer:
-    """Test the HTTP handler directly by spinning up a server on a random port."""
+class TestPkceAuth:
+    """Tests for auth_server.run_pkce_auth and its helpers."""
 
-    def _start(self):
+    _ENV = {"RELAY_URL": "https://relay.test", "SPOTIPY_CLIENT_ID": "cid"}
+
+    def _make_mock_pkce(self):
+        m = MagicMock()
+        m.get_authorize_url.return_value = "https://accounts.spotify.com/authorize?x=1"
+        return m
+
+    def test_happy_path_returns_true(self):
         import spotifactory.auth_server as mod
-        server = HTTPServer(("127.0.0.1", 0), mod._Handler)
-        port = server.server_address[1]
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        return server, port, thread
+        mock_pkce = self._make_mock_pkce()
+        with patch.dict("os.environ", self._ENV), \
+             patch("spotipy.oauth2.SpotifyPKCE", return_value=mock_pkce), \
+             patch.object(mod, "_post_register"), \
+             patch.object(mod, "_poll_for_code", return_value="mycode"):
+            result = mod.run_pkce_auth()
+        assert result is True
+        mock_pkce.get_access_token.assert_called_once_with(
+            "mycode", as_dict=False, check_cache=False
+        )
 
-    def test_root_redirects_to_spotify(self):
+    def test_on_session_ready_receives_session_url(self):
         import spotifactory.auth_server as mod
-        mock_oauth = MagicMock()
-        mock_oauth.get_authorize_url.return_value = "https://accounts.spotify.com/authorize?test=1"
+        mock_pkce = self._make_mock_pkce()
+        received: list[str] = []
+        with patch.dict("os.environ", self._ENV), \
+             patch("spotipy.oauth2.SpotifyPKCE", return_value=mock_pkce), \
+             patch.object(mod, "_post_register"), \
+             patch.object(mod, "_poll_for_code", return_value="code"):
+            mod.run_pkce_auth(on_session_ready=received.append)
+        assert len(received) == 1
+        assert received[0].startswith("https://relay.test/")
+        assert len(received[0]) == len("https://relay.test/") + 8  # 8-char hex session id
 
-        server, port, _ = self._start()
-        try:
-            with patch.object(mod, "_make_oauth", return_value=mock_oauth):
-                opener = urllib.request.build_opener(_NoRedirectHandler)
-                try:
-                    opener.open(f"http://127.0.0.1:{port}/")
-                    pytest.fail("expected redirect")
-                except urllib.error.HTTPError as e:
-                    assert e.code == 302
-                    assert "accounts.spotify.com" in e.headers["Location"]
-        finally:
-            server.shutdown()
-
-    def test_callback_with_code_returns_success_page(self):
+    def test_returns_false_when_poll_times_out(self):
         import spotifactory.auth_server as mod
-        mock_oauth = MagicMock()
-        mock_oauth.get_access_token.return_value = "tok"
+        mock_pkce = self._make_mock_pkce()
+        with patch.dict("os.environ", self._ENV), \
+             patch("spotipy.oauth2.SpotifyPKCE", return_value=mock_pkce), \
+             patch.object(mod, "_post_register"), \
+             patch.object(mod, "_poll_for_code", return_value=None):
+            result = mod.run_pkce_auth()
+        assert result is False
+        mock_pkce.get_access_token.assert_not_called()
 
-        server, port, thread = self._start()
-        with patch.object(mod, "_make_oauth", return_value=mock_oauth):
-            resp = urllib.request.urlopen(
-                f"http://127.0.0.1:{port}/callback?code=testcode", timeout=3
-            )
-            assert resp.status == 200
-            assert b"Connected" in resp.read()
-        mock_oauth.get_access_token.assert_called_once_with("testcode", as_dict=False)
-        thread.join(timeout=3)
-
-    def test_callback_without_code_returns_400(self):
-        server, port, _ = self._start()
-        try:
-            with pytest.raises(urllib.error.HTTPError) as exc:
-                urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/callback", timeout=2
-                )
-            assert exc.value.code == 400
-        finally:
-            server.shutdown()
-
-    def test_server_shuts_down_after_successful_callback(self):
+    def test_poll_retries_on_404_then_returns_code(self):
         import spotifactory.auth_server as mod
-        mock_oauth = MagicMock()
-        mock_oauth.get_access_token.return_value = "tok"
+        call_n = [0]
+        responses: list = [
+            urllib.error.HTTPError("url", 404, "Not Found", {}, None),
+            urllib.error.HTTPError("url", 404, "Not Found", {}, None),
+        ]
 
-        server, port, thread = self._start()
-        with patch.object(mod, "_make_oauth", return_value=mock_oauth):
-            urllib.request.urlopen(
-                f"http://127.0.0.1:{port}/callback?code=abc", timeout=3
-            )
-        thread.join(timeout=3)
-        assert not thread.is_alive(), "server should have shut down after callback"
+        def fake_urlopen(req, **kw):
+            n = call_n[0]
+            call_n[0] += 1
+            if n < len(responses):
+                raise responses[n]
+            m = MagicMock()
+            m.read.return_value = json.dumps({"code": "abc123"}).encode()
+            return m
 
-    def test_unknown_path_returns_404(self):
-        server, port, _ = self._start()
-        try:
-            with pytest.raises(urllib.error.HTTPError) as exc:
-                urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/unknown", timeout=2
-                )
-            assert exc.value.code == 404
-        finally:
-            server.shutdown()
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen), \
+             patch("time.sleep"):
+            code = mod._poll_for_code("https://relay.test", "sess01", timeout=10)
+        assert code == "abc123"
+
+    def test_poll_returns_none_after_timeout(self):
+        import spotifactory.auth_server as mod
+        with patch("urllib.request.urlopen",
+                   side_effect=urllib.error.HTTPError("url", 404, "", {}, None)), \
+             patch("time.sleep"):
+            # timeout=0.0 → deadline is already past on first check
+            code = mod._poll_for_code("https://relay.test", "sess02", timeout=0.0)
+        assert code is None

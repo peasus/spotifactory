@@ -1,101 +1,97 @@
-"""Minimal Spotify OAuth callback server for headless Pi setup.
+"""PKCE Spotify auth via Cloudflare Worker relay.
 
-Serves on port 8080:
-  GET /          → redirects to Spotify authorise URL
-  GET /callback  → exchanges code for token (spotipy saves .cache), returns success page
+Flow:
+  1. Pi generates session_id + SpotifyPKCE object (code_verifier stored internally)
+  2. Pi builds Spotify authorize URL that includes the code_challenge
+  3. Pi POSTs {session_id, authorize_url} to the relay
+  4. on_session_ready callback fires so OLED can display the session URL
+  5. Pi polls relay GET /poll/{session_id} every second until code arrives
+  6. Pi exchanges code via auth.get_access_token(code) — no client_secret needed
+  7. Token saved to .cache; run_pkce_auth() returns True
 
-Call run_auth_server() and it blocks until the callback is received.
+Required env vars: RELAY_URL, SPOTIPY_CLIENT_ID
 """
 from __future__ import annotations
 
+import json
 import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
+import time
+import uuid
+import urllib.error
+import urllib.request
+from typing import Callable, Optional
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-PORT = 8080
-
-SCOPES = " ".join([
-    "user-read-playback-state",
-    "user-modify-playback-state",
-    "user-read-currently-playing",
-])
-
-SUCCESS_HTML = b"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Spotifactory</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:sans-serif;text-align:center;padding:60px 20px;background:#191414;color:#fff}
-h1{color:#1DB954;font-size:2em}p{color:#ccc}</style></head>
-<body><h1>&#10003; Connected!</h1>
-<p>Your Spotifactory is ready.<br>You can close this tab.</p>
-</body></html>
-"""
-
-ERROR_HTML = b"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Spotifactory</title></head>
-<body><h1>Something went wrong</h1><p>Please restart the device and try again.</p></body>
-</html>
-"""
+POLL_INTERVAL = 1.5   # seconds between relay polls
+POLL_TIMEOUT = 300.0  # give up after 5 minutes
 
 
-def _make_oauth():
-    from spotipy.oauth2 import SpotifyOAuth
-    return SpotifyOAuth(
+def run_pkce_auth(on_session_ready: Optional[Callable[[str], None]] = None) -> bool:
+    """Run PKCE relay auth flow. Calls on_session_ready(url) once registered.
+
+    Returns True when the token has been saved to .cache, False on timeout.
+    """
+    from spotipy.oauth2 import SpotifyPKCE
+    from spotifactory.spotify import SCOPES
+
+    relay_url = os.environ["RELAY_URL"].rstrip("/")
+    session_id = uuid.uuid4().hex[:8]
+
+    auth = SpotifyPKCE(
         client_id=os.environ["SPOTIPY_CLIENT_ID"],
-        client_secret=os.environ["SPOTIPY_CLIENT_SECRET"],
-        redirect_uri=os.environ["SPOTIPY_REDIRECT_URI"],
-        scope=SCOPES,
+        redirect_uri=f"{relay_url}/callback",
+        scope=" ".join(SCOPES),
+        open_browser=False,
     )
 
+    # get_authorize_url() generates code_verifier + code_challenge internally
+    authorize_url = auth.get_authorize_url(state=session_id)
 
-class _Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        pass  # suppress request logs
+    _post_register(relay_url, session_id, authorize_url)
 
-    def do_GET(self):
-        parsed = urlparse(self.path)
+    session_url = f"{relay_url}/{session_id}"
+    print(f"[auth] visit {session_url}", flush=True)
 
-        if parsed.path == "/":
-            url = _make_oauth().get_authorize_url()
-            self.send_response(302)
-            self.send_header("Location", url)
-            self.end_headers()
+    if on_session_ready is not None:
+        on_session_ready(session_url)
 
-        elif parsed.path == "/callback":
-            params = parse_qs(parsed.query)
-            code = params.get("code", [None])[0]
-            if code:
-                try:
-                    _make_oauth().get_access_token(code, as_dict=False)
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(SUCCESS_HTML)
-                    # Shut down server after response is sent
-                    threading.Thread(target=self.server.shutdown, daemon=True).start()
-                except Exception as e:
-                    print(f"[auth] token exchange failed: {e}", flush=True)
-                    self.send_response(500)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(ERROR_HTML)
+    code = _poll_for_code(relay_url, session_id)
+    if not code:
+        print("[auth] timed out waiting for Spotify code", flush=True)
+        return False
+
+    print("[auth] exchanging code for tokens", flush=True)
+    auth.get_access_token(code, as_dict=False, check_cache=False)
+    print("[auth] token saved", flush=True)
+    return True
+
+
+def _post_register(relay_url: str, session_id: str, authorize_url: str) -> None:
+    data = json.dumps({"session_id": session_id, "authorize_url": authorize_url}).encode()
+    req = urllib.request.Request(
+        f"{relay_url}/register",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    urllib.request.urlopen(req, timeout=10)
+
+
+def _poll_for_code(
+    relay_url: str,
+    session_id: str,
+    timeout: float = POLL_TIMEOUT,
+) -> Optional[str]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = urllib.request.urlopen(
+                f"{relay_url}/poll/{session_id}", timeout=5
+            )
+            body = json.loads(resp.read())
+            return body["code"]
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                time.sleep(POLL_INTERVAL)
             else:
-                self.send_response(400)
-                self.end_headers()
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-
-def run_auth_server() -> None:
-    """Block until Spotify OAuth callback is received and token is saved."""
-    server = HTTPServer(("0.0.0.0", PORT), _Handler)
-    print(f"[auth] listening on :{PORT}", flush=True)
-    server.serve_forever()
-    print("[auth] token saved, server stopped", flush=True)
+                raise
+    return None
