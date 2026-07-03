@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from dotenv import load_dotenv
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
+from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError, SpotifyPKCE
 
 load_dotenv()
 
@@ -29,15 +29,30 @@ class NowPlayingInfo:
 _client: spotipy.Spotify | None = None
 
 
+def _make_auth_manager():
+    # Mac dev: client secret in env → standard OAuth with browser flow
+    # Pi: no client secret → PKCE flow (no secret needed, relay handles redirect)
+    client_secret = os.environ.get("SPOTIPY_CLIENT_SECRET")
+    if client_secret:
+        return SpotifyOAuth(
+            client_id=os.environ["SPOTIPY_CLIENT_ID"],
+            client_secret=client_secret,
+            redirect_uri=os.environ["SPOTIPY_REDIRECT_URI"],
+            scope=" ".join(SCOPES),
+        )
+    relay_url = os.environ["RELAY_URL"].rstrip("/")
+    return SpotifyPKCE(
+        client_id=os.environ["SPOTIPY_CLIENT_ID"],
+        redirect_uri=f"{relay_url}/callback",
+        scope=" ".join(SCOPES),
+        open_browser=False,
+    )
+
+
 def get_client() -> spotipy.Spotify:
     global _client
     if _client is None:
-        _client = spotipy.Spotify(auth_manager=SpotifyOAuth(
-            client_id=os.environ["SPOTIPY_CLIENT_ID"],
-            client_secret=os.environ["SPOTIPY_CLIENT_SECRET"],
-            redirect_uri=os.environ["SPOTIPY_REDIRECT_URI"],
-            scope=" ".join(SCOPES),
-        ))
+        _client = spotipy.Spotify(auth_manager=_make_auth_manager())
     return _client
 
 

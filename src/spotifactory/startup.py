@@ -2,7 +2,7 @@
 
 Runs pre-flight checks with OLED feedback before handing off to the main loop:
   1. Network — if offline, launches Balena WiFi Connect captive portal
-  2. Spotify auth — if no valid token, runs the OAuth callback server
+  2. Spotify auth — if no valid token, runs the PKCE relay auth flow
   3. Main app — starts the regular run_on_pi loop
 """
 from __future__ import annotations
@@ -37,6 +37,30 @@ def _show(display, line1: str, line2: str = "") -> None:
     display.update()
 
 
+def _show_auth_url(display, url: str) -> None:
+    """Display a relay session URL split across OLED lines."""
+    # Strip protocol: "spotifactory-auth.x.workers.dev/a1b2c3d4"
+    short = url.replace("https://", "").replace("http://", "")
+    slash = short.rfind("/")
+    host = short[:slash] if slash >= 0 else short
+    code = short[slash:] if slash >= 0 else ""
+
+    display.clear()
+    display.draw_text(2, 0, "Setup Spotify:")
+    if len(host) <= 21:
+        display.draw_text(2, 14, host)
+        display.draw_text(2, 26, code)
+    else:
+        # Break host at a dot boundary that fits within 21 chars
+        mid = host.rfind(".", 0, 22)
+        if mid < 0:
+            mid = 21
+        display.draw_text(2, 14, host[:mid + 1])
+        display.draw_text(2, 26, host[mid + 1:])
+        display.draw_text(2, 38, code)
+    display.update()
+
+
 def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
@@ -65,13 +89,9 @@ def main() -> None:
 
     # ---------------------------------------------------------- Spotify auth
     if not _has_valid_token():
-        _show(display, "Connect Spotify:", "spotifactory", )
-        # Second line intentionally short — third line shows port
-        display.draw_text(2, 44, ".local:8080")
-        display.update()
-        print("[startup] no valid Spotify token — starting auth server", flush=True)
-        from spotifactory.auth_server import run_auth_server
-        run_auth_server()
+        print("[startup] no valid Spotify token — starting PKCE relay auth", flush=True)
+        from spotifactory.auth_server import run_pkce_auth
+        run_pkce_auth(on_session_ready=lambda url: _show_auth_url(display, url))
 
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
