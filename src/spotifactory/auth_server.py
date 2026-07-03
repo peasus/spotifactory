@@ -17,7 +17,6 @@ import json
 import os
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 import uuid
 from typing import Callable, Optional
@@ -66,12 +65,15 @@ def run_pkce_auth(on_session_ready: Optional[Callable[[str], None]] = None) -> b
     return True
 
 
+_UA = {"User-Agent": "Spotifactory/1.0"}
+
+
 def _post_register(relay_url: str, session_id: str, authorize_url: str) -> None:
     data = json.dumps({"session_id": session_id, "authorize_url": authorize_url}).encode()
     req = urllib.request.Request(
         f"{relay_url}/register",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={**_UA, "Content-Type": "application/json"},
         method="POST",
     )
     urllib.request.urlopen(req, timeout=10)
@@ -89,9 +91,10 @@ def _poll_for_code(
         if terminate is not None and terminate():
             return None
         try:
-            resp = urllib.request.urlopen(
-                f"{relay_url}/poll/{session_id}", timeout=5
+            req = urllib.request.Request(
+                f"{relay_url}/poll/{session_id}", headers=_UA
             )
+            resp = urllib.request.urlopen(req, timeout=5)
             body = json.loads(resp.read())
             return body["code"]
         except urllib.error.HTTPError as e:
@@ -102,14 +105,3 @@ def _poll_for_code(
     return None
 
 
-def _shorten_url(url: str) -> str:
-    """Shorten a URL via TinyURL. Falls back to the original on any error."""
-    try:
-        api = "https://tinyurl.com/api-create.php?url=" + urllib.parse.quote(url, safe="")
-        resp = urllib.request.urlopen(api, timeout=10)
-        short = resp.read().decode().strip()
-        if short.startswith("http"):
-            return short
-    except Exception as e:
-        print(f"[auth] URL shortening failed: {e}", flush=True)
-    return url

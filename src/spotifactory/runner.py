@@ -57,6 +57,9 @@ class Runner:
             self.nav.current.move_up()
 
     def handle_down(self) -> None:
+        if self._in_qr_auth():
+            self._task.current_step.toggle_url()
+            return
         if self._in_home_scan():
             self._toggle_shuffle()
             return
@@ -263,22 +266,23 @@ class Runner:
 
     def _render_qr_auth(self) -> None:
         step = self._task.current_step
-        qr = step.qr_image
-        url = step.short_url
-
-        # Strip protocol: "tinyurl.com/xxxxxxx"
-        short = url.replace("https://", "").replace("http://", "")
-        slash = short.rfind("/")
-        line1 = short[:slash + 1] if slash >= 0 else short   # "tinyurl.com/"
-        line2 = short[slash + 1:] if slash >= 0 else ""       # "xxxxxxx"
-
-        x = qr.width + 4  # 4px gap between QR and text
-
         self.display.clear()
-        self.display.draw_image(0, 7, qr)  # vertically centred in 64px
-        self.display.draw_text(x, 4, line1)
-        self.display.draw_text(x, 16, line2)
-        self.display.draw_text(x, 50, "^ Cancel")
+
+        if getattr(step, "_show_url", False):
+            # URL view — full URL split across lines, ↓ to go back
+            url = step.session_url.replace("https://", "").replace("http://", "")
+            self.display.draw_text(2, 0, "URL (↑ Cancel):")
+            col = 21  # chars per line at 6px/char on 128px
+            for i, chunk in enumerate([url[j:j + col] for j in range(0, len(url), col)]):
+                self.display.draw_text(2, 14 + i * 12, chunk)
+        else:
+            # QR view — centred QR, minimal text, ↓ to show URL
+            qr = step.qr_image
+            qx = (128 - qr.width) // 2
+            self.display.draw_image(qx, 6, qr)
+            self.display.draw_text(2, 0, "Scan QR")
+            self.display.draw_text(88, 0, "^ Cancel")
+
         self.display.update()
 
     def _render_home(self) -> None:
