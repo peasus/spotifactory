@@ -78,6 +78,9 @@ class Runner:
             self._do_back()
 
     def handle_right(self) -> None:
+        if self._in_qr_auth():
+            self._task.current_step.toggle_url()
+            return
         if self._in_home_mode():
             self._next_track()
         else:
@@ -285,6 +288,7 @@ class Runner:
             self.display.draw_image(0, 3, qr)
             x = qr.width + 4
             self.display.draw_text(x, 8, "Scan Code")
+            self.display.draw_text(x, 36, "> View URL")
             self.display.draw_text(x, 50, "< Cancel")
 
         self.display.update()
