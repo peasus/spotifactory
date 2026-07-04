@@ -17,7 +17,7 @@ class ScanStep(Step):
             ctx.data["uri"] = _SIM_URI
             return Continue()
         try:
-            from spotifactory.rfid import read_card
+            from spotifactory.hardware.rfid import read_card
             card = read_card()
         except Exception as exc:
             self.show_for(f"RFID error: {type(exc).__name__}", 3.0)

@@ -131,7 +131,7 @@ def print_image(
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Usage: python -m spotifactory.printer <image_path>")
+        print("Usage: python -m spotifactory.hardware.printer <image_path>")
         sys.exit(1)
     result = print_image(sys.argv[1])
     print(result)
