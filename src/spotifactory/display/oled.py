@@ -2,7 +2,7 @@ import board
 from PIL import Image, ImageDraw, ImageFont
 import adafruit_ssd1306
 
-from spotifactory.menu.scroll import ScrollTracker
+from spotifactory.display.scroll import ScrollTracker
 
 
 class DisplayOLED:

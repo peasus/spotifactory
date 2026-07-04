@@ -22,10 +22,10 @@ def main():
     args = parser.parse_args()
 
     if args.sim or not _is_raspberry_pi():
-        from spotifactory.menu.simulated_menu import main as run_sim
+        from spotifactory.platforms.sim import main as run_sim
         run_sim()
     else:
-        from spotifactory.menu.run_on_pi import main as run_pi
+        from spotifactory.platforms.pi import main as run_pi
         run_pi()
 
 

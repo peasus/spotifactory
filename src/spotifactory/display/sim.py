@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import font as tkfont
 
-from spotifactory.menu.scroll import ScrollTracker
+from spotifactory.display.scroll import ScrollTracker
 
 
 class DisplaySim:

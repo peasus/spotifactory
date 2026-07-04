@@ -45,7 +45,7 @@ ignore_missing_imports = true  # needed for optional RPi/Adafruit deps
 [project.scripts]
 spotifactory = "spotifactory.main:main"
 spotifactory-pi = "spotifactory.startup:main"
-spotifactory-seengreat = "spotifactory.menu.run_on_seengreat:main"
+spotifactory-seengreat = "spotifactory.platforms.seengreat:main"
 
 [project.optional-dependencies]
 gui = [

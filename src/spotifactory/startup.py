@@ -65,7 +65,7 @@ def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
 
-    from spotifactory.menu.renderer_oled import DisplayOLED
+    from spotifactory.display.oled import DisplayOLED
     display = DisplayOLED()
 
     # ------------------------------------------------------------------ WiFi
@@ -96,7 +96,7 @@ def main() -> None:
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
     print("[startup] starting main app", flush=True)
-    from spotifactory.menu.run_on_pi import main as run_pi
+    from spotifactory.platforms.pi import main as run_pi
     run_pi()
 
 

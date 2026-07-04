@@ -1,8 +1,8 @@
 import time
 
 from spotifactory.menu.catalog import MENUS
-from spotifactory.menu.input_buttons import ButtonInput
-from spotifactory.menu.renderer_oled import DisplayOLED
+from spotifactory.input.buttons import ButtonInput
+from spotifactory.display.oled import DisplayOLED
 from spotifactory.runner import Runner
 from spotifactory.tasks.home import HomeTask
 

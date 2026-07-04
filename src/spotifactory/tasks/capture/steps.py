@@ -78,7 +78,7 @@ class PrintStep(Step):
             except Exception as e:
                 print(f"[print] artwork preview failed: {e}", flush=True)
 
-        from spotifactory.printer import print_image
+        from spotifactory.hardware.printer import print_image
         self.status = "Connecting..."
         result = print_image(
             ctx.data["image"],
@@ -102,7 +102,7 @@ class PrintStep(Step):
 
 class ScanStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.rfid import write_uri
+        from spotifactory.hardware.rfid import write_uri
         self.status = "Please scan tag"
         try:
             write_uri(ctx.data["info"].album_uri)

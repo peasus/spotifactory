@@ -1,5 +1,5 @@
 from spotifactory.menu.catalog import MENUS
-from spotifactory.menu.renderer_sim import DisplaySim
+from spotifactory.display.sim import DisplaySim
 from spotifactory.runner import Runner
 from spotifactory.tasks.home import HomeTask
 
