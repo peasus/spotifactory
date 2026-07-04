@@ -160,6 +160,6 @@ class HomeScanStep(Step):
 
             while not self._cancel.is_set():
                 terminate()
-                time.sleep(0.1)
+                self._cancel.wait(timeout=0.05)
 
         return Cancel()
