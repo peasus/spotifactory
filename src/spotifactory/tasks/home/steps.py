@@ -133,10 +133,32 @@ class HomeScanStep(Step):
             return self._cancel.is_set()
 
         # --- attempt real RFID ---
+        # watch_tags blocks until terminate() returns True, then nfcpy spends
+        # ~1-2s tearing down the ContactlessFrontend. Run it in a daemon thread
+        # so we can return Cancel() the instant cancel is set without waiting
+        # for hardware teardown to complete.
         try:
             from spotifactory.hardware.rfid import PORT, watch_tags
             print(f"[home] opening RFID reader on {PORT!r}…", flush=True)
-            watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
+
+            _rfid_exc: list[Exception] = []
+            _rfid_done = threading.Event()
+
+            def _run_rfid() -> None:
+                try:
+                    watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
+                except Exception as exc:
+                    _rfid_exc.append(exc)
+                finally:
+                    _rfid_done.set()
+
+            threading.Thread(target=_run_rfid, daemon=True).start()
+
+            while not self._cancel.is_set() and not _rfid_done.is_set():
+                self._cancel.wait(timeout=0.05)
+
+            if _rfid_exc:
+                raise _rfid_exc[0]  # trigger soft-wait fallback below
 
         except Exception as exc:
             available = []
