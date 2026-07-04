@@ -134,7 +134,7 @@ class HomeScanStep(Step):
 
         # --- attempt real RFID ---
         try:
-            from spotifactory.rfid import PORT, watch_tags
+            from spotifactory.hardware.rfid import PORT, watch_tags
             print(f"[home] opening RFID reader on {PORT!r}…", flush=True)
             watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
 

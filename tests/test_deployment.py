@@ -55,8 +55,8 @@ class TestStartupMain:
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.menu.run_on_pi.main") as mock_run_pi, \
+             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
+             patch("spotifactory.platforms.pi.main") as mock_run_pi, \
              patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):
@@ -70,8 +70,8 @@ class TestStartupMain:
         # First call: no network; second call: connected (after wifi-connect)
         with patch("spotifactory.startup._has_network", side_effect=[False, True]), \
              patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.menu.run_on_pi.main"), \
+             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
+             patch("spotifactory.platforms.pi.main"), \
              patch("spotifactory.auth_server.run_pkce_auth"), \
              patch("subprocess.run") as mock_sub, \
              patch("dotenv.load_dotenv"):
@@ -84,7 +84,7 @@ class TestStartupMain:
     def test_exits_if_still_offline_after_wifi_connect(self):
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=False), \
-             patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
+             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"), \
              pytest.raises(SystemExit):
@@ -95,8 +95,8 @@ class TestStartupMain:
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=False), \
-             patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.menu.run_on_pi.main"), \
+             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
+             patch("spotifactory.platforms.pi.main"), \
              patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):
@@ -108,8 +108,8 @@ class TestStartupMain:
         display = MagicMock()
         with patch("spotifactory.startup._has_network", return_value=True), \
              patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.menu.renderer_oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.menu.run_on_pi.main"), \
+             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
+             patch("spotifactory.platforms.pi.main"), \
              patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
              patch("subprocess.run"), \
              patch("dotenv.load_dotenv"):

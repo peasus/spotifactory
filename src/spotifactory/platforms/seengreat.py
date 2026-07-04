@@ -1,8 +1,8 @@
 import time
 
 from spotifactory.menu.catalog import MENUS
-from spotifactory.menu.input_seengreat import SeenGreatInput
-from spotifactory.menu.renderer_sh1106 import DisplaySH1106
+from spotifactory.input.seengreat import SeenGreatInput
+from spotifactory.display.sh1106 import DisplaySH1106
 from spotifactory.runner import Runner
 from spotifactory.tasks.home import HomeTask
 

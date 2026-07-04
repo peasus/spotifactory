@@ -3,7 +3,7 @@ from luma.core.interface.serial import spi
 from luma.oled.device import sh1106
 from PIL import Image, ImageDraw, ImageFont
 
-from spotifactory.menu.scroll import ScrollTracker
+from spotifactory.display.scroll import ScrollTracker
 
 WIDTH = 128
 HEIGHT = 64
