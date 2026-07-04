@@ -24,12 +24,13 @@ def main() -> None:
             runner.handle_back()
         elif key in ("t", "T"):
             runner.handle_tag_scan_sim()
+        runner.tick()
         runner.render()
 
     def poll():
         runner.tick()
         runner.render()
-        display.root.after(100, poll)
+        display.root.after(50, poll)
 
     display.root.bind("<Key>", on_key)
     runner.render()
