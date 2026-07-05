@@ -35,11 +35,14 @@ class PlayStep(Step):
         self.status = "Starting playback..."
         uri = ctx.data["uri"]
         try:
+            from spotifactory.spotify import get_playback_device_id
             sp = get_client()
-            sp.start_playback(context_uri=uri)
+            sp.start_playback(context_uri=uri, device_id=get_playback_device_id())
         except spotipy.SpotifyException as e:
-            msg = "No active device" if "device" in str(e).lower() else "Spotify error"
-            self.show_for(msg, 3.0)
+            if "device" in str(e).lower() or "restricted" in str(e).lower():
+                self.show_for("Choose Speaker first", 3.0)
+            else:
+                self.show_for("Spotify error", 3.0)
             return Done()
         except Exception as e:
             self.show_for(f"Error: {str(e)[:20]}", 3.0)

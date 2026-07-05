@@ -118,3 +118,95 @@ class DoneStep(Step):
         photos = f"{result.photos_left} photos left" if result else ""
         self.show_for(f"Album ready! {photos}".strip(), 3.0)
         return Done()
+
+
+# ---------------------------------------------------------------------------
+# Playlist-specific steps  (share FetchArtStep, PrintStep with the album task)
+# ---------------------------------------------------------------------------
+
+class FetchPlaylistInfoStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        self.status = "Checking Spotify..."
+        try:
+            from spotifactory.spotify import get_client
+            sp = get_client()
+            playback = sp.current_playback()
+        except Exception as e:
+            self.show_for(f"Spotify error: {str(e)[:20]}", 3.0)
+            return Done()
+
+        if not playback:
+            self.show_for("Nothing playing", 2.0)
+            return Done()
+
+        context = playback.get("context")
+        if not context or context.get("type") != "playlist":
+            self.show_for("No playlist playing", 2.0)
+            return Done()
+
+        playlist_uri = context["uri"]
+        playlist_id = playlist_uri.split(":")[-1]
+
+        self.status = "Fetching playlist..."
+        try:
+            pl = sp.playlist(playlist_id, fields="name,images,owner")
+        except Exception as e:
+            self.show_for(f"Playlist error: {str(e)[:20]}", 3.0)
+            return Done()
+
+        images = pl.get("images", [])
+        if not images:
+            self.show_for("No playlist image", 2.0)
+            return Done()
+
+        ctx.data["playlist"] = {
+            "name": pl.get("name", "Unknown Playlist"),
+            "uri": playlist_uri,
+            "image_url": images[0]["url"],
+            "owner": pl.get("owner", {}).get("display_name", ""),
+        }
+        return Continue()
+
+
+class PlaylistConfirmStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        pl = ctx.data["playlist"]
+        return PushMenu(
+            menu=_confirm_menu(pl["name"], pl["owner"]),
+            on_confirm=Continue(),
+            on_cancel=Cancel(),
+        )
+
+
+class FetchPlaylistArtStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        self.status = "Fetching artwork..."
+        try:
+            url = ctx.data["playlist"]["image_url"]
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            ctx.data["image"] = BytesIO(resp.content)
+        except Exception as e:
+            self.show_for(f"Art error: {str(e)[:20]}", 3.0)
+            return Done()
+        return Continue()
+
+
+class PlaylistScanStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        from spotifactory.hardware.rfid import write_uri
+        self.status = "Please scan tag"
+        try:
+            write_uri(ctx.data["playlist"]["uri"])
+        except Exception as e:
+            self.show_for(f"RFID error: {str(e)[:20]}", 3.0)
+            return Done()
+        return Continue()
+
+
+class PlaylistDoneStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        result = ctx.data.get("print_result")
+        photos = f"{result.photos_left} photos left" if result else ""
+        self.show_for(f"Playlist ready! {photos}".strip(), 3.0)
+        return Done()

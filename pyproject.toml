@@ -16,6 +16,7 @@ dependencies = [
     "pyserial>=3.5",
     "nfcpy>=1.0",
     "simplepyble>=0.7.0",
+    "soco>=0.31.0",
 ]
 
 [tool.setuptools.packages.find]
