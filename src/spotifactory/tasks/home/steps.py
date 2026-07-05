@@ -52,6 +52,7 @@ class HomeScanStep(Step):
 
         _active_uri: str | None = None
         _device_error: bool = False
+        _soco_speaker: str | None = None  # set when SoCo is handling playback
         last_poll = 0.0
 
         def on_poll() -> None:
@@ -77,7 +78,7 @@ class HomeScanStep(Step):
                 pass
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri, _device_error
+            nonlocal _active_uri, _device_error, _soco_speaker
             uri = card.get("uri")
             if not uri:
                 return
@@ -87,39 +88,63 @@ class HomeScanStep(Step):
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
             try:
+                from spotifactory.spotify import get_playback_device
+                dev = get_playback_device()
+                if dev.restricted:
+                    from spotifactory.hardware.sonos import play_spotify_uri
+                    print(f"[home] device {dev.name!r} is restricted — using SoCo", flush=True)
+                    try:
+                        play_spotify_uri(dev.name, uri)
+                        _soco_speaker = dev.name
+                        _device_error = False
+                    except RuntimeError as e:
+                        print(f"[home] SoCo error: {e}", flush=True)
+                        _device_error = True
+                        self.status = "Link Spotify in"
+                        self.artist = "the Sonos app"
+                    return
                 from spotifactory.spotify import get_now_playing, get_client
                 info = get_now_playing()
                 if info and info.album_uri == uri:
                     print(f"[home] already playing {uri}, skipping start_playback", flush=True)
                     return
-                get_client().start_playback(context_uri=uri)
+                print(f"[home] start_playback {uri} on device {dev.device_id!r}", flush=True)
+                get_client().start_playback(context_uri=uri, device_id=dev.device_id)
+                _soco_speaker = None
                 _device_error = False
             except Exception as e:
-                if getattr(e, "reason", None) == "NO_ACTIVE_DEVICE":
+                reason = getattr(e, "reason", None)
+                if reason == "NO_ACTIVE_DEVICE" or "restricted device" in str(e).lower():
                     _device_error = True
-                    self.status = "No active device"
-                    self.artist = "Go to Choose Speaker"
+                    self.status = "Select speaker in"
+                    self.artist = "Spotify app first"
                 else:
                     print(f"[home] start_playback error: {e}", flush=True)
 
         def on_remove(card: dict) -> None:
-            nonlocal _active_uri
+            nonlocal _active_uri, _soco_speaker
             if not _active_uri:
                 return
             if self._cancel.is_set():
                 # user navigated away — nfcpy fires on_release as it exits, ignore it
                 _active_uri = None
+                _soco_speaker = None
                 return
             print(f"[home] tag removed {card['uid']}", flush=True)
             if not ctx.dry_run:
-                try:
-                    from spotifactory.spotify import get_now_playing, get_client
-                    info = get_now_playing()
-                    if info and info.album_uri == _active_uri:
-                        get_client().pause_playback()
-                except Exception as e:
-                    print(f"[home] pause_playback error: {e}", flush=True)
+                if _soco_speaker:
+                    from spotifactory.hardware.sonos import pause_speaker
+                    pause_speaker(_soco_speaker)
+                else:
+                    try:
+                        from spotifactory.spotify import get_now_playing, get_client
+                        info = get_now_playing()
+                        if info and info.album_uri == _active_uri:
+                            get_client().pause_playback()
+                    except Exception as e:
+                        print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None
+            _soco_speaker = None
 
         def check_sim() -> None:
             sim = self._sim_tag

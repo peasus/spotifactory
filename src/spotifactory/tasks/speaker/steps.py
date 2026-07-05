@@ -70,8 +70,9 @@ class SetDeviceStep(Step):
 
         self.status = "Switching..."
         try:
-            from spotifactory.spotify import transfer_playback
+            from spotifactory.spotify import set_active_device, transfer_playback
             transfer_playback(device["id"])
+            set_active_device(device["id"])
         except Exception as e:
             self.show_for(f"Error: {str(e)[:20]}", 3.0)
             return Done()
