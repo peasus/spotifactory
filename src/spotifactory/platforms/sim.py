@@ -6,7 +6,7 @@ from spotifactory.tasks.home import HomeTask
 
 def main() -> None:
     display = DisplaySim()
-    runner = Runner(display, MENUS, dry_run=False, printer_dry_run=False, home_task_class=HomeTask)
+    runner = Runner(display, MENUS, dry_run=False, printer_dry_run=True, home_task_class=HomeTask)
 
     def on_key(event):
         key = event.keysym

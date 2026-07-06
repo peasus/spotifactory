@@ -3,7 +3,7 @@
 # Run over SSH on a fresh Raspberry Pi OS Lite 64-bit image:
 #   ssh spotifactory@spotifactory.local
 #   cd ~/spotifactory && bash deploy/setup.sh
-set -euo pipefail
+set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 USER="${SUDO_USER:-$(whoami)}"
@@ -38,15 +38,41 @@ sudo usermod -a -G spi,gpio,i2c,bluetooth "$USER"
 
 # --------------------------------------------------------- Balena WiFi Connect
 echo "==> Installing Balena WiFi Connect..."
-# This script replaces dhcpcd with NetworkManager and installs wifi-connect binary
-bash <(curl -sL https://github.com/balena-os/wifi-connect/raw/master/scripts/raspbian-install.sh)
+# The Balena installer script only ships a 32-bit ARM binary; on 64-bit Pi OS
+# we download the aarch64 release directly instead.
+ARCH="$(uname -m)"
+WC_VERSION="v4.4.6"
+if [ "$ARCH" = "aarch64" ]; then
+  WC_URL="https://github.com/balena-os/wifi-connect/releases/download/${WC_VERSION}/wifi-connect-${WC_VERSION}-linux-aarch64.tar.gz"
+  echo "  Detected aarch64 — downloading 64-bit binary..."
+  curl -sL "$WC_URL" | sudo tar -xz -C /usr/local/sbin/
+  sudo chmod +x /usr/local/sbin/wifi-connect
+  # Still need NetworkManager (the installer script normally sets this up)
+  sudo apt-get install -y network-manager
+  sudo systemctl enable NetworkManager
+else
+  bash <(curl -sL https://github.com/balena-os/wifi-connect/raw/master/scripts/raspbian-install.sh)
+fi
+
+if wifi-connect --version &>/dev/null; then
+  echo "  WiFi Connect installed: $(wifi-connect --version)"
+else
+  echo "  WARNING: WiFi Connect install failed — captive portal will not work."
+  echo "  The app will still run if WiFi is already configured."
+fi
 
 # ---------------------------------------------------- Python virtual environment
 echo "==> Setting up Python environment..."
 cd "$REPO_DIR"
 python3 -m venv .venv
 .venv/bin/pip install --upgrade pip -q
-.venv/bin/pip install -e ".[rpi]" -q
+# Load .env to check SPOTIFACTORY_PLATFORM if already present
+PLATFORM="seengreat"
+if [ -f "$REPO_DIR/.env" ]; then
+  PLATFORM=$(grep -oP '(?<=SPOTIFACTORY_PLATFORM=)\S+' "$REPO_DIR/.env" || echo "seengreat")
+fi
+echo "  Platform: $PLATFORM"
+.venv/bin/pip install -e ".[$PLATFORM]" -q
 
 # ----------------------------------------------------------------- .env check
 if [ ! -f "$REPO_DIR/.env" ]; then

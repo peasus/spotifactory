@@ -148,22 +148,40 @@ class FetchPlaylistInfoStep(Step):
         playlist_id = playlist_uri.split(":")[-1]
 
         self.status = "Fetching playlist..."
+        pl = None
         try:
-            pl = sp.playlist(playlist_id, fields="name,images,owner")
+            # sp.playlist() adds additional_types=track which causes 404 on
+            # auto-generated playlists; use _get directly to avoid it.
+            pl = sp._get(f"playlists/{playlist_id}")
         except Exception as e:
-            self.show_for(f"Playlist error: {str(e)[:20]}", 3.0)
-            return Done()
+            if "404" not in str(e):
+                self.show_for(f"Playlist error: {str(e)[:20]}", 3.0)
+                return Done()
+            # Auto-generated playlists (Discover Weekly, Daily Mix, radio) are
+            # not accessible via the public API. Fall back to the current
+            # track's album art so the tag is still useful.
 
-        images = pl.get("images", [])
-        if not images:
-            self.show_for("No playlist image", 2.0)
+        if pl is not None:
+            images = pl.get("images", [])
+            name = pl.get("name", "Unknown Playlist")
+            owner = pl.get("owner", {}).get("display_name", "")
+            image_url = images[0]["url"] if images else None
+        else:
+            item = playback.get("item", {})
+            album_images = item.get("album", {}).get("images", [])
+            image_url = album_images[0]["url"] if album_images else None
+            name = "Auto Playlist"
+            owner = item.get("name", "")
+
+        if not image_url:
+            self.show_for("No image available", 2.0)
             return Done()
 
         ctx.data["playlist"] = {
-            "name": pl.get("name", "Unknown Playlist"),
+            "name": name,
             "uri": playlist_uri,
-            "image_url": images[0]["url"],
-            "owner": pl.get("owner", {}).get("display_name", ""),
+            "image_url": image_url,
+            "owner": owner,
         }
         return Continue()
 
