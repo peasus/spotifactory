@@ -37,27 +37,24 @@ def _show(display, line1: str, line2: str = "") -> None:
     display.update()
 
 
-def _show_auth_url(display, url: str) -> None:
-    """Display a relay session URL split across OLED lines."""
-    # Strip protocol: "spotifactory-auth.x.workers.dev/a1b2c3d4"
-    short = url.replace("https://", "").replace("http://", "")
-    slash = short.rfind("/")
-    host = short[:slash] if slash >= 0 else short
-    code = short[slash:] if slash >= 0 else ""
+def _make_qr(url: str):
+    import qrcode
+    from qrcode.constants import ERROR_CORRECT_L
+    qr = qrcode.QRCode(error_correction=ERROR_CORRECT_L, box_size=2, border=0)
+    qr.add_data(url)
+    qr.make(fit=True)
+    return qr.make_image(fill_color="white", back_color="black").get_image().convert("1")
 
+
+def _show_auth_url(display, url: str) -> None:
+    """Display a QR code + label for the PKCE relay session URL."""
+    qr = _make_qr(url)
     display.clear()
-    display.draw_text(2, 0, "Setup Spotify:")
-    if len(host) <= 21:
-        display.draw_text(2, 14, host)
-        display.draw_text(2, 26, code)
-    else:
-        # Break host at a dot boundary that fits within 21 chars
-        mid = host.rfind(".", 0, 22)
-        if mid < 0:
-            mid = 21
-        display.draw_text(2, 14, host[:mid + 1])
-        display.draw_text(2, 26, host[mid + 1:])
-        display.draw_text(2, 38, code)
+    display.draw_image(0, 3, qr)
+    x = qr.width + 4
+    display.draw_text(x, 4, "Scan to")
+    display.draw_text(x, 18, "connect")
+    display.draw_text(x, 32, "Spotify")
     display.update()
 
 
