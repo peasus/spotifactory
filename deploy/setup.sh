@@ -24,8 +24,9 @@ sudo apt-get install -y \
   curl
 
 # ------------------------------------------------------------ Hardware config
-echo "==> Enabling I2C..."
+echo "==> Enabling I2C and SPI..."
 sudo raspi-config nonint do_i2c 0
+sudo raspi-config nonint do_spi 0
 
 echo "==> Setting hostname to 'spotifactory'..."
 sudo hostnamectl set-hostname spotifactory
