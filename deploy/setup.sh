@@ -37,6 +37,18 @@ sudo systemctl restart avahi-daemon
 echo "==> Adding $USER to hardware groups..."
 sudo usermod -a -G spi,gpio,i2c,bluetooth,dialout "$USER"
 
+# ----------------------------------------------------------- Bluetooth config
+echo "==> Configuring Bluetooth..."
+sudo systemctl enable bluetooth
+sudo rfkill unblock bluetooth
+# Ensure the controller auto-powers on after every boot
+if grep -q "AutoEnable" /etc/bluetooth/main.conf 2>/dev/null; then
+  sudo sed -i 's/.*AutoEnable.*/AutoEnable=true/' /etc/bluetooth/main.conf
+else
+  echo "AutoEnable=true" | sudo tee -a /etc/bluetooth/main.conf
+fi
+sudo systemctl restart bluetooth
+
 # --------------------------------------------------------- Balena WiFi Connect
 echo "==> Installing Balena WiFi Connect..."
 # The Balena installer script only ships a 32-bit ARM binary; on 64-bit Pi OS
