@@ -2,11 +2,11 @@ import RPi.GPIO as GPIO
 
 # BCM pin assignments for SeenGreat 1.3" OLED HAT (A)
 # Joystick
-_UP     = 6
-_DOWN   = 19
-_LEFT   = 5
-_RIGHT  = 26
-_SELECT = 13
+_UP     = 19
+_DOWN   = 13
+_LEFT   = 26
+_RIGHT  = 6
+_SELECT = 5
 # Buttons — K1 wired to Back, K2/K3 unused by default
 _K1 = 21
 _K2 = 20
