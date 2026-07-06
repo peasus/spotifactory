@@ -36,13 +36,20 @@ _patch_serial_nonexclusive()
 def _default_port() -> str:
     """Return the default nfcpy port string for the PN532 reader.
 
-    'tty:usbserial' lets nfcpy auto-discover any cu.usbserial-* device on
-    macOS without needing the exact serial-number suffix. On Pi/Linux the
-    specific name is still used. Override at runtime with NFC_PORT.
+    On macOS, 'tty:usbserial' auto-discovers any cu.usbserial-* device.
+    On Linux, scan for the first ttyUSB or ttyACM device and build the
+    nfcpy port string (e.g. /dev/ttyUSB0 → 'tty:USB0').
+    Override at runtime with NFC_PORT env var.
     """
     if sys.platform == "darwin":
         return "tty:usbserial"
-    return "tty:usbserial-210"
+    import glob
+    for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*"]:
+        devices = sorted(glob.glob(pattern))
+        if devices:
+            # nfcpy expects "tty:USB0" not "/dev/ttyUSB0"
+            return "tty:" + devices[0][len("/dev/tty"):]
+    return "tty:USB0"
 
 
 PORT = os.environ.get("NFC_PORT") or _default_port()
