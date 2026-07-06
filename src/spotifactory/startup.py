@@ -61,12 +61,31 @@ def _show_auth_url(display, url: str) -> None:
     display.update()
 
 
+def _make_display():
+    import os
+    platform = os.environ.get("SPOTIFACTORY_PLATFORM", "seengreat")
+    if platform == "seengreat":
+        from spotifactory.display.sh1106 import DisplaySH1106
+        return DisplaySH1106()
+    from spotifactory.display.oled import DisplayOLED
+    return DisplayOLED()
+
+
+def _run_platform():
+    import os
+    platform = os.environ.get("SPOTIFACTORY_PLATFORM", "seengreat")
+    if platform == "seengreat":
+        from spotifactory.platforms.seengreat import main
+    else:
+        from spotifactory.platforms.pi import main
+    main()
+
+
 def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
 
-    from spotifactory.display.oled import DisplayOLED
-    display = DisplayOLED()
+    display = _make_display()
 
     # ------------------------------------------------------------------ WiFi
     if not _has_network():
@@ -96,8 +115,7 @@ def main() -> None:
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
     print("[startup] starting main app", flush=True)
-    from spotifactory.platforms.pi import main as run_pi
-    run_pi()
+    _run_platform()
 
 
 if __name__ == "__main__":

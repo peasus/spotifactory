@@ -13,6 +13,7 @@ SCOPES = [
     "user-read-playback-state",
     "user-modify-playback-state",
     "user-read-currently-playing",
+    "playlist-read-private",
 ]
 
 
@@ -24,6 +25,7 @@ class NowPlayingInfo:
     album_uri: str
     artwork_url: str
     shuffle_active: bool = False
+    context_uri: str | None = None  # playlist/album/artist the track is playing from
 
 
 _client: spotipy.Spotify | None = None
@@ -174,6 +176,7 @@ def get_now_playing() -> NowPlayingInfo | None:
         return None
     item = playback["item"]
     album = item["album"]
+    context = playback.get("context")
     return NowPlayingInfo(
         track_name=item["name"],
         artist_name=", ".join(a["name"] for a in item["artists"]),
@@ -181,4 +184,5 @@ def get_now_playing() -> NowPlayingInfo | None:
         album_uri=album["uri"],
         artwork_url=album["images"][0]["url"],
         shuffle_active=bool(playback.get("shuffle_state", False)),
+        context_uri=context.get("uri") if context else None,
     )

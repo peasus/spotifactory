@@ -105,7 +105,7 @@ class HomeScanStep(Step):
                     return
                 from spotifactory.spotify import get_now_playing, get_client
                 info = get_now_playing()
-                if info and info.album_uri == uri:
+                if info and (info.album_uri == uri or info.context_uri == uri):
                     print(f"[home] already playing {uri}, skipping start_playback", flush=True)
                     return
                 print(f"[home] start_playback {uri} on device {dev.device_id!r}", flush=True)

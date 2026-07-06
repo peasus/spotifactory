@@ -53,11 +53,17 @@ gui = [
     "Pillow>=9.0",
     "qrcode[pil]>=7.4",
 ]
+seengreat = [
+    "Pillow>=9.0",
+    "qrcode[pil]>=7.4",
+    "luma.oled>=3.8",
+    "RPi.GPIO>=0.7",
+]
 rpi = [
     "Pillow>=9.0",
     "qrcode[pil]>=7.4",
     "Adafruit-Blinka>=8.0.0",
-    "adafruit-circuitpython-ssd1306>=4.0.0",
+    "adafruit-circuitpython-ssd1306>=2.12.0",
     "luma.oled>=3.8",
     "RPi.GPIO>=0.7",
 ]
