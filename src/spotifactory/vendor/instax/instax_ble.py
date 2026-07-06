@@ -206,13 +206,19 @@ class InstaxBLE:
             while True:
                 self.adapter.scan_for(2000)
                 peripherals = self.adapter.scan_get_results()
+                # Prefer (ANDROID) over (IOS) — on Linux/BlueZ the ANDROID
+                # advertisement address connects reliably; IOS aborts locally.
+                peripherals = sorted(
+                    peripherals,
+                    key=lambda p: 0 if p.identifier().endswith('(ANDROID)') else 1,
+                )
                 for peripheral in peripherals:
                     foundName = peripheral.identifier()
                     foundAddress = peripheral.address()
                     if (self.deviceName and foundName.startswith(self.deviceName)) or \
                        (self.deviceAddress and foundAddress == self.deviceAddress) or \
                        (self.deviceName is None and self.deviceAddress is None and
-                       foundName.startswith('INSTAX-') and foundName.endswith('(IOS)')):
+                       foundName.startswith('INSTAX-')):
                         if peripheral.is_connectable():
                             return peripheral
                         elif not self.quiet:
