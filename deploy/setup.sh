@@ -35,7 +35,7 @@ sudo systemctl enable avahi-daemon
 sudo systemctl restart avahi-daemon
 
 echo "==> Adding $USER to hardware groups..."
-sudo usermod -a -G spi,gpio,i2c,bluetooth "$USER"
+sudo usermod -a -G spi,gpio,i2c,bluetooth,dialout "$USER"
 
 # --------------------------------------------------------- Balena WiFi Connect
 echo "==> Installing Balena WiFi Connect..."
