@@ -60,7 +60,7 @@ def run_pkce_auth(on_session_ready: Optional[Callable[[str], None]] = None) -> b
         return False
 
     print("[auth] exchanging code for tokens", flush=True)
-    auth.get_access_token(code, as_dict=False, check_cache=False)
+    auth.get_access_token(code, check_cache=False)
     print("[auth] token saved", flush=True)
     return True
 
