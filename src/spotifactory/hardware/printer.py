@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass
 from io import BytesIO
@@ -53,6 +54,13 @@ class _TrackedInstaxBLE(InstaxBLE):
             self.print_confirmed = True
 
 
+def _make_instax(print_enabled: bool, quiet: bool):
+    if sys.platform == "linux":
+        from spotifactory.vendor.instax.instax_rfcomm import InstaxRFCOMM
+        return InstaxRFCOMM(print_enabled=print_enabled, quiet=quiet)
+    return _TrackedInstaxBLE(print_enabled=print_enabled, quiet=quiet)
+
+
 def print_image(
     image: str | BytesIO,
     dry_run: bool = False,
@@ -73,12 +81,12 @@ def print_image(
         if on_progress:
             on_progress(msg)
 
-    instax = _TrackedInstaxBLE(print_enabled=not dry_run, quiet=True)
+    instax = _make_instax(print_enabled=not dry_run, quiet=True)
     try:
         _report("Connecting...")
         instax.connect(timeout=CONNECT_TIMEOUT)
 
-        if instax.peripheral is None or not instax.peripheral.is_connected():
+        if not instax.peripheral.is_connected():
             return PrintResult(printer_found=False, error="Printer not found")
 
         if instax.photosLeft == 0 and not dry_run:
