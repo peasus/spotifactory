@@ -1,5 +1,4 @@
-import RPi.GPIO as GPIO
-from luma.core.interface.serial import spi
+from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 from PIL import Image, ImageDraw, ImageFont
 
@@ -8,18 +7,13 @@ from spotifactory.display.scroll import ScrollTracker
 WIDTH = 128
 HEIGHT = 64
 
-# SPI display pins (BCM) — matches SeenGreat 1.3" OLED HAT (A) hardware switch in SPI mode
-_DC_PIN  = 25
-_RST_PIN = 17
+# I2C — SeenGreat 1.3" OLED HAT (A) with SW1=0, SW2=0 (I2C mode)
+_I2C_ADDRESS = 0x3C
 
 
 class DisplaySH1106:
     def __init__(self):
-        serial = spi(
-            device=0, port=0,
-            bus_speed_hz=8_000_000, transfer_size=4096,
-            gpio_DC=_DC_PIN, gpio_RST=_RST_PIN,
-        )
+        serial = i2c(port=1, address=_I2C_ADDRESS)
         self.device = sh1106(serial, rotate=2)
         self.image = Image.new("1", (WIDTH, HEIGHT))
         self.draw = ImageDraw.Draw(self.image)
