@@ -45,26 +45,35 @@ def play_spotify_uri(speaker_name: str, uri: str) -> None:
     """Clear the queue and start playing a Spotify URI on a Sonos speaker."""
     _ensure_spotify_service_number()
     speaker = _get_speaker(speaker_name)
-    plugin = ShareLinkPlugin(speaker)
-    speaker.clear_queue()
+    # Queue operations must go through the group coordinator.
+    coordinator = speaker.group.coordinator if speaker.group else speaker
+    plugin = ShareLinkPlugin(coordinator)
+    coordinator.clear_queue()
     try:
         position = plugin.add_share_link_to_queue(uri)
     except Exception as e:
-        if "804" in str(e):
+        err = str(e)
+        if "804" in err:
             raise RuntimeError(
-                f"Sonos UPnP 804 — Spotify is not linked in the Sonos app. "
-                f"Open the Sonos app → Browse → Add Music Services → Spotify."
+                "Sonos: Spotify is not linked. Open the Sonos app → "
+                "Browse → Add Music Services → Spotify (Premium required)."
+            ) from e
+        if "800" in err:
+            raise RuntimeError(
+                "Sonos: Spotify Premium is required to play via Sonos. "
+                "Link a Premium account in the Sonos app."
             ) from e
         raise
-    speaker.play_from_queue(position - 1)
-    print(f"[sonos] playing {uri} on {speaker_name!r}", flush=True)
+    coordinator.play_from_queue(position - 1)
+    print(f"[sonos] playing {uri} on {speaker_name!r} (coordinator: {coordinator.player_name!r})", flush=True)
 
 
 def pause_speaker(speaker_name: str) -> None:
     """Pause playback on a Sonos speaker."""
     try:
         speaker = _get_speaker(speaker_name)
-        speaker.pause()
+        coordinator = speaker.group.coordinator if speaker.group else speaker
+        coordinator.pause()
         print(f"[sonos] paused {speaker_name!r}", flush=True)
     except Exception as e:
         print(f"[sonos] pause error: {e}", flush=True)
