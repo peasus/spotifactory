@@ -63,6 +63,9 @@ if [ "$ARCH" = "aarch64" ]; then
   # Still need NetworkManager (the installer script normally sets this up)
   sudo apt-get install -y network-manager
   sudo systemctl enable NetworkManager
+  # dhcpcd conflicts with NetworkManager (present on Bullseye; not installed on Bookworm)
+  sudo systemctl disable dhcpcd 2>/dev/null || true
+  sudo systemctl stop dhcpcd 2>/dev/null || true
 else
   bash <(curl -sL https://github.com/balena-os/wifi-connect/raw/master/scripts/raspbian-install.sh)
 fi
