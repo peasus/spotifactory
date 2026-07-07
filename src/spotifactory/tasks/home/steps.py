@@ -51,14 +51,11 @@ class HomeScanStep(Step):
         self.shuffle_active = False
 
         _active_uri: str | None = None
-        _device_error: bool = False
-        _soco_speaker: str | None = None  # set when SoCo is handling playback
+        _soco_speaker: str | None = None  # set when active device is Sonos (restricted)
         last_poll = 0.0
 
         def on_poll() -> None:
             nonlocal last_poll
-            if _device_error:
-                return  # keep error visible until next successful scan
             now = time.monotonic()
             if now - last_poll < _POLL_INTERVAL_SECS:
                 return
@@ -78,7 +75,7 @@ class HomeScanStep(Step):
                 pass
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri, _device_error, _soco_speaker
+            nonlocal _active_uri, _soco_speaker
             uri = card.get("uri")
             if not uri:
                 return
@@ -91,17 +88,12 @@ class HomeScanStep(Step):
                 from spotifactory.spotify import get_playback_device
                 dev = get_playback_device()
                 if dev.restricted:
-                    from spotifactory.hardware.sonos import play_spotify_uri
-                    print(f"[home] device {dev.name!r} is restricted — using SoCo", flush=True)
-                    try:
-                        play_spotify_uri(dev.name, uri)
-                        _soco_speaker = dev.name
-                        _device_error = False
-                    except RuntimeError as e:
-                        print(f"[home] SoCo error: {e}", flush=True)
-                        _device_error = True
-                        self.status = "Link Spotify in"
-                        self.artist = "the Sonos app"
+                    # Sonos S2: programmatic play is not supported (see docs/sonos.md).
+                    # Pause on tag-remove still works via SoCo UPnP.
+                    print(f"[home] device {dev.name!r} is restricted — pause only via SoCo", flush=True)
+                    _soco_speaker = dev.name
+                    self.status = "Start in Spotify,"
+                    self.artist = "tag removes pauses"
                     return
                 from spotifactory.spotify import get_now_playing, get_client
                 info = get_now_playing()
@@ -111,15 +103,14 @@ class HomeScanStep(Step):
                 print(f"[home] start_playback {uri} on device {dev.device_id!r}", flush=True)
                 get_client().start_playback(context_uri=uri, device_id=dev.device_id)
                 _soco_speaker = None
-                _device_error = False
             except Exception as e:
                 reason = getattr(e, "reason", None)
                 if reason == "NO_ACTIVE_DEVICE" or "restricted device" in str(e).lower():
-                    _device_error = True
                     self.status = "Select speaker in"
                     self.artist = "Spotify app first"
                 else:
                     print(f"[home] start_playback error: {e}", flush=True)
+                _soco_speaker = None
 
         def on_remove(card: dict) -> None:
             nonlocal _active_uri, _soco_speaker
