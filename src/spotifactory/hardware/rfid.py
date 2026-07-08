@@ -9,14 +9,12 @@ import nfc
 
 
 def _patch_serial_nonexclusive() -> None:
-    """Disable pyserial's TIOCEXCL on macOS.
+    """Disable pyserial's TIOCEXCL exclusive-mode ioctl.
 
-    Some macOS USB-serial drivers (e.g. CH340) return ENODEV for the
-    TIOCEXCL ioctl that pyserial issues by default.  Setting exclusive=None
-    tells pyserial not to touch the exclusive-mode flag at all.
+    CH340 and similar USB-serial chips return ENODEV for the TIOCEXCL ioctl
+    that pyserial issues by default, on both macOS and Linux (Pi). Setting
+    exclusive=None tells pyserial not to touch the exclusive-mode flag at all.
     """
-    if sys.platform != "darwin":
-        return
     try:
         import serial
         _orig = serial.Serial.__init__
