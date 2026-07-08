@@ -105,6 +105,17 @@ def get_devices() -> list[dict]:
     return result.get("devices", [])
 
 
+@_with_auth_retry
+def find_device_by_name(name: str) -> dict | None:
+    """Return first Spotify Connect device whose name starts with `name` (case-insensitive)."""
+    devices = get_client().devices().get("devices", [])
+    name_lower = name.lower()
+    for d in devices:
+        if d.get("name", "").lower().startswith(name_lower):
+            return d
+    return None
+
+
 def set_active_device(device_id: str) -> None:
     global _active_device_id
     _active_device_id = device_id

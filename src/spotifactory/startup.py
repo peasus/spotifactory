@@ -109,6 +109,23 @@ def main() -> None:
         from spotifactory.auth_server import run_pkce_auth
         run_pkce_auth(on_session_ready=lambda url: _show_auth_url(display, url))
 
+    # ---------------------------------------------------------- Bluetooth
+    import os as _os
+    _mac = _os.environ.get("SPOTIFACTORY_SPEAKER_MAC", "").strip()
+    if _mac:
+        _show(display, "Connecting BT...", _mac[-8:])
+        import threading as _threading
+        def _reconnect_bt() -> None:
+            try:
+                from spotifactory.hardware.bluetooth import is_connected, reconnect
+                if not is_connected(_mac):
+                    reconnect(_mac)
+            except Exception as e:
+                print(f"[startup] BT reconnect: {e}", flush=True)
+        _threading.Thread(target=_reconnect_bt, daemon=True).start()
+        import time as _time
+        _time.sleep(1.5)
+
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
     print("[startup] starting main app", flush=True)

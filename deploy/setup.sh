@@ -20,6 +20,8 @@ sudo apt-get install -y \
   libusb-1.0-0-dev \
   i2c-tools \
   bluetooth bluez \
+  bluealsa \
+  bluez-alsa-utils \
   avahi-daemon \
   curl
 
@@ -77,6 +79,22 @@ else
   echo "  The app will still run if WiFi is already configured."
 fi
 
+# ----------------------------------------------------------- Raspotify
+echo "==> Installing Raspotify (Spotify Connect receiver)..."
+curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
+sudo cp "$REPO_DIR/deploy/raspotify.conf" /etc/default/raspotify
+sudo systemctl daemon-reload
+sudo systemctl enable raspotify
+sudo systemctl restart raspotify || true
+
+# BlueAlsa: bridge BlueZ Bluetooth to ALSA (no PipeWire needed on Lite)
+sudo systemctl enable bluealsa
+sudo systemctl start bluealsa || true
+
+# Passwordless sudo for "Pair Speaker" menu — restart raspotify and write ALSA config
+echo "$USER ALL=(ALL) NOPASSWD: /bin/systemctl restart raspotify, /usr/bin/tee /etc/asound.conf" \
+  | sudo tee /etc/sudoers.d/spotifactory-audio > /dev/null
+
 # ---------------------------------------------------- Python virtual environment
 echo "==> Setting up Python environment..."
 cd "$REPO_DIR"
@@ -118,3 +136,7 @@ echo "  2. Make sure http://spotifactory.local:8080/callback is in your Spotify"
 echo "     Developer Dashboard as an allowed Redirect URI."
 echo "  3. Reboot: sudo reboot"
 echo "     On boot the device will guide the recipient through WiFi + Spotify setup."
+echo "  4. Open the Spotify app → Devices → select 'Spotifactory' once to complete"
+echo "     Raspotify Zeroconf auth. After that, RFID tags play directly on the Pi."
+echo "  5. From the main menu → 'Pair Speaker' to connect a Bluetooth speaker."
+echo "     Audio will route through it automatically on the next tag scan."
