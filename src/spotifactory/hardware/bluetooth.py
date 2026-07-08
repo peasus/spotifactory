@@ -149,20 +149,23 @@ def scan_devices(timeout: int = 10) -> list[dict]:
 
 
 def pair_and_configure(mac: str) -> None:
-    """Pair, trust, and connect to a Bluetooth device."""
-    # Pair first — device must be in pairing mode
+    """Pair, trust, and connect to a Bluetooth device.
+
+    Scan must remain active during pairing so BlueZ can reach the device.
+    """
     pair_out = _pty_session(
-        ["power on", "agent NoInputNoOutput", "default-agent", f"pair {mac}"],
-        read_duration=15.0,
+        ["power on", "agent NoInputNoOutput", "default-agent",
+         "scan on", f"pair {mac}"],
+        read_duration=20.0,
     )
+    print(f"[bluetooth] pair output:\n{pair_out}", flush=True)
     if "Failed to pair" in pair_out or "not available" in pair_out.lower():
-        raise RuntimeError(
-            f"Pairing failed — make sure the speaker is in pairing mode.\n{pair_out.strip()}"
-        )
-    # Trust and connect in a separate session after pairing succeeds
+        raise RuntimeError("Keep speaker in pairing mode and try again")
+
     conn_out = _pty_session([f"trust {mac}", f"connect {mac}"], read_duration=10.0)
+    print(f"[bluetooth] connect output:\n{conn_out}", flush=True)
     if "Failed to connect" in conn_out:
-        raise RuntimeError(f"Connect failed:\n{conn_out.strip()}")
+        raise RuntimeError("Paired but could not connect — try again")
 
 
 def is_connected(mac: str) -> bool:
