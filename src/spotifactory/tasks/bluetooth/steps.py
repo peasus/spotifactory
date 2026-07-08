@@ -88,7 +88,8 @@ class PairStep(Step):
             pair_and_configure(mac)
             write_asoundrc(mac)
         except Exception as e:
-            self.show_for(f"Pair failed: {str(e)[:18]}", 3.0)
+            print(f"[bluetooth] pair_and_configure error: {e}", flush=True)
+            self.show_for(str(e)[:20], 3.0)
             return Done()
 
         # Persist MAC to .env for auto-reconnect on boot
