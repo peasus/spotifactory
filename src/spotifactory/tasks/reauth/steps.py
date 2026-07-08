@@ -4,7 +4,7 @@ import os
 import threading
 import uuid
 
-from spotifactory.tasks.base import Cancel, Done, Step, StepOutcome, TaskContext
+from spotifactory.tasks.base import Cancel, Continue, Done, Step, StepOutcome, TaskContext
 
 
 def _make_qr(url: str):
@@ -83,7 +83,7 @@ class QRAuthStep(Step):
         _set_client(_spotipy.Spotify(auth_manager=auth))
 
         self.show_for("Spotify connected!", 2.0)
-        return Done()
+        return Continue()
 
 
 class ZeroconfPromptStep(Step):
