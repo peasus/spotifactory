@@ -168,12 +168,9 @@ def pair_and_configure(mac: str) -> None:
     """Pair, trust, and connect to a Bluetooth device.
 
     Scan must remain active during pairing so BlueZ can reach the device.
+    Auto-confirms passkey prompts (numeric comparison pairing).
     """
-    pair_out = _pty_session(
-        ["power on", "agent NoInputNoOutput", "default-agent",
-         "scan on", f"pair {mac}"],
-        read_duration=20.0,
-    )
+    pair_out = _pair_interactive(mac)
     print(f"[bluetooth] pair output:\n{pair_out}", flush=True)
     if "Failed to pair" in pair_out or "not available" in pair_out.lower():
         raise RuntimeError("Keep speaker in pairing mode and try again")
@@ -182,6 +179,69 @@ def pair_and_configure(mac: str) -> None:
     print(f"[bluetooth] connect output:\n{conn_out}", flush=True)
     if "Failed to connect" in conn_out:
         raise RuntimeError("Paired but could not connect — try again")
+
+
+def _pair_interactive(mac: str, timeout: float = 25.0) -> str:
+    """Run pairing in a PTY session, auto-responding yes to passkey prompts."""
+    master_fd, slave_fd = pty.openpty()
+    proc = subprocess.Popen(
+        ["bluetoothctl"],
+        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        close_fds=True,
+    )
+    os.close(slave_fd)
+
+    output_parts: list[str] = []
+    buf = ""
+    deadline = time.monotonic() + timeout
+
+    try:
+        for cmd in ["power on", "agent NoInputNoOutput", "default-agent",
+                    "scan on", f"pair {mac}"]:
+            os.write(master_fd, (cmd + "\n").encode())
+            time.sleep(0.1)
+
+        while time.monotonic() < deadline:
+            remaining = max(0.05, deadline - time.monotonic())
+            try:
+                ready, _, _ = select.select([master_fd], [], [], min(remaining, 0.3))
+            except (ValueError, OSError):
+                break
+            if not ready:
+                continue
+            try:
+                chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
+            except OSError:
+                break
+            cleaned = _ANSI.sub("", chunk)
+            output_parts.append(cleaned)
+            buf += cleaned
+
+            # Auto-confirm numeric comparison passkey
+            if "(yes/no):" in buf:
+                os.write(master_fd, b"yes\n")
+                buf = ""
+
+            # Pairing finished (success or failure)
+            if "Pairing successful" in buf or "Failed to pair" in buf:
+                break
+
+        os.write(master_fd, b"quit\n")
+        time.sleep(0.2)
+    except OSError:
+        pass
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            proc.kill()
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+
+    return "".join(output_parts)
 
 
 def is_connected(mac: str) -> bool:
