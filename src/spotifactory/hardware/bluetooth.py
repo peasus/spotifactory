@@ -8,6 +8,18 @@ import subprocess
 import time
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*[mKABCDHJ]|\r")
+_HEX_NAME = re.compile(r"^[0-9A-Fa-f:_\-]+$")
+
+
+def _is_real_name(name: str, mac: str) -> bool:
+    """Return True only for human-readable device names."""
+    if not name or len(name) < 3:
+        return False
+    if name.upper() == mac:
+        return False
+    if _HEX_NAME.match(name):  # anonymous BLE devices broadcast hex strings as names
+        return False
+    return True
 
 
 def _pty_session(commands: list[str], read_duration: float = 0.0) -> str:
@@ -132,7 +144,7 @@ def scan_devices(timeout: int = 10) -> list[dict]:
     return [
         {"mac": mac, "name": name}
         for mac, name in found.items()
-        if name and name.upper() != mac
+        if _is_real_name(name, mac)
     ]
 
 
