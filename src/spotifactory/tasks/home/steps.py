@@ -11,7 +11,7 @@ from spotifactory.tasks.base import (
     TaskContext,
 )
 
-_POLL_INTERVAL_SECS = 1.0   # how often to refresh now-playing display from Spotify
+_POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
 
 
 class HomeScanStep(Step):
@@ -56,6 +56,9 @@ class HomeScanStep(Step):
 
         def on_poll() -> None:
             nonlocal last_poll
+            # Only poll Spotify while a tag is active — idle screen needs no API calls.
+            if _active_uri is None:
+                return
             now = time.monotonic()
             if now - last_poll < _POLL_INTERVAL_SECS:
                 return

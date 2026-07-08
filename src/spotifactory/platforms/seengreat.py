@@ -33,6 +33,7 @@ def main() -> None:
             time.sleep(0.05)
     finally:
         buttons.cleanup()
+        display.device.cleanup()  # release I2C bus cleanly so it doesn't lock on next start
 
 
 if __name__ == "__main__":
