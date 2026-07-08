@@ -19,6 +19,7 @@ class DisplaySH1106:
         self.draw = ImageDraw.Draw(self.image)
         self.font = ImageFont.load_default()
         self._scroll = ScrollTracker()
+        self._last_bytes: bytes = b""
 
     def clear(self):
         self.draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
@@ -64,4 +65,8 @@ class DisplaySH1106:
         self.draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=255)
 
     def update(self):
+        current = self.image.tobytes()
+        if current == self._last_bytes:
+            return
+        self._last_bytes = current
         self.device.display(self.image)
