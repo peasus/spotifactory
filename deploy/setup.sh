@@ -78,19 +78,12 @@ else
   echo "  The app will still run if WiFi is already configured."
 fi
 
-# ----------------------------------------------------------- PipeWire
+# ----------------------------------------------------------- PipeWire + autologin
 echo "==> Configuring PipeWire audio for user $USER..."
-USER_ID=$(id -u "$USER")
-# Enable linger so user services start at boot without a login session
-sudo loginctl enable-linger "$USER"
-# Ensure the runtime dir exists so systemctl --user works from this script
-sudo mkdir -p "/run/user/$USER_ID"
-sudo chown "$USER:$USER" "/run/user/$USER_ID"
-sudo chmod 700 "/run/user/$USER_ID"
-sudo -u "$USER" \
-  XDG_RUNTIME_DIR="/run/user/$USER_ID" \
-  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
-  systemctl --user enable pipewire pipewire-pulse wireplumber || true
+# PipeWire/WirePlumber need a real login session to register A2DP with BlueZ.
+# loginctl enable-linger is not sufficient — autologin to tty1 creates the
+# full session (D-Bus, seat) that PipeWire requires on Pi OS Lite.
+sudo raspi-config nonint do_boot_behaviour B2
 
 # ----------------------------------------------------------- Raspotify
 echo "==> Installing Raspotify (Spotify Connect receiver)..."
