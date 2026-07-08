@@ -5,19 +5,39 @@ import subprocess
 import time
 
 
+def _bt(args: list[str], input: str | None = None, timeout: int = 15) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bluetoothctl", *args],
+        input=input, capture_output=True, text=True, timeout=timeout,
+    )
+
+
 def scan_devices(timeout: int = 10) -> list[dict]:
     """Scan for nearby Bluetooth devices. Returns [{mac, name}]."""
-    result = subprocess.run(
-        ["bluetoothctl", "--timeout", str(timeout), "scan", "on"],
-        capture_output=True, text=True, timeout=timeout + 5,
+    _bt(["power", "on"])
+
+    # Start scanning in a background process
+    scan_proc = subprocess.Popen(
+        ["bluetoothctl", "scan", "on"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
-    output = result.stdout + result.stderr
+    try:
+        time.sleep(timeout)
+    finally:
+        scan_proc.terminate()
+        try:
+            scan_proc.wait(timeout=2)
+        except Exception:
+            scan_proc.kill()
+
+    # Query the devices bluetoothctl accumulated during the scan
+    result = _bt(["devices"])
     found: dict[str, str] = {}
-    for line in output.splitlines():
-        m = re.search(r"\[NEW\] Device ([0-9A-F:]{17}) (.+)", line)
+    for line in result.stdout.splitlines():
+        # Format: "Device AA:BB:CC:DD:EE:FF Name Here"
+        m = re.match(r"Device ([0-9A-F:]{17}) (.+)", line)
         if m:
             mac, name = m.group(1), m.group(2).strip()
-            # Skip unnamed or obviously internal entries
             if name and name != mac:
                 found[mac] = name
     return [{"mac": mac, "name": name} for mac, name in found.items()]
@@ -25,39 +45,40 @@ def scan_devices(timeout: int = 10) -> list[dict]:
 
 def pair_and_configure(mac: str) -> None:
     """Pair, trust, and connect to a Bluetooth device."""
-    def _bt(*args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["bluetoothctl", *args],
-            capture_output=True, text=True, timeout=15,
-        )
+    _bt(["power", "on"])
 
-    _bt("power", "on")
-    _bt("agent", "NoInputNoOutput")
-    _bt("default-agent")
-    _bt("pair", mac)
-    time.sleep(2)
-    _bt("trust", mac)
-    result = _bt("connect", mac)
-    if result.returncode != 0 and "Failed" in result.stdout:
-        raise RuntimeError(f"bluetoothctl connect failed: {result.stdout.strip()}")
+    # Run all pairing commands in a single bluetoothctl session so the
+    # agent registration and discovered device state are shared.
+    commands = "\n".join([
+        "agent NoInputNoOutput",
+        "default-agent",
+        f"pair {mac}",
+        f"trust {mac}",
+        f"connect {mac}",
+        "quit",
+    ]) + "\n"
+
+    result = subprocess.run(
+        ["bluetoothctl"],
+        input=commands,
+        capture_output=True, text=True, timeout=30,
+    )
+
+    output = result.stdout + result.stderr
+    if "Failed to connect" in output or "not available" in output.lower():
+        raise RuntimeError(f"Bluetooth pairing failed:\n{output.strip()}")
 
 
 def is_connected(mac: str) -> bool:
     """Return True if the Bluetooth device is currently connected."""
-    result = subprocess.run(
-        ["bluetoothctl", "info", mac],
-        capture_output=True, text=True, timeout=5,
-    )
+    result = _bt(["info", mac])
     return "Connected: yes" in result.stdout
 
 
 def reconnect(mac: str) -> None:
     """Attempt to connect to an already-trusted Bluetooth device. Does not raise."""
     try:
-        subprocess.run(
-            ["bluetoothctl", "connect", mac],
-            capture_output=True, text=True, timeout=10,
-        )
+        _bt(["connect", mac], timeout=10)
     except Exception:
         pass
 
