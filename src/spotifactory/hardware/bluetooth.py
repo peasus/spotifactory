@@ -261,31 +261,17 @@ def reconnect(mac: str) -> None:
         pass
 
 
-def write_asoundrc(mac: str) -> None:
-    """Write /etc/asound.conf to route ALSA default to the BT speaker via BlueAlsa.
+def set_bt_audio_output(mac: str) -> None:
+    """Set the paired BT speaker as the default PipeWire audio output.
 
-    Written system-wide (not ~/.asoundrc) so Raspotify's system service can read it.
-    Requires passwordless sudo for /usr/bin/tee /etc/asound.conf (set up by setup.sh).
+    PipeWire names BT sinks as bluez_output.AA_BB_CC_DD_EE_FF.1.
+    Uses pactl (PulseAudio compat layer) to set the default sink so
+    Raspotify's ALSA output routes to the speaker automatically.
     """
-    conf = f"""defaults.bluealsa.interface "hci0"
-defaults.bluealsa.device "{mac}"
-defaults.bluealsa.profile "a2dp"
-
-pcm.!default {{
-    type plug
-    slave.pcm {{
-        type bluealsa
-        interface "hci0"
-        device "{mac}"
-        profile "a2dp"
-    }}
-}}
-
-ctl.!default {{
-    type bluealsa
-}}
-"""
-    subprocess.run(
-        ["sudo", "tee", "/etc/asound.conf"],
-        input=conf, capture_output=True, text=True, check=True,
+    sink = "bluez_output." + mac.replace(":", "_") + ".1"
+    result = subprocess.run(
+        ["pactl", "set-default-sink", sink],
+        capture_output=True, text=True, timeout=5,
     )
+    if result.returncode != 0:
+        print(f"[bluetooth] pactl set-default-sink: {result.stderr.strip()}", flush=True)

@@ -84,9 +84,9 @@ class PairStep(Step):
 
         self.status = f"Pairing {name}..."
         try:
-            from spotifactory.hardware.bluetooth import pair_and_configure, write_asoundrc
+            from spotifactory.hardware.bluetooth import pair_and_configure, set_bt_audio_output
             pair_and_configure(mac)
-            write_asoundrc(mac)
+            set_bt_audio_output(mac)
         except Exception as e:
             print(f"[bluetooth] pair_and_configure error: {e}", flush=True)
             self.show_for(str(e)[:20], 3.0)

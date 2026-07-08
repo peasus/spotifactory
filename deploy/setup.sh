@@ -20,8 +20,7 @@ sudo apt-get install -y \
   libusb-1.0-0-dev \
   i2c-tools \
   bluetooth bluez \
-  bluealsa \
-  bluez-alsa-utils \
+  pipewire wireplumber libspa-0.2-bluetooth pipewire-alsa pipewire-pulse \
   avahi-daemon \
   curl
 
@@ -79,20 +78,37 @@ else
   echo "  The app will still run if WiFi is already configured."
 fi
 
+# ----------------------------------------------------------- PipeWire
+echo "==> Configuring PipeWire audio for user $USER..."
+USER_ID=$(id -u "$USER")
+# Enable linger so user services start at boot without a login session
+sudo loginctl enable-linger "$USER"
+# Ensure the runtime dir exists so systemctl --user works from this script
+sudo mkdir -p "/run/user/$USER_ID"
+sudo chown "$USER:$USER" "/run/user/$USER_ID"
+sudo chmod 700 "/run/user/$USER_ID"
+sudo -u "$USER" \
+  XDG_RUNTIME_DIR="/run/user/$USER_ID" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
+  systemctl --user enable pipewire pipewire-pulse wireplumber || true
+
 # ----------------------------------------------------------- Raspotify
 echo "==> Installing Raspotify (Spotify Connect receiver)..."
 curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
 sudo cp "$REPO_DIR/deploy/raspotify.conf" /etc/default/raspotify
+
+# Run Raspotify as the spotifactory user so it shares the PipeWire session
+sudo mkdir -p /etc/systemd/system/raspotify.service.d
+printf "[Service]\nUser=%s\nGroup=%s\nEnvironment=XDG_RUNTIME_DIR=/run/user/%s\n" \
+  "$USER" "$USER" "$USER_ID" \
+  | sudo tee /etc/systemd/system/raspotify.service.d/user.conf > /dev/null
+
 sudo systemctl daemon-reload
 sudo systemctl enable raspotify
 sudo systemctl restart raspotify || true
 
-# BlueAlsa: bridge BlueZ Bluetooth to ALSA (no PipeWire needed on Lite)
-sudo systemctl enable bluealsa
-sudo systemctl start bluealsa || true
-
-# Passwordless sudo for "Pair Speaker" menu — restart raspotify and write ALSA config
-echo "$USER ALL=(ALL) NOPASSWD: /bin/systemctl restart raspotify, /usr/bin/tee /etc/asound.conf" \
+# Passwordless sudo for "Pair Speaker" menu — restart raspotify
+echo "$USER ALL=(ALL) NOPASSWD: /bin/systemctl restart raspotify" \
   | sudo tee /etc/sudoers.d/spotifactory-audio > /dev/null
 
 # ---------------------------------------------------- Python virtual environment
