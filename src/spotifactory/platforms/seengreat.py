@@ -7,8 +7,9 @@ from spotifactory.runner import Runner
 from spotifactory.tasks.home import HomeTask
 
 
-def main() -> None:
-    display = DisplaySH1106()
+def main(display=None) -> None:
+    if display is None:
+        display = DisplaySH1106()
     buttons = SeenGreatInput()
     runner = Runner(display, MENUS, dry_run=False, home_task_class=HomeTask)
 
@@ -29,11 +30,17 @@ def main() -> None:
                 runner.handle_back()
 
             runner.tick()
-            runner.render()
+            try:
+                runner.render()
+            except Exception as e:
+                print(f"[display] render error (continuing): {e}", flush=True)
             time.sleep(0.05)
     finally:
         buttons.cleanup()
-        display.device.cleanup()  # release I2C bus cleanly so it doesn't lock on next start
+        try:
+            display.device.cleanup()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
