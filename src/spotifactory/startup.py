@@ -68,14 +68,14 @@ def _make_display():
     return DisplayOLED()
 
 
-def _run_platform():
+def _run_platform(display):
     import os
     platform = os.environ.get("SPOTIFACTORY_PLATFORM", "seengreat")
     if platform == "seengreat":
         from spotifactory.platforms.seengreat import main
     else:
         from spotifactory.platforms.pi import main
-    main()
+    main(display=display)
 
 
 def main() -> None:
@@ -129,7 +129,7 @@ def main() -> None:
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
     print("[startup] starting main app", flush=True)
-    _run_platform()
+    _run_platform(display)
 
 
 if __name__ == "__main__":
