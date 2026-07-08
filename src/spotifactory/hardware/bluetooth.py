@@ -13,16 +13,37 @@ def _bt(args: list[str], input: str | None = None, timeout: int = 15) -> subproc
 
 
 def scan_devices(timeout: int = 10) -> list[dict]:
-    """Scan for nearby Bluetooth devices. Returns [{mac, name}]."""
+    """Scan for nearby Bluetooth devices actively advertising right now.
+
+    Captures [NEW] Device lines from the live scan output rather than querying
+    `bluetoothctl devices`, which returns all previously-known devices regardless
+    of whether they are currently present.
+    """
     _bt(["power", "on"])
 
-    # Start scanning in a background process
     scan_proc = subprocess.Popen(
         ["bluetoothctl", "scan", "on"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True,
     )
+
+    found: dict[str, str] = {}
+    deadline = time.monotonic() + timeout
     try:
-        time.sleep(timeout)
+        assert scan_proc.stdout is not None
+        import select
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            ready, _, _ = select.select([scan_proc.stdout], [], [], min(remaining, 0.5))
+            if ready:
+                line = scan_proc.stdout.readline()
+                if not line:
+                    break
+                m = re.search(r"\[NEW\] Device ([0-9A-F:]{17}) (.+)", line)
+                if m:
+                    mac, name = m.group(1), m.group(2).strip()
+                    if name and name != mac:
+                        found[mac] = name
     finally:
         scan_proc.terminate()
         try:
@@ -30,16 +51,6 @@ def scan_devices(timeout: int = 10) -> list[dict]:
         except Exception:
             scan_proc.kill()
 
-    # Query the devices bluetoothctl accumulated during the scan
-    result = _bt(["devices"])
-    found: dict[str, str] = {}
-    for line in result.stdout.splitlines():
-        # Format: "Device AA:BB:CC:DD:EE:FF Name Here"
-        m = re.match(r"Device ([0-9A-F:]{17}) (.+)", line)
-        if m:
-            mac, name = m.group(1), m.group(2).strip()
-            if name and name != mac:
-                found[mac] = name
     return [{"mac": mac, "name": name} for mac, name in found.items()]
 
 
