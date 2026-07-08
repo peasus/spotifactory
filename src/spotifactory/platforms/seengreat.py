@@ -13,7 +13,6 @@ def main(display=None) -> None:
     buttons = SeenGreatInput()
     runner = Runner(display, MENUS, dry_run=False, home_task_class=HomeTask)
 
-    display_ok = True
     try:
         while True:
             action = buttons.read()
@@ -31,19 +30,11 @@ def main(display=None) -> None:
                 runner.handle_back()
 
             runner.tick()
-            if display_ok:
-                try:
-                    runner.render()
-                except Exception as e:
-                    print(f"[display] render failed, disabling display: {e}", flush=True)
-                    display_ok = False
+            runner.render()
             time.sleep(0.05)
     finally:
         buttons.cleanup()
-        try:
-            display.device.cleanup()
-        except Exception:
-            pass
+        display.device.cleanup()
 
 
 if __name__ == "__main__":
