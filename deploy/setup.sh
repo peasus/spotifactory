@@ -7,6 +7,7 @@ set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 USER="${SUDO_USER:-$(whoami)}"
+USER_ID="$(id -u "$USER")"
 
 echo "==> Spotifactory setup (repo: $REPO_DIR, user: $USER)"
 
@@ -88,21 +89,32 @@ sudo raspi-config nonint do_boot_behaviour B2
 # ----------------------------------------------------------- Raspotify
 echo "==> Installing Raspotify (Spotify Connect receiver)..."
 curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
-sudo cp "$REPO_DIR/deploy/raspotify.conf" /etc/default/raspotify
 
-# Run Raspotify as the spotifactory user so it shares the PipeWire session
-sudo mkdir -p /etc/systemd/system/raspotify.service.d
-printf "[Service]\nUser=%s\nGroup=%s\nEnvironment=XDG_RUNTIME_DIR=/run/user/%s\n" \
-  "$USER" "$USER" "$USER_ID" \
-  | sudo tee /etc/systemd/system/raspotify.service.d/user.conf > /dev/null
+# Disable the system service — we run Raspotify as a user service instead so it
+# lives in the same PipeWire session without user-namespace auth complications.
+sudo systemctl disable raspotify
+sudo systemctl stop raspotify || true
 
-sudo systemctl daemon-reload
-sudo systemctl enable raspotify
-sudo systemctl restart raspotify || true
+# Install as a user service so librespot and PipeWire share the same session.
+mkdir -p "$HOME/.config/systemd/user/"
+cat > "$HOME/.config/systemd/user/raspotify.service" << 'UNIT'
+[Unit]
+Description=Raspotify (Spotify Connect Client)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+Wants=pipewire.service pipewire-pulse.service
 
-# Passwordless sudo for "Pair Speaker" menu — restart raspotify
-echo "$USER ALL=(ALL) NOPASSWD: /bin/systemctl restart raspotify" \
-  | sudo tee /etc/sudoers.d/spotifactory-audio > /dev/null
+[Service]
+ExecStart=/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+UNIT
+
+systemctl --user daemon-reload
+systemctl --user enable raspotify
+systemctl --user start raspotify || true
 
 # ---------------------------------------------------- Python virtual environment
 echo "==> Setting up Python environment..."

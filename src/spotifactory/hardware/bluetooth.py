@@ -10,6 +10,26 @@ import time
 _ANSI = re.compile(r"\x1b\[[0-9;]*[mKABCDHJ]|\r")
 _HEX_NAME = re.compile(r"^[0-9A-Fa-f:_\-]+$")
 
+# Instax Square Link BLE address prefix (IOS personality)
+_INSTAX_IOS_PREFIX = "FA:AB:BC:"
+# Corresponding Classic BT address prefix (Android/RFCOMM personality)
+_INSTAX_ANDROID_PREFIX = "88:B4:36:"
+
+
+def is_instax(device: dict) -> bool:
+    """Return True if device is an Instax printer (name starts with INSTAX-)."""
+    return device.get("name", "").upper().startswith("INSTAX-")
+
+
+def instax_classic_addr(ios_mac: str) -> str:
+    """Derive the Classic BT (RFCOMM) address from the BLE IOS address.
+
+    Fujifilm firmware convention: FA:AB:BC:xx:xx:xx → 88:B4:36:xx:xx:xx.
+    The last three octets are the same across both personalities.
+    """
+    suffix = ios_mac.upper()[len(_INSTAX_IOS_PREFIX):]
+    return _INSTAX_ANDROID_PREFIX + suffix
+
 
 def _is_real_name(name: str, mac: str) -> bool:
     """Return True only for human-readable device names."""
@@ -89,6 +109,7 @@ def scan_devices(timeout: int = 10) -> list[dict]:
     os.close(slave_fd)
 
     found: dict[str, str] = {}
+    non_connectable: set[str] = set()  # beacons: Connectable: no
     buf = ""
     deadline = time.monotonic() + timeout
 
@@ -118,14 +139,22 @@ def scan_devices(timeout: int = 10) -> list[dict]:
                     mac = m.group(1).upper()
                     if mac not in found:
                         found[mac] = ""
-                # Name resolved inline or via CHG Name event
-                m = re.search(r"\[(?:NEW|CHG)\] Device ([0-9A-Fa-f:]{17}) (?:Name: )?(.+)", line)
+                # [NEW] carries the name inline; [CHG] must say "Name:" or "Alias:" explicitly.
+                # Accepting any [CHG] payload captures RSSI/TxPower/etc as fake names.
+                m = re.search(r"\[NEW\] Device ([0-9A-Fa-f:]{17}) (.+)", line)
+                if not m:
+                    m = re.search(r"\[CHG\] Device ([0-9A-Fa-f:]{17}) (?:Name|Alias): (.+)", line)
                 if m:
                     mac = m.group(1).upper()
                     name = m.group(2).strip()
-                    # Only update if it looks like a real name (not a property like "RSSI: -65")
-                    if name and ":" not in name and not name.startswith("-"):
+                    if name:
                         found[mac] = name
+                # Beacons advertise Connectable: no — exclude them regardless of name.
+                # Classic BT devices (speakers etc.) don't emit this property at all,
+                # so we only exclude on an explicit no rather than requiring yes.
+                m = re.search(r"\[CHG\] Device ([0-9A-Fa-f:]{17}) Connectable: no", line)
+                if m:
+                    non_connectable.add(m.group(1).upper())
 
         os.write(master_fd, b"scan off\n")
         time.sleep(0.2)
@@ -160,7 +189,7 @@ def scan_devices(timeout: int = 10) -> list[dict]:
     return [
         {"mac": mac, "name": name}
         for mac, name in found.items()
-        if _is_real_name(name, mac)
+        if _is_real_name(name, mac) and mac not in non_connectable
     ]
 
 
