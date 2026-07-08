@@ -84,3 +84,27 @@ class QRAuthStep(Step):
 
         self.show_for("Spotify connected!", 2.0)
         return Done()
+
+
+class ZeroconfPromptStep(Step):
+    """Prompts the user to select Spotifactory in the Spotify app.
+
+    This links Raspotify's audio stream to the same account just authenticated,
+    preventing a mismatch where the Web API controls one account but audio plays
+    on another. The user presses any button to dismiss, or it auto-advances after
+    30 seconds.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._cancel = threading.Event()
+        self.artist: str = ""
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        self.status = "Open Spotify app:"
+        self.artist = "tap Spotifactory"
+        self._cancel.wait(timeout=30.0)
+        return Done()

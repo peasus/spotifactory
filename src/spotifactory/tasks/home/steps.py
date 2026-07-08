@@ -85,17 +85,49 @@ class HomeScanStep(Step):
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
             try:
-                from spotifactory.spotify import get_playback_device
+                from spotifactory.spotify import (
+                    get_active_device, find_device_by_name,
+                    get_playback_device, get_now_playing, get_client,
+                )
+
+                # Tier 1: User explicitly chose a device via Choose Speaker
+                if get_active_device() is not None:
+                    dev = get_playback_device()
+                    info = get_now_playing()
+                    if info and (info.album_uri == uri or info.context_uri == uri):
+                        print(f"[home] already playing {uri}, skipping start_playback", flush=True)
+                        return
+                    print(f"[home] start_playback {uri} on chosen device {dev.device_id!r}", flush=True)
+                    get_client().start_playback(context_uri=uri, device_id=dev.device_id)
+                    _soco_speaker = None
+                    return
+
+                # Tier 2: Default to local Raspotify instance
+                raspotify = find_device_by_name("Spotifactory")
+                if raspotify:
+                    dev_id = raspotify["id"]
+                    print(f"[home] start_playback {uri} on Raspotify {dev_id!r}", flush=True)
+                    try:
+                        get_client().transfer_playback(dev_id, force_play=False)
+                    except Exception:
+                        pass
+                    get_client().start_playback(context_uri=uri, device_id=dev_id)
+                    _soco_speaker = None
+                    return
+
+                # Tier 3: Fall back to active Spotify device (Raspotify not yet auth'd)
                 dev = get_playback_device()
                 if dev.restricted:
-                    # Sonos S2: programmatic play is not supported (see docs/sonos.md).
-                    # Pause on tag-remove still works via SoCo UPnP.
+                    # Sonos S2: programmatic play not supported (see docs/sonos.md).
                     print(f"[home] device {dev.name!r} is restricted — pause only via SoCo", flush=True)
                     _soco_speaker = dev.name
                     self.status = "Start in Spotify,"
                     self.artist = "tag removes pauses"
                     return
-                from spotifactory.spotify import get_now_playing, get_client
+                if dev.device_id is None:
+                    self.status = "Select speaker in"
+                    self.artist = "Spotify app first"
+                    return
                 info = get_now_playing()
                 if info and (info.album_uri == uri or info.context_uri == uri):
                     print(f"[home] already playing {uri}, skipping start_playback", flush=True)
