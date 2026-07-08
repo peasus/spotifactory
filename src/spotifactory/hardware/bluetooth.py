@@ -100,12 +100,17 @@ def scan_devices(timeout: int = 10) -> list[dict]:
             buf += _ANSI.sub("", chunk)
             *lines, buf = buf.split("\n")
             for line in lines:
-                m = re.search(r"\[NEW\] Device ([0-9A-Fa-f:]{17}) (.+)", line)
+                # Initial discovery — name may still be the MAC address
+                m = re.search(r"\[NEW\] Device ([0-9A-Fa-f:]{17})(?: (.+))?", line)
                 if m:
                     mac = m.group(1).upper()
-                    name = m.group(2).strip()
-                    if name and name != mac:
-                        found[mac] = name
+                    if mac not in found:
+                        found[mac] = (m.group(2) or "").strip()
+                # Name resolved asynchronously after initial discovery
+                m = re.search(r"\[CHG\] Device ([0-9A-Fa-f:]{17}) Name: (.+)", line)
+                if m:
+                    mac = m.group(1).upper()
+                    found[mac] = m.group(2).strip()
 
         os.write(master_fd, b"scan off\n")
         time.sleep(0.2)
@@ -124,7 +129,11 @@ def scan_devices(timeout: int = 10) -> list[dict]:
         except OSError:
             pass
 
-    return [{"mac": mac, "name": name} for mac, name in found.items()]
+    return [
+        {"mac": mac, "name": name}
+        for mac, name in found.items()
+        if name and name.upper() != mac
+    ]
 
 
 def pair_and_configure(mac: str) -> None:
