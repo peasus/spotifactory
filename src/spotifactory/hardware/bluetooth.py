@@ -112,17 +112,20 @@ def scan_devices(timeout: int = 10) -> list[dict]:
             buf += _ANSI.sub("", chunk)
             *lines, buf = buf.split("\n")
             for line in lines:
-                # Initial discovery — name may still be the MAC address
-                m = re.search(r"\[NEW\] Device ([0-9A-Fa-f:]{17})(?: (.+))?", line)
+                # [NEW] = first time seen; [CHG] = already known, actively advertising
+                m = re.search(r"\[(?:NEW|CHG)\] Device ([0-9A-Fa-f:]{17})", line)
                 if m:
                     mac = m.group(1).upper()
                     if mac not in found:
-                        found[mac] = (m.group(2) or "").strip()
-                # Name resolved asynchronously after initial discovery
-                m = re.search(r"\[CHG\] Device ([0-9A-Fa-f:]{17}) Name: (.+)", line)
+                        found[mac] = ""
+                # Name resolved inline or via CHG Name event
+                m = re.search(r"\[(?:NEW|CHG)\] Device ([0-9A-Fa-f:]{17}) (?:Name: )?(.+)", line)
                 if m:
                     mac = m.group(1).upper()
-                    found[mac] = m.group(2).strip()
+                    name = m.group(2).strip()
+                    # Only update if it looks like a real name (not a property like "RSSI: -65")
+                    if name and ":" not in name and not name.startswith("-"):
+                        found[mac] = name
 
         os.write(master_fd, b"scan off\n")
         time.sleep(0.2)
@@ -140,6 +143,19 @@ def scan_devices(timeout: int = 10) -> list[dict]:
             os.close(master_fd)
         except OSError:
             pass
+
+    # For MACs with no resolved name yet, query bluetoothctl info
+    for mac in list(found):
+        if not _is_real_name(found[mac], mac):
+            result = subprocess.run(
+                ["bluetoothctl", "info", mac],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.splitlines():
+                m = re.search(r"Name: (.+)", line)
+                if m:
+                    found[mac] = m.group(1).strip()
+                    break
 
     return [
         {"mac": mac, "name": name}
