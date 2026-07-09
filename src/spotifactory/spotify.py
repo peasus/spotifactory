@@ -180,6 +180,18 @@ def transfer_playback(device_id: str) -> None:
 
 
 @_with_auth_retry
+def get_current_context() -> tuple[str | None, str | None]:
+    """Return (context_uri, album_uri) from current playback, including when paused."""
+    playback = get_client().current_playback()
+    if not playback or not playback.get("item"):
+        return None, None
+    context = playback.get("context")
+    context_uri = context.get("uri") if context else None
+    album_uri = (playback["item"].get("album") or {}).get("uri")
+    return context_uri, album_uri
+
+
+@_with_auth_retry
 def get_now_playing() -> NowPlayingInfo | None:
     sp = get_client()
     playback = sp.current_playback()

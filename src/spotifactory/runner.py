@@ -39,6 +39,7 @@ class Runner:
         self._task: Task | None = None
         self._pushed_menu: PushMenu | None = None
         self._home_task_class = home_task_class
+        self._home_blanked: bool = False
 
         if home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
@@ -51,6 +52,8 @@ class Runner:
 
     def handle_up(self) -> None:
         if self._in_home_scan():
+            if self._wake_if_sleeping():
+                return
             self._task.current_step.cancel()
             return
         if self._accepting_nav_input:
@@ -61,6 +64,8 @@ class Runner:
             self._task.current_step.toggle_url()
             return
         if self._in_home_scan():
+            if self._wake_if_sleeping():
+                return
             self._toggle_shuffle()
             return
         if self._accepting_nav_input:
@@ -71,6 +76,8 @@ class Runner:
             self._task.current_step.cancel()
             return
         if self._in_home_mode():
+            if self._wake_if_sleeping():
+                return
             self._prev_track()
             return
         # In a menu: treat left as Back
@@ -82,11 +89,15 @@ class Runner:
             self._task.current_step.toggle_url()
             return
         if self._in_home_mode():
+            if self._wake_if_sleeping():
+                return
             self._next_track()
         else:
             self.handle_select()
 
     def handle_select(self) -> None:
+        if self._in_home_scan() and self._wake_if_sleeping():
+            return
         item = self.nav.current.selected_item
 
         if self._pushed_menu is not None:
@@ -124,10 +135,13 @@ class Runner:
             self._task.current_step.simulate_scan(uri)
 
     def handle_back(self) -> None:
+        if self._wake_if_sleeping():
+            return
         if self._pushed_menu is not None:
             self._resolve(self._pushed_menu.on_cancel)
         elif self._task is None:
-            self.nav.pop()
+            if not self.nav.pop() and self._home_task_class is not None:
+                self._start_task(self._home_task_class)
 
     # ------------------------------------------------------------------
     # Tick — advance task state; call on every loop iteration
@@ -161,7 +175,7 @@ class Runner:
             and self._task.current_step
             and not self._task.current_step.is_done
         ):
-            self._render_status(self._task.current_step.status)
+            self._render_status(self._task.current_step)
             return
 
         self._render_menu()
@@ -212,7 +226,8 @@ class Runner:
         if self._pushed_menu is not None:
             self._resolve(self._pushed_menu.on_cancel)
         elif self._task is None:
-            self.nav.pop()
+            if not self.nav.pop() and self._home_task_class is not None:
+                self._start_task(self._home_task_class)
 
     def _prev_track(self) -> None:
         try:
@@ -234,6 +249,17 @@ class Runner:
             toggle_shuffle()
         except Exception:
             pass
+
+    def _wake_if_sleeping(self) -> bool:
+        """Blank the display and eat the button press if the home screen is sleeping."""
+        if not self._in_home_scan():
+            return False
+        step = self._task.current_step
+        if not step.screen_off:
+            return False
+        step.wake()
+        self._home_blanked = False
+        return True
 
     def _return_home(self) -> None:
         """After a task ends, go back to the home screen — unless we're already
@@ -295,6 +321,14 @@ class Runner:
 
     def _render_home(self) -> None:
         step = self._task.current_step
+        if step.screen_off:
+            if not self._home_blanked:
+                self.display.clear()
+                self.display.update()
+                self._home_blanked = True
+            return
+        self._home_blanked = False
+
         song = step.status
         artist = getattr(step, "artist", "")
         shuffle = getattr(step, "shuffle_active", False)
@@ -340,9 +374,15 @@ class Runner:
         if active:
             self.display.draw_circle(cx, cy + hh + 5, 2)
 
-    def _render_status(self, text: str) -> None:
+    def _render_status(self, step) -> None:
+        text = step.status
+        detail = getattr(step, "artist", "")
         self.display.clear()
-        self.display.draw_text(2, 20, text)
+        if detail:
+            self.display.draw_text(2, 14, text)
+            self.display.draw_text(2, 28, detail)
+        else:
+            self.display.draw_text(2, 20, text)
         self.display.update()
 
     def _render_menu(self) -> None:

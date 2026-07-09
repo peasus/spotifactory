@@ -27,8 +27,6 @@ def _devices_menu(devices: list[dict]):
 
 def _device_label(d: dict) -> str:
     name = d.get("name", "Unknown")
-    if len(name) > 18:
-        name = name[:17] + "…"
     return f"{name} *" if d.get("is_active") else name
 
 
