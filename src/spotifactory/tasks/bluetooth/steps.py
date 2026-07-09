@@ -28,10 +28,7 @@ def _bt_devices_menu(devices: list[dict]):
 
 
 def _device_label(d: dict) -> str:
-    name = d.get("name", d.get("mac", "Unknown"))
-    if len(name) > 18:
-        name = name[:17] + "…"
-    return name
+    return d.get("name", d.get("mac", "Unknown"))
 
 
 def _find_env_path() -> str:

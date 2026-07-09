@@ -12,6 +12,7 @@ from spotifactory.tasks.base import (
 )
 
 _POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
+_SCREEN_OFF_SECS = 600.0    # blank display after this many idle seconds
 
 
 class HomeScanStep(Step):
@@ -33,6 +34,8 @@ class HomeScanStep(Step):
         self._sim_tag: str | None = None
         self.artist: str = ""
         self.shuffle_active: bool = False
+        self.screen_off: bool = False
+        self._idle_since: float = time.monotonic()
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -40,6 +43,11 @@ class HomeScanStep(Step):
     def simulate_scan(self, uri: str) -> None:
         """Inject a virtual tag scan; works in both hardware and fallback modes."""
         self._sim_tag = uri
+
+    def wake(self) -> None:
+        """Called by the runner on any button press when screen is blanked."""
+        self.screen_off = False
+        self._idle_since = time.monotonic()
 
     # ------------------------------------------------------------------
 
@@ -49,6 +57,8 @@ class HomeScanStep(Step):
         self.status = "Place tag..."
         self.artist = ""
         self.shuffle_active = False
+        self.screen_off = False
+        self._idle_since = time.monotonic()
 
         _active_uri: str | None = None
         _soco_speaker: str | None = None  # set when active device is Sonos (restricted)
@@ -78,30 +88,42 @@ class HomeScanStep(Step):
                 pass
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri, _soco_speaker
+            nonlocal _active_uri, _soco_speaker, last_poll
             uri = card.get("uri")
             if not uri:
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
+            self.screen_off = False
+            self.status = "Loading..."
+            self.artist = ""
+            # Schedule a poll ~1.5 s from now — gives Spotify time to start before we query.
+            last_poll = time.monotonic() - _POLL_INTERVAL_SECS + 1.5
             if ctx.dry_run:
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
             try:
                 from spotifactory.spotify import (
-                    get_active_device, find_device_by_name,
-                    get_playback_device, get_now_playing, get_client,
+                    get_active_device, find_device_by_name, get_current_context,
+                    get_playback_device, get_client,
                 )
+
+                # Check if we're already in this album context (even if paused).
+                # If so, resume rather than restart from track 1.
+                _ctx_uri, _alb_uri = get_current_context()
+                _in_context = (_ctx_uri == uri or _alb_uri == uri)
+
+                def _play(device_id: str) -> None:
+                    if _in_context:
+                        get_client().start_playback(device_id=device_id)
+                    else:
+                        get_client().start_playback(context_uri=uri, device_id=device_id)
 
                 # Tier 1: User explicitly chose a device via Choose Speaker
                 if get_active_device() is not None:
                     dev = get_playback_device()
-                    info = get_now_playing()
-                    if info and (info.album_uri == uri or info.context_uri == uri):
-                        print(f"[home] already playing {uri}, skipping start_playback", flush=True)
-                        return
-                    print(f"[home] start_playback {uri} on chosen device {dev.device_id!r}", flush=True)
-                    get_client().start_playback(context_uri=uri, device_id=dev.device_id)
+                    print(f"[home] {'resume' if _in_context else 'start'} {uri} on chosen device {dev.device_id!r}", flush=True)
+                    _play(dev.device_id)
                     _soco_speaker = None
                     return
 
@@ -109,12 +131,12 @@ class HomeScanStep(Step):
                 raspotify = find_device_by_name("Spotifactory")
                 if raspotify:
                     dev_id = raspotify["id"]
-                    print(f"[home] start_playback {uri} on Raspotify {dev_id!r}", flush=True)
+                    print(f"[home] {'resume' if _in_context else 'start'} {uri} on Raspotify {dev_id!r}", flush=True)
                     try:
                         get_client().transfer_playback(dev_id, force_play=False)
                     except Exception:
                         pass
-                    get_client().start_playback(context_uri=uri, device_id=dev_id)
+                    _play(dev_id)
                     _soco_speaker = None
                     return
 
@@ -128,15 +150,11 @@ class HomeScanStep(Step):
                     self.artist = "tag removes pauses"
                     return
                 if dev.device_id is None:
-                    self.status = "Select speaker in"
-                    self.artist = "Spotify app first"
+                    self.status = "Open Spotify:"
+                    self.artist = "select Spotifactory"
                     return
-                info = get_now_playing()
-                if info and (info.album_uri == uri or info.context_uri == uri):
-                    print(f"[home] already playing {uri}, skipping start_playback", flush=True)
-                    return
-                print(f"[home] start_playback {uri} on device {dev.device_id!r}", flush=True)
-                get_client().start_playback(context_uri=uri, device_id=dev.device_id)
+                print(f"[home] {'resume' if _in_context else 'start'} {uri} on device {dev.device_id!r}", flush=True)
+                _play(dev.device_id)
                 _soco_speaker = None
             except Exception as e:
                 reason = getattr(e, "reason", None)
@@ -171,6 +189,15 @@ class HomeScanStep(Step):
                         print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None
             _soco_speaker = None
+            self.status = "Place tag..."
+            self.artist = ""
+            self.shuffle_active = False
+            self._idle_since = time.monotonic()
+
+        def check_idle() -> None:
+            if _active_uri is None and not self.screen_off:
+                if time.monotonic() - self._idle_since >= _SCREEN_OFF_SECS:
+                    self.screen_off = True
 
         def check_sim() -> None:
             sim = self._sim_tag
@@ -181,6 +208,7 @@ class HomeScanStep(Step):
         def terminate() -> bool:
             check_sim()
             on_poll()
+            check_idle()
             return self._cancel.is_set()
 
         # --- attempt real RFID ---
