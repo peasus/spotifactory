@@ -139,6 +139,11 @@ if [ ! -f "$REPO_DIR/.env" ]; then
   echo ""
 fi
 
+# ------------------------------------------------- Passwordless sudo for hardware
+# USB soft-reset (RFID reader recovery after crash/Ctrl+C)
+echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/*/authorized" \
+  | sudo tee /etc/sudoers.d/spotifactory-usb > /dev/null
+
 # --------------------------------------------------------------- systemd service
 echo "==> Installing systemd service..."
 sudo cp "$REPO_DIR/deploy/spotifactory.service" /etc/systemd/system/spotifactory.service

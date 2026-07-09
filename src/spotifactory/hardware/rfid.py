@@ -62,21 +62,64 @@ def _dev_path(nfcpy_port: str) -> str | None:
 
 
 def _reset_uart(dev_path: str) -> None:
-    """Send a serial BREAK to reset the PN532's UART state machine.
-
-    When nfcpy exits mid-session the PN532 can be left mid-frame or in
-    supervision mode. A BREAK signal (TX held low > 1 frame time) resets
-    its UART state machine to idle so the next init sequence is accepted.
-    """
+    """Flush serial buffers to clear leftover PN532 UART data from a previous session."""
     try:
         import serial
         with serial.Serial(dev_path, baudrate=115200, timeout=0.1, exclusive=None) as s:
-            s.send_break(duration=0.25)
             s.reset_input_buffer()
             s.reset_output_buffer()
-        time.sleep(0.15)
+        time.sleep(0.2)
     except Exception as e:
-        print(f"[rfid] uart reset failed: {e}", flush=True)
+        print(f"[rfid] uart flush: {e}", flush=True)
+
+
+def _usb_soft_reset(dev_path: str) -> bool:
+    """Software replug via sysfs authorized toggle — equivalent to physical unplug/replug.
+
+    The CH340 USB-serial chip can end up in ENODEV state after an abrupt
+    disconnect (process crash, Ctrl+C). Toggling 'authorized' tells the USB
+    host controller to disconnect then reconnect the device, resetting all state.
+    Returns True if the reset was attempted.
+    """
+    import pathlib
+    try:
+        tty_name = pathlib.Path(dev_path).name          # e.g. 'ttyUSB0'
+        sysfs = pathlib.Path(f"/sys/class/tty/{tty_name}/device")
+        if not sysfs.exists():
+            return False
+        # Walk up sysfs until we find the USB device node (has an 'authorized' file)
+        path = sysfs.resolve()
+        usb_path = None
+        for _ in range(6):
+            path = path.parent
+            if (path / "authorized").exists():
+                usb_path = path
+                break
+        if usb_path is None:
+            return False
+
+        auth = usb_path / "authorized"
+        print(f"[rfid] USB soft-reset via {auth}", flush=True)
+        _sysfs_write(auth, "0\n")
+        time.sleep(0.5)
+        _sysfs_write(auth, "1\n")
+        time.sleep(1.5)   # wait for re-enumeration and ch341 driver rebind
+        return True
+    except Exception as e:
+        print(f"[rfid] USB soft-reset failed: {e}", flush=True)
+        return False
+
+
+def _sysfs_write(path, content: str) -> None:
+    import pathlib
+    try:
+        pathlib.Path(path).write_text(content)
+    except PermissionError:
+        import subprocess
+        subprocess.run(
+            ["sudo", "tee", str(path)],
+            input=content, text=True, capture_output=True, check=True,
+        )
 
 
 def _parse_tag(tag) -> dict:
@@ -122,10 +165,15 @@ def watch_tags(
     last_exc: Exception | None = None
 
     for attempt in range(3):
-        if attempt > 0:
-            print(f"[rfid] retrying after UART reset (attempt {attempt + 1}/3)…", flush=True)
+        if attempt == 1:
+            print("[rfid] retry 1: flushing UART buffers…", flush=True)
             if dev:
                 _reset_uart(dev)
+        elif attempt == 2:
+            print("[rfid] retry 2: USB soft-reset (software replug)…", flush=True)
+            if dev:
+                _usb_soft_reset(dev)
+
         try:
             with nfc.ContactlessFrontend(port) as clf:
                 clf.connect(
@@ -137,7 +185,7 @@ def watch_tags(
             last_exc = exc
             if terminate and terminate():
                 return  # cancelled — don't retry
-            print(f"[rfid] ContactlessFrontend error: {exc}", flush=True)
+            print(f"[rfid] attempt {attempt + 1} failed: {exc}", flush=True)
 
     raise last_exc
 
