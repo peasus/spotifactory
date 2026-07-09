@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import subprocess
-
 from spotifactory.tasks.base import (
     Cancel,
     Continue,
@@ -77,14 +75,14 @@ class PairStep(Step):
             return Done()
 
         from spotifactory.hardware.bluetooth import (
-            is_instax, instax_classic_addr, pair_and_configure, set_bt_audio_output,
+            is_instax, instax_classic_addr, pair_and_configure, set_bt_audio_output, move_sink_inputs,
         )
         from dotenv import set_key
 
         if is_instax(device):
             self._pair_printer(mac, short_name, instax_classic_addr, pair_and_configure, set_key)
         else:
-            self._pair_speaker(mac, short_name, pair_and_configure, set_bt_audio_output, set_key)
+            self._pair_speaker(mac, short_name, pair_and_configure, set_bt_audio_output, move_sink_inputs, set_key)
 
         return Done()
 
@@ -105,7 +103,7 @@ class PairStep(Step):
 
         self.show_for(f"Printer ready!", 2.0)
 
-    def _pair_speaker(self, mac, name, pair_and_configure, set_bt_audio_output, set_key):
+    def _pair_speaker(self, mac, name, pair_and_configure, set_bt_audio_output, move_sink_inputs, set_key):
         self.status = f"Pairing {name}..."
         try:
             pair_and_configure(mac)
@@ -122,20 +120,5 @@ class PairStep(Step):
 
         # Move any active librespot stream to the new sink (no restart needed)
         self.status = "Switching audio..."
-        try:
-            result = subprocess.run(
-                ["pactl", "list", "sink-inputs", "short"],
-                capture_output=True, text=True, timeout=5,
-            )
-            sink_name = "bluez_output." + mac.replace(":", "_") + ".1"
-            for line in result.stdout.splitlines():
-                parts = line.split()
-                if parts:
-                    subprocess.run(
-                        ["pactl", "move-sink-input", parts[0], sink_name],
-                        capture_output=True, timeout=5,
-                    )
-        except Exception:
-            pass
-
+        move_sink_inputs(mac)
         self.show_for(f"Paired! {name}", 2.0)

@@ -308,3 +308,26 @@ def set_bt_audio_output(mac: str) -> None:
     )
     if result.returncode != 0:
         print(f"[bluetooth] pactl set-default-sink: {result.stderr.strip()}", flush=True)
+
+
+def move_sink_inputs(mac: str) -> None:
+    """Move all active PipeWire sink inputs (e.g. librespot) to the BT speaker.
+
+    set_bt_audio_output() updates the default for new streams; this redirects
+    any stream that is already running so Raspotify switches without restarting.
+    """
+    sink = "bluez_output." + mac.replace(":", "_") + ".1"
+    try:
+        result = subprocess.run(
+            ["pactl", "list", "sink-inputs", "short"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if parts:
+                subprocess.run(
+                    ["pactl", "move-sink-input", parts[0], sink],
+                    capture_output=True, timeout=5,
+                )
+    except Exception as e:
+        print(f"[bluetooth] move-sink-input: {e}", flush=True)

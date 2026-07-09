@@ -85,7 +85,7 @@ def _bt_reconnect_loop(mac: str) -> None:
     so the speaker can be turned on any time after Spotifactory starts.
     """
     import time
-    from spotifactory.hardware.bluetooth import is_connected, reconnect, set_bt_audio_output
+    from spotifactory.hardware.bluetooth import is_connected, reconnect, set_bt_audio_output, move_sink_inputs
 
     while True:
         try:
@@ -96,8 +96,9 @@ def _bt_reconnect_loop(mac: str) -> None:
                     print(f"[startup] BT speaker connected", flush=True)
                     try:
                         set_bt_audio_output(mac)
+                        move_sink_inputs(mac)
                     except Exception as e:
-                        print(f"[startup] set_bt_audio_output: {e}", flush=True)
+                        print(f"[startup] BT audio redirect: {e}", flush=True)
         except Exception as e:
             print(f"[startup] BT retry: {e}", flush=True)
         time.sleep(30)
