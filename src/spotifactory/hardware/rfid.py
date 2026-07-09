@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Callable
 
 import ndef
@@ -53,6 +54,31 @@ def _default_port() -> str:
 PORT = os.environ.get("NFC_PORT") or _default_port()
 
 
+def _dev_path(nfcpy_port: str) -> str | None:
+    """'tty:USB0' → '/dev/ttyUSB0', etc. Returns None for non-tty ports."""
+    if nfcpy_port.startswith("tty:"):
+        return "/dev/tty" + nfcpy_port[4:]
+    return None
+
+
+def _reset_uart(dev_path: str) -> None:
+    """Send a serial BREAK to reset the PN532's UART state machine.
+
+    When nfcpy exits mid-session the PN532 can be left mid-frame or in
+    supervision mode. A BREAK signal (TX held low > 1 frame time) resets
+    its UART state machine to idle so the next init sequence is accepted.
+    """
+    try:
+        import serial
+        with serial.Serial(dev_path, baudrate=115200, timeout=0.1, exclusive=None) as s:
+            s.send_break(duration=0.25)
+            s.reset_input_buffer()
+            s.reset_output_buffer()
+        time.sleep(0.15)
+    except Exception as e:
+        print(f"[rfid] uart reset failed: {e}", flush=True)
+
+
 def _parse_tag(tag) -> dict:
     entry = {"uid": tag.identifier.hex().upper()}
     if tag.ndef and tag.ndef.records:
@@ -92,11 +118,28 @@ def watch_tags(
             on_remove(_current[0])
         _current.clear()
 
-    with nfc.ContactlessFrontend(port) as clf:
-        clf.connect(
-            rdwr={"on-connect": on_connect, "on-release": on_release},
-            terminate=terminate,
-        )
+    dev = _dev_path(port)
+    last_exc: Exception | None = None
+
+    for attempt in range(3):
+        if attempt > 0:
+            print(f"[rfid] retrying after UART reset (attempt {attempt + 1}/3)…", flush=True)
+            if dev:
+                _reset_uart(dev)
+        try:
+            with nfc.ContactlessFrontend(port) as clf:
+                clf.connect(
+                    rdwr={"on-connect": on_connect, "on-release": on_release},
+                    terminate=terminate,
+                )
+            return  # clean exit (terminate() returned True)
+        except Exception as exc:
+            last_exc = exc
+            if terminate and terminate():
+                return  # cancelled — don't retry
+            print(f"[rfid] ContactlessFrontend error: {exc}", flush=True)
+
+    raise last_exc
 
 
 def read_card(port: str = PORT) -> dict | None:
