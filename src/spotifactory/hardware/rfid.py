@@ -87,12 +87,14 @@ def _usb_soft_reset(dev_path: str) -> bool:
         sysfs = pathlib.Path(f"/sys/class/tty/{tty_name}/device")
         if not sysfs.exists():
             return False
-        # Walk up sysfs until we find the USB device node (has an 'authorized' file)
+        # Walk up sysfs to the USB *device* node (not interface node).
+        # Interface nodes have a colon in their name (e.g. '1-1:1.0') and also
+        # carry 'authorized' on modern kernels — skip them; we want '1-1', '1-1.4', etc.
         path = sysfs.resolve()
         usb_path = None
         for _ in range(6):
             path = path.parent
-            if (path / "authorized").exists():
+            if ":" not in path.name and (path / "authorized").exists():
                 usb_path = path
                 break
         if usb_path is None:
@@ -101,9 +103,20 @@ def _usb_soft_reset(dev_path: str) -> bool:
         auth = usb_path / "authorized"
         print(f"[rfid] USB soft-reset via {auth}", flush=True)
         _sysfs_write(auth, "0\n")
-        time.sleep(0.5)
+        time.sleep(0.3)
         _sysfs_write(auth, "1\n")
-        time.sleep(1.5)   # wait for re-enumeration and ch341 driver rebind
+
+        # Poll for the tty device to reappear (re-enumeration timing varies).
+        dev = pathlib.Path(dev_path)
+        for _ in range(30):          # up to 15 s
+            if dev.exists():
+                time.sleep(0.3)      # brief settle before nfcpy opens it
+                break
+            time.sleep(0.5)
+        else:
+            print(f"[rfid] {dev_path} did not reappear after USB reset", flush=True)
+            return False
+
         return True
     except Exception as e:
         print(f"[rfid] USB soft-reset failed: {e}", flush=True)
@@ -164,7 +177,7 @@ def watch_tags(
     dev = _dev_path(port)
     last_exc: Exception | None = None
 
-    for attempt in range(3):
+    for attempt in range(4):
         if attempt == 1:
             print("[rfid] retry 1: flushing UART buffers…", flush=True)
             if dev:
@@ -173,6 +186,7 @@ def watch_tags(
             print("[rfid] retry 2: USB soft-reset (software replug)…", flush=True)
             if dev:
                 _usb_soft_reset(dev)
+        # attempt 3 is a plain retry after the USB reset with no extra delay
 
         try:
             with nfc.ContactlessFrontend(port) as clf:
