@@ -254,13 +254,30 @@ class HomeScanStep(Step):
             print(
                 f"[home] RFID unavailable ({type(exc).__name__}: {exc})\n"
                 f"[home]   available: {available or ['(none found)']}\n"
-                f"[home]   entering soft-wait (press t to simulate a tag)",
+                f"[home]   replug the USB reader — will retry every 30 s",
                 flush=True,
             )
             sys.stderr.flush()
+            self.status = "Replug RFID reader"
+            self.artist = ""
+
+            _next_rfid_retry = time.monotonic() + 30.0
 
             while not self._cancel.is_set():
                 terminate()
                 self._cancel.wait(timeout=0.05)
+
+                if time.monotonic() >= _next_rfid_retry and not self._cancel.is_set():
+                    _next_rfid_retry = time.monotonic() + 30.0
+                    print("[home] retrying RFID connection…", flush=True)
+                    try:
+                        watch_tags(
+                            on_place=on_place, on_remove=on_remove,
+                            terminate=terminate, port=PORT,
+                        )
+                        # watch_tags exited cleanly — terminate() returned True
+                        break
+                    except Exception:
+                        pass  # still not available; keep waiting
 
         return Cancel()

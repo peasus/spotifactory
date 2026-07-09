@@ -73,68 +73,6 @@ def _reset_uart(dev_path: str) -> None:
         print(f"[rfid] uart flush: {e}", flush=True)
 
 
-def _usb_soft_reset(dev_path: str) -> bool:
-    """Software replug via sysfs authorized toggle — equivalent to physical unplug/replug.
-
-    The CH340 USB-serial chip can end up in ENODEV state after an abrupt
-    disconnect (process crash, Ctrl+C). Toggling 'authorized' tells the USB
-    host controller to disconnect then reconnect the device, resetting all state.
-    Returns True if the reset was attempted.
-    """
-    import pathlib
-    try:
-        tty_name = pathlib.Path(dev_path).name          # e.g. 'ttyUSB0'
-        sysfs = pathlib.Path(f"/sys/class/tty/{tty_name}/device")
-        if not sysfs.exists():
-            return False
-        # Walk up sysfs to the USB *device* node (not interface node).
-        # Interface nodes have a colon in their name (e.g. '1-1:1.0') and also
-        # carry 'authorized' on modern kernels — skip them; we want '1-1', '1-1.4', etc.
-        path = sysfs.resolve()
-        usb_path = None
-        for _ in range(6):
-            path = path.parent
-            if ":" not in path.name and (path / "authorized").exists():
-                usb_path = path
-                break
-        if usb_path is None:
-            return False
-
-        auth = usb_path / "authorized"
-        print(f"[rfid] USB soft-reset via {auth}", flush=True)
-        _sysfs_write(auth, "0\n")
-        time.sleep(0.3)
-        _sysfs_write(auth, "1\n")
-
-        # Poll for the tty device to reappear (re-enumeration timing varies).
-        dev = pathlib.Path(dev_path)
-        for _ in range(30):          # up to 15 s
-            if dev.exists():
-                time.sleep(0.3)      # brief settle before nfcpy opens it
-                break
-            time.sleep(0.5)
-        else:
-            print(f"[rfid] {dev_path} did not reappear after USB reset", flush=True)
-            return False
-
-        return True
-    except Exception as e:
-        print(f"[rfid] USB soft-reset failed: {e}", flush=True)
-        return False
-
-
-def _sysfs_write(path, content: str) -> None:
-    import pathlib
-    try:
-        pathlib.Path(path).write_text(content)
-    except PermissionError:
-        import subprocess
-        subprocess.run(
-            ["sudo", "tee", str(path)],
-            input=content, text=True, capture_output=True, check=True,
-        )
-
-
 def _parse_tag(tag) -> dict:
     entry = {"uid": tag.identifier.hex().upper()}
     if tag.ndef and tag.ndef.records:
@@ -177,16 +115,11 @@ def watch_tags(
     dev = _dev_path(port)
     last_exc: Exception | None = None
 
-    for attempt in range(4):
+    for attempt in range(2):
         if attempt == 1:
-            print("[rfid] retry 1: flushing UART buffers…", flush=True)
+            print("[rfid] retry: flushing UART buffers…", flush=True)
             if dev:
                 _reset_uart(dev)
-        elif attempt == 2:
-            print("[rfid] retry 2: USB soft-reset (software replug)…", flush=True)
-            if dev:
-                _usb_soft_reset(dev)
-        # attempt 3 is a plain retry after the USB reset with no extra delay
 
         try:
             with nfc.ContactlessFrontend(port) as clf:
