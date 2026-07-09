@@ -37,6 +37,8 @@ def _is_real_name(name: str, mac: str) -> bool:
         return False
     if name.upper() == mac:
         return False
+    if name.startswith("(") and name.endswith(")"):  # BlueZ placeholders: (unknown), (random), etc.
+        return False
     if _HEX_NAME.match(name):  # anonymous BLE devices broadcast hex strings as names
         return False
     return True
@@ -183,7 +185,9 @@ def scan_devices(timeout: int = 10) -> list[dict]:
             for line in result.stdout.splitlines():
                 m = re.search(r"Name: (.+)", line)
                 if m:
-                    found[mac] = m.group(1).strip()
+                    candidate = m.group(1).strip()
+                    if _is_real_name(candidate, mac):
+                        found[mac] = candidate
                     break
 
     return [

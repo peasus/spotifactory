@@ -376,11 +376,16 @@ class Runner:
 
     def _render_status(self, step) -> None:
         text = step.status
-        detail = getattr(step, "artist", "")
+        artist = getattr(step, "artist", "")
+        detail = getattr(step, "detail", "")
         self.display.clear()
-        if detail:
+        if artist and detail:
+            self.display.draw_text(2, 4, text)
+            self.display.draw_text(2, 20, artist)
+            self.display.draw_text(2, 36, detail)
+        elif artist:
             self.display.draw_text(2, 14, text)
-            self.display.draw_text(2, 28, detail)
+            self.display.draw_text(2, 28, artist)
         else:
             self.display.draw_text(2, 20, text)
         self.display.update()

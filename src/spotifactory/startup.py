@@ -78,6 +78,31 @@ def _run_platform(display):
     main(display=display)
 
 
+def _bt_reconnect_loop(mac: str) -> None:
+    """Background daemon thread: reconnect paired BT speaker whenever it's not connected.
+
+    Runs for the lifetime of the app. Checks every 30 s and reconnects if needed,
+    so the speaker can be turned on any time after Spotifactory starts.
+    """
+    import time
+    from spotifactory.hardware.bluetooth import is_connected, reconnect, set_bt_audio_output
+
+    while True:
+        try:
+            if not is_connected(mac):
+                print(f"[startup] BT speaker not connected — reconnecting {mac[-8:]}", flush=True)
+                reconnect(mac)
+                if is_connected(mac):
+                    print(f"[startup] BT speaker connected", flush=True)
+                    try:
+                        set_bt_audio_output(mac)
+                    except Exception as e:
+                        print(f"[startup] set_bt_audio_output: {e}", flush=True)
+        except Exception as e:
+            print(f"[startup] BT retry: {e}", flush=True)
+        time.sleep(30)
+
+
 def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
@@ -115,15 +140,8 @@ def main() -> None:
     if _mac:
         _show(display, "Connecting BT...", _mac[-8:])
         import threading as _threading
-        def _reconnect_bt() -> None:
-            try:
-                from spotifactory.hardware.bluetooth import is_connected, reconnect
-                if not is_connected(_mac):
-                    reconnect(_mac)
-            except Exception as e:
-                print(f"[startup] BT reconnect: {e}", flush=True)
-        _threading.Thread(target=_reconnect_bt, daemon=True).start()
         import time as _time
+        _threading.Thread(target=_bt_reconnect_loop, args=(_mac,), daemon=True).start()
         _time.sleep(1.5)
 
     # -------------------------------------------------------------- Main app

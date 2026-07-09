@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from io import BytesIO
 
 import requests
@@ -115,8 +116,10 @@ class ScanStep(Step):
 class DoneStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         result = ctx.data.get("print_result")
-        photos = f"{result.photos_left} photos left" if result else ""
-        self.show_for(f"Album ready! {photos}".strip(), 3.0)
+        self.status = "Album ready!"
+        self.artist = f"{result.photos_left} photos left" if result else ""
+        self.detail = f"Battery: {result.battery_pct}%" if (result and result.battery_pct is not None) else ""
+        time.sleep(3.0)
         return Done()
 
 
@@ -225,6 +228,8 @@ class PlaylistScanStep(Step):
 class PlaylistDoneStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         result = ctx.data.get("print_result")
-        photos = f"{result.photos_left} photos left" if result else ""
-        self.show_for(f"Playlist ready! {photos}".strip(), 3.0)
+        self.status = "Playlist ready!"
+        self.artist = f"{result.photos_left} photos left" if result else ""
+        self.detail = f"Battery: {result.battery_pct}%" if (result and result.battery_pct is not None) else ""
+        time.sleep(3.0)
         return Done()
