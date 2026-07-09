@@ -19,6 +19,7 @@ class PrintResult:
     printer_found: bool
     success: bool = False
     photos_left: int = 0
+    battery_pct: int | None = None
     error: str | None = None
 
 
@@ -125,10 +126,12 @@ def print_image(
             return PrintResult(printer_found=True, success=False, error="Cancelled")
 
         success = dry_run or instax.print_confirmed
+        batt = instax.batteryPercentage
         return PrintResult(
             printer_found=True,
             success=success,
             photos_left=instax.photosLeft,
+            battery_pct=batt if batt > 0 else None,
         )
     except Exception as e:
         return PrintResult(printer_found=True, success=False, error=str(e))

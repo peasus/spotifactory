@@ -80,10 +80,12 @@ class HomeScanStep(Step):
                     self.status = info.track_name
                     self.artist = info.artist_name
                     self.shuffle_active = info.shuffle_active
-                else:
+                elif _active_uri is None:
+                    # Tag was removed between poll scheduling and this call.
                     self.status = "Place tag..."
                     self.artist = ""
                     self.shuffle_active = False
+                # else: tag still present but Spotify not reflecting playback yet — keep "Loading..."
             except Exception:
                 pass
 
@@ -97,8 +99,9 @@ class HomeScanStep(Step):
             self.screen_off = False
             self.status = "Loading..."
             self.artist = ""
-            # Schedule a poll ~1.5 s from now — gives Spotify time to start before we query.
-            last_poll = time.monotonic() - _POLL_INTERVAL_SECS + 1.5
+            # Poll as soon as possible — on_poll now guards against resetting "Loading..."
+            # to "Place tag..." if Spotify hasn't reflected the new state yet.
+            last_poll = time.monotonic() - _POLL_INTERVAL_SECS
             if ctx.dry_run:
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
@@ -181,10 +184,8 @@ class HomeScanStep(Step):
                     pause_speaker(_soco_speaker)
                 else:
                     try:
-                        from spotifactory.spotify import get_now_playing, get_client
-                        info = get_now_playing()
-                        if info and info.album_uri == _active_uri:
-                            get_client().pause_playback()
+                        from spotifactory.spotify import get_client
+                        get_client().pause_playback()
                     except Exception as e:
                         print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None
@@ -225,7 +226,12 @@ class HomeScanStep(Step):
 
             def _run_rfid() -> None:
                 try:
-                    watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
+                    while not self._cancel.is_set():
+                        watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
+                        if not self._cancel.is_set():
+                            # nfcpy exited without cancel — PN532 supervision dropped.
+                            # Reopen the reader so the home screen keeps working.
+                            print("[home] RFID: restarting after unexpected exit", flush=True)
                 except Exception as exc:
                     _rfid_exc.append(exc)
                 finally:
