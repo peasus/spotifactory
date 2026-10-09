@@ -294,20 +294,27 @@ def reconnect(mac: str) -> None:
         pass
 
 
-def set_bt_audio_output(mac: str) -> None:
+def set_bt_audio_output(mac: str) -> bool:
     """Set the paired BT speaker as the default PipeWire audio output.
 
     PipeWire names BT sinks as bluez_output.AA_BB_CC_DD_EE_FF.1.
     Uses pactl (PulseAudio compat layer) to set the default sink so
     Raspotify's ALSA output routes to the speaker automatically.
+    Returns False if pactl failed (sink not up yet, or PipeWire unreachable).
     """
     sink = "bluez_output." + mac.replace(":", "_") + ".1"
-    result = subprocess.run(
-        ["pactl", "set-default-sink", sink],
-        capture_output=True, text=True, timeout=5,
-    )
+    try:
+        result = subprocess.run(
+            ["pactl", "set-default-sink", sink],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"[bluetooth] pactl set-default-sink: {e}", flush=True)
+        return False
     if result.returncode != 0:
         print(f"[bluetooth] pactl set-default-sink: {result.stderr.strip()}", flush=True)
+        return False
+    return True
 
 
 def move_sink_inputs(mac: str) -> None:

@@ -145,6 +145,7 @@ sudo cp "$REPO_DIR/deploy/spotifactory.service" /etc/systemd/system/spotifactory
 # Patch the user and working directory to match the actual setup
 sudo sed -i "s|User=spotifactory|User=$USER|g" /etc/systemd/system/spotifactory.service
 sudo sed -i "s|/home/spotifactory/spotifactory|$REPO_DIR|g" /etc/systemd/system/spotifactory.service
+sudo sed -i "s|/run/user/1000|/run/user/$USER_ID|g" /etc/systemd/system/spotifactory.service
 sudo systemctl daemon-reload
 sudo systemctl enable spotifactory
 

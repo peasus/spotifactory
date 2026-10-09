@@ -10,6 +10,9 @@ from __future__ import annotations
 import socket
 import subprocess
 import sys
+import time
+
+_BOOT_NETWORK_WAIT_SECS = 30.0  # saved WiFi can take a while to associate after boot
 
 
 def _has_network(timeout: float = 3.0) -> bool:
@@ -18,6 +21,17 @@ def _has_network(timeout: float = 3.0) -> bool:
         return True
     except OSError:
         return False
+
+
+def _wait_for_network(timeout: float = _BOOT_NETWORK_WAIT_SECS) -> bool:
+    """Poll for connectivity so a slow WiFi join at boot doesn't trigger the captive portal."""
+    deadline = time.monotonic() + timeout
+    while True:
+        if _has_network():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(2.0)
 
 
 def _has_valid_token() -> bool:
@@ -83,22 +97,33 @@ def _bt_reconnect_loop(mac: str) -> None:
 
     Runs for the lifetime of the app. Checks every 30 s and reconnects if needed,
     so the speaker can be turned on any time after Spotifactory starts.
-    """
-    import time
-    from spotifactory.hardware.bluetooth import is_connected, reconnect, set_bt_audio_output, move_sink_inputs
 
+    Audio is (re)routed whenever the speaker is connected but not yet routed —
+    whether we reconnected it or BlueZ auto-reconnected it — and retried on the
+    next pass if PipeWire wasn't reachable yet (e.g. early in boot).
+    """
+    from spotifactory.hardware.bluetooth import (
+        is_connected,
+        move_sink_inputs,
+        reconnect,
+        set_bt_audio_output,
+    )
+
+    routed = False
     while True:
         try:
-            if not is_connected(mac):
+            connected = is_connected(mac)
+            if not connected:
                 print(f"[startup] BT speaker not connected — reconnecting {mac[-8:]}", flush=True)
                 reconnect(mac)
-                if is_connected(mac):
-                    print(f"[startup] BT speaker connected", flush=True)
-                    try:
-                        set_bt_audio_output(mac)
-                        move_sink_inputs(mac)
-                    except Exception as e:
-                        print(f"[startup] BT audio redirect: {e}", flush=True)
+                connected = is_connected(mac)
+            if not connected:
+                routed = False
+            elif not routed:
+                print("[startup] BT speaker connected — redirecting audio", flush=True)
+                routed = set_bt_audio_output(mac)
+                if routed:
+                    move_sink_inputs(mac)
         except Exception as e:
             print(f"[startup] BT retry: {e}", flush=True)
         time.sleep(30)
@@ -111,7 +136,7 @@ def main() -> None:
     display = _make_display()
 
     # ------------------------------------------------------------------ WiFi
-    if not _has_network():
+    if not _wait_for_network():
         _show(display, "Connect to WiFi:", "Spotifactory")
         print("[startup] no network — launching WiFi Connect", flush=True)
         try:
@@ -141,9 +166,8 @@ def main() -> None:
     if _mac:
         _show(display, "Connecting BT...", _mac[-8:])
         import threading as _threading
-        import time as _time
         _threading.Thread(target=_bt_reconnect_loop, args=(_mac,), daemon=True).start()
-        _time.sleep(1.5)
+        time.sleep(1.5)
 
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
