@@ -137,6 +137,7 @@ class InstaxRFCOMM:
     def connect(self, timeout: int = 0) -> None:
         addr = _find_printer_address(max(timeout, 10))
         if not addr:
+            print("[rfcomm] printer not found in BLE scan", flush=True)
             return
         try:
             sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
@@ -145,8 +146,8 @@ class InstaxRFCOMM:
             self._sock = sock
             self._connected = True
         except Exception as e:
-            if not self.quiet:
-                print(f"[rfcomm] connect failed: {e}", flush=True)
+            # Logged even when quiet: without it a failed connect only shows as "Printer Off?".
+            print(f"[rfcomm] connect to {addr} failed: {e}", flush=True)
             return
         self._query_printer_info()
 
