@@ -149,6 +149,17 @@ sudo sed -i "s|/run/user/1000|/run/user/$USER_ID|g" /etc/systemd/system/spotifac
 sudo systemctl daemon-reload
 sudo systemctl enable spotifactory
 
+# Let this user start/stop/restart only this service without a password, so
+# updates can be deployed over SSH (git pull + restart) non-interactively.
+SUDOERS_FILE=/etc/sudoers.d/spotifactory-service
+echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl start spotifactory, /usr/bin/systemctl stop spotifactory, /usr/bin/systemctl restart spotifactory" \
+  | sudo tee "$SUDOERS_FILE" > /dev/null
+sudo chmod 440 "$SUDOERS_FILE"
+if ! sudo visudo -cf "$SUDOERS_FILE" > /dev/null; then
+  echo "  WARNING: sudoers rule failed validation — removing it."
+  sudo rm -f "$SUDOERS_FILE"
+fi
+
 echo ""
 echo "==> Setup complete!"
 echo ""
@@ -164,3 +175,4 @@ echo "     (put it in pairing mode first), then the Instax printer."
 echo ""
 echo "To run by hand over SSH, stop the service first so they don't fight over"
 echo "the RFID reader and buttons: sudo systemctl stop spotifactory"
+echo "To deploy an update: cd $REPO_DIR && git pull && sudo systemctl restart spotifactory"
