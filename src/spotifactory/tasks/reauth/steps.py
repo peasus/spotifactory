@@ -91,14 +91,14 @@ class ZeroconfPromptStep(Step):
 
     This links Raspotify's audio stream to the same account just authenticated,
     preventing a mismatch where the Web API controls one account but audio plays
-    on another. The user presses any button to dismiss, or it auto-advances after
-    30 seconds.
+    on another. Back dismisses it, or it auto-advances after 30 seconds.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self._cancel = threading.Event()
         self.artist: str = ""
+        self.detail: str = ""
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -106,5 +106,6 @@ class ZeroconfPromptStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Open Spotify app:"
         self.artist = "tap Spotifactory"
+        self.detail = "Back when done"
         self._cancel.wait(timeout=30.0)
         return Done()

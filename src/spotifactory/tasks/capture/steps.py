@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from io import BytesIO
 
@@ -68,6 +69,35 @@ class FetchArtStep(Step):
         return Continue()
 
 
+def _pause_local_playback() -> bool:
+    """Pause Spotify if it's playing on this device's Raspotify.
+
+    The Pi Zero 2W has one radio for WiFi and Bluetooth, so streaming to the BT
+    speaker while uploading to the Instax over Bluetooth makes the audio stutter.
+    Music on other devices (Sonos, phone) is left alone. Returns True if paused.
+    """
+    try:
+        from spotifactory.spotify import get_client
+        sp = get_client()
+        playback = sp.current_playback()
+        device_name = ((playback or {}).get("device") or {}).get("name", "")
+        is_local = device_name.lower().startswith("spotifactory")
+        if playback and playback.get("is_playing") and is_local:
+            sp.pause_playback()
+            return True
+    except Exception as e:
+        print(f"[print] couldn't pause playback: {e}", flush=True)
+    return False
+
+
+def _resume_playback() -> None:
+    try:
+        from spotifactory.spotify import get_client
+        get_client().start_playback()
+    except Exception as e:
+        print(f"[print] couldn't resume playback: {e}", flush=True)
+
+
 class PrintStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         if ctx.printer_dry_run:
@@ -80,12 +110,17 @@ class PrintStep(Step):
                 print(f"[print] artwork preview failed: {e}", flush=True)
 
         from spotifactory.hardware.printer import print_image
+        paused = _pause_local_playback()
         self.status = "Connecting..."
-        result = print_image(
-            ctx.data["image"],
-            dry_run=ctx.printer_dry_run,
-            on_progress=lambda msg: setattr(self, "status", msg),
-        )
+        try:
+            result = print_image(
+                ctx.data["image"],
+                dry_run=ctx.printer_dry_run,
+                on_progress=lambda msg: setattr(self, "status", msg),
+            )
+        finally:
+            if paused:
+                _resume_playback()
         ctx.data["print_result"] = result
 
         if not result.printer_found:
@@ -101,16 +136,62 @@ class PrintStep(Step):
         return Continue()
 
 
-class ScanStep(Step):
+_TAG_WRITE_TIMEOUT_SECS = 120.0
+
+
+class _WriteTagStep(Step):
+    """Writes the just-printed album/playlist URI to a tag.
+
+    Back skips; gives up after a timeout so the device can't get stuck here.
+    A tag that can't be written shows why and waits for another one.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._cancel = threading.Event()
+        self.artist: str = ""
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def _uri(self, ctx: TaskContext) -> str:
+        raise NotImplementedError
+
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.hardware.rfid import write_uri
-        self.status = "Please scan tag"
-        try:
-            write_uri(ctx.data["info"].album_uri)
-        except Exception as e:
-            self.show_for(f"RFID error: {str(e)[:20]}", 3.0)
-            return Done()
-        return Continue()
+        from spotifactory.hardware.rfid import TagWriteError, write_uri
+
+        self._cancel.clear()
+        deadline = time.monotonic() + _TAG_WRITE_TIMEOUT_SECS
+
+        def stop() -> bool:
+            return self._cancel.is_set() or time.monotonic() >= deadline
+
+        while not stop():
+            self.status = "Place tag to write"
+            self.artist = "Back to skip"
+            try:
+                if write_uri(self._uri(ctx), terminate=stop):
+                    self.artist = ""
+                    return Continue()
+            except TagWriteError as e:
+                print(f"[capture] tag write failed: {e}", flush=True)
+                self.status = "Can't write this tag"
+                self.artist = str(e)
+                self._cancel.wait(3.0)
+            except Exception as e:
+                print(f"[capture] RFID error: {e}", flush=True)
+                self.artist = ""
+                self.show_for(f"RFID error: {e}", 3.0)
+                return Done()
+
+        self.artist = ""
+        self.show_for("Tag not written", 2.0)
+        return Done()
+
+
+class ScanStep(_WriteTagStep):
+    def _uri(self, ctx: TaskContext) -> str:
+        return ctx.data["info"].album_uri
 
 
 class DoneStep(Step):
@@ -213,16 +294,9 @@ class FetchPlaylistArtStep(Step):
         return Continue()
 
 
-class PlaylistScanStep(Step):
-    def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.hardware.rfid import write_uri
-        self.status = "Please scan tag"
-        try:
-            write_uri(ctx.data["playlist"]["uri"])
-        except Exception as e:
-            self.show_for(f"RFID error: {str(e)[:20]}", 3.0)
-            return Done()
-        return Continue()
+class PlaylistScanStep(_WriteTagStep):
+    def _uri(self, ctx: TaskContext) -> str:
+        return ctx.data["playlist"]["uri"]
 
 
 class PlaylistDoneStep(Step):
