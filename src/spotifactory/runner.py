@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Optional, Type
 
 from spotifactory.menu.definitions import MenuDef
@@ -14,6 +15,10 @@ from spotifactory.tasks.base import (
     Task,
     TaskContext,
 )
+
+# Tags only work on the home screen, so a menu left open would make the
+# device look broken — return home after this long without input.
+_MENU_IDLE_SECS = 60.0
 
 
 class Runner:
@@ -40,6 +45,7 @@ class Runner:
         self._pushed_menu: PushMenu | None = None
         self._home_task_class = home_task_class
         self._home_blanked: bool = False
+        self._last_input: float = time.monotonic()
 
         if home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
@@ -51,6 +57,7 @@ class Runner:
     # ------------------------------------------------------------------
 
     def handle_up(self) -> None:
+        self._last_input = time.monotonic()
         if self._in_home_scan():
             if self._wake_if_sleeping():
                 return
@@ -60,6 +67,7 @@ class Runner:
             self.nav.current.move_up()
 
     def handle_down(self) -> None:
+        self._last_input = time.monotonic()
         if self._in_qr_auth():
             self._task.current_step.toggle_url()
             return
@@ -72,19 +80,17 @@ class Runner:
             self.nav.current.move_down()
 
     def handle_left(self) -> None:
-        if self._in_qr_auth():
-            self._task.current_step.cancel()
-            return
+        self._last_input = time.monotonic()
         if self._in_home_mode():
             if self._wake_if_sleeping():
                 return
             self._prev_track()
             return
-        # In a menu: treat left as Back
-        if self._accepting_nav_input:
-            self._do_back()
+        # In a menu or a running task: treat left as Back
+        self.handle_back()
 
     def handle_right(self) -> None:
+        self._last_input = time.monotonic()
         if self._in_qr_auth():
             self._task.current_step.toggle_url()
             return
@@ -96,6 +102,7 @@ class Runner:
             self.handle_select()
 
     def handle_select(self) -> None:
+        self._last_input = time.monotonic()
         if self._in_home_scan() and self._wake_if_sleeping():
             return
         item = self.nav.current.selected_item
@@ -135,6 +142,7 @@ class Runner:
             self._task.current_step.simulate_scan(uri)
 
     def handle_back(self) -> None:
+        self._last_input = time.monotonic()
         if self._wake_if_sleeping():
             return
         if self._pushed_menu is not None:
@@ -142,12 +150,15 @@ class Runner:
         elif self._task is None:
             if not self.nav.pop() and self._home_task_class is not None:
                 self._start_task(self._home_task_class)
+        elif not self._in_home_mode():
+            self._cancel_running_step()
 
     # ------------------------------------------------------------------
     # Tick — advance task state; call on every loop iteration
     # ------------------------------------------------------------------
 
     def tick(self) -> None:
+        self._return_home_if_idle()
         if self._task is None:
             return
         if self._pushed_menu is not None:
@@ -222,12 +233,23 @@ class Runner:
         self._task = task_class(ctx)
         self._task.start_current_step()
 
-    def _do_back(self) -> None:
+    def _cancel_running_step(self) -> None:
+        """Ask the current step to stop, if it supports it (QR auth, tag write, prompts)."""
+        step = self._task.current_step if self._task else None
+        if step is not None and not step.is_done and hasattr(step, "cancel"):
+            step.cancel()
+
+    def _return_home_if_idle(self) -> None:
+        if self._home_task_class is None:
+            return
+        if time.monotonic() - self._last_input < _MENU_IDLE_SECS:
+            return
         if self._pushed_menu is not None:
-            self._resolve(self._pushed_menu.on_cancel)
+            self._resolve(self._pushed_menu.on_cancel)  # Cancel → home
         elif self._task is None:
-            if not self.nav.pop() and self._home_task_class is not None:
-                self._start_task(self._home_task_class)
+            while self.nav.pop():
+                pass
+            self._start_task(self._home_task_class)
 
     def _prev_track(self) -> None:
         try:
@@ -281,6 +303,7 @@ class Runner:
                 self._task.start_current_step()
 
         elif isinstance(outcome, PushMenu):
+            self._last_input = time.monotonic()  # idle timeout starts when the menu appears
             self._pushed_menu = outcome
             self.nav.push(outcome.menu)
 

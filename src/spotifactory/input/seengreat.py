@@ -27,12 +27,19 @@ class SeenGreatInput:
         GPIO.setmode(GPIO.BCM)
         for pin, _ in _MAPPING:
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        self._held = None
 
     def read(self):
+        """Return an action once per press; None while it's held or nothing is pressed."""
+        pressed = None
         for pin, action in _MAPPING:
             if not GPIO.input(pin):  # active-low
-                return action
-        return None
+                pressed = action
+                break
+        if pressed == self._held:
+            return None
+        self._held = pressed
+        return pressed
 
     def cleanup(self):
         GPIO.cleanup()

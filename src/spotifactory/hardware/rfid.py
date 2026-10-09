@@ -151,21 +151,44 @@ def read_card(port: str = PORT) -> dict | None:
     return result[0] if result else None
 
 
-def write_uri(uri: str, port: str = PORT) -> str | None:
-    """Write a URI to the next scanned tag. Returns the tag UID on success."""
-    result = []
+class TagWriteError(Exception):
+    """A tag was found but the URI could not be written to it."""
+
+
+def write_uri(
+    uri: str,
+    port: str = PORT,
+    terminate: "Callable[[], bool] | None" = None,
+) -> str | None:
+    """Write a URI to the next tag placed on the reader.
+
+    Returns the tag UID on success, or None if terminate() returned True first.
+    Raises TagWriteError if a tag was found but couldn't be written
+    (not NDEF-formatted, read-only, or too small for the URI).
+    """
+    result: list[str] = []
+    errors: list[str] = []
 
     def on_connect(tag):
         if not tag.ndef:
-            print("Tag is not NDEF formatted — cannot write.")
+            errors.append("Not NDEF formatted")
             return False
-        tag.ndef.records = [ndef.UriRecord(uri)]
+        if not tag.ndef.is_writeable:
+            errors.append("Tag is read-only")
+            return False
+        try:
+            tag.ndef.records = [ndef.UriRecord(uri)]
+        except Exception as e:
+            errors.append(str(e) or type(e).__name__)
+            return False
         result.append(tag.identifier.hex().upper())
         return False
 
     with nfc.ContactlessFrontend(port) as clf:
-        clf.connect(rdwr={"on-connect": on_connect})
+        clf.connect(rdwr={"on-connect": on_connect}, terminate=terminate or (lambda: False))
 
+    if errors:
+        raise TagWriteError(errors[0])
     return result[0] if result else None
 
 

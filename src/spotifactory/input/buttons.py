@@ -21,16 +21,22 @@ class ButtonInput:
 
         self.btn_select = digitalio.DigitalInOut(board.D21)
         self.btn_select.switch_to_input(pull=digitalio.Pull.UP)
+        self._held = None
 
     def read(self):
+        """Return an action once per press; None while it's held or nothing is pressed."""
+        pressed = None
         if not self.btn_up.value:
-            return "Up"
-        if not self.btn_down.value:
-            return "Down"
-        if not self.btn_left.value:
-            return "Left"
-        if not self.btn_right.value:
-            return "Right"
-        if not self.btn_select.value:
-            return "Select"
-        return None
+            pressed = "Up"
+        elif not self.btn_down.value:
+            pressed = "Down"
+        elif not self.btn_left.value:
+            pressed = "Left"
+        elif not self.btn_right.value:
+            pressed = "Right"
+        elif not self.btn_select.value:
+            pressed = "Select"
+        if pressed == self._held:
+            return None
+        self._held = pressed
+        return pressed
