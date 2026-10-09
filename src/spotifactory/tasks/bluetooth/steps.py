@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from spotifactory.tasks.base import (
     Cancel,
     Continue,
@@ -29,15 +27,6 @@ def _bt_devices_menu(devices: list[dict]):
 
 def _device_label(d: dict) -> str:
     return d.get("name", d.get("mac", "Unknown"))
-
-
-def _find_env_path() -> str:
-    import pathlib
-    here = pathlib.Path(__file__).resolve()
-    for parent in here.parents:
-        if (parent / "pyproject.toml").exists():
-            return str(parent / ".env")
-    return ".env"
 
 
 class ScanStep(Step):
@@ -76,19 +65,19 @@ class PairStep(Step):
             self.show_for(f"Would pair {short_name}", 2.0)
             return Done()
 
-        from spotifactory.hardware.bluetooth import (
-            is_instax, instax_classic_addr, pair_and_configure, set_bt_audio_output, move_sink_inputs,
-        )
-        from dotenv import set_key
+        from spotifactory.hardware.bluetooth import is_instax
 
         if is_instax(device):
-            self._pair_printer(mac, short_name, instax_classic_addr, pair_and_configure, set_key)
+            self._pair_printer(mac, short_name)
         else:
-            self._pair_speaker(mac, short_name, pair_and_configure, set_bt_audio_output, move_sink_inputs, set_key)
+            self._pair_speaker(mac, short_name)
 
         return Done()
 
-    def _pair_printer(self, ios_mac, name, instax_classic_addr, pair_and_configure, set_key):
+    def _pair_printer(self, ios_mac, name):
+        from spotifactory.hardware.bluetooth import instax_classic_addr, pair_and_configure
+        from spotifactory.settings import save_setting
+
         classic_mac = instax_classic_addr(ios_mac)
         self.status = f"Pairing {name}..."
         try:
@@ -98,16 +87,18 @@ class PairStep(Step):
             self.show_for(str(e), 3.0)
             return
 
-        # Save for next boot, and apply now so printing skips the BLE scan.
-        os.environ["INSTAX_BT_ADDRESS"] = classic_mac
-        try:
-            set_key(_find_env_path(), "INSTAX_BT_ADDRESS", classic_mac)
-        except Exception:
-            pass
-
+        # Applies now (printing skips the BLE scan) and on the next boot.
+        save_setting("INSTAX_BT_ADDRESS", classic_mac)
         self.show_for("Printer ready!", 2.0)
 
-    def _pair_speaker(self, mac, name, pair_and_configure, set_bt_audio_output, move_sink_inputs, set_key):
+    def _pair_speaker(self, mac, name):
+        from spotifactory.hardware.bluetooth import (
+            move_sink_inputs,
+            pair_and_configure,
+            set_bt_audio_output,
+        )
+        from spotifactory.settings import save_setting
+
         self.status = f"Pairing {name}..."
         try:
             pair_and_configure(mac)
@@ -117,10 +108,7 @@ class PairStep(Step):
             self.show_for(str(e), 3.0)
             return
 
-        try:
-            set_key(_find_env_path(), "SPOTIFACTORY_SPEAKER_MAC", mac)
-        except Exception:
-            pass
+        save_setting("SPOTIFACTORY_SPEAKER_MAC", mac)
 
         # Move any active librespot stream to the new sink (no restart needed)
         self.status = "Switching audio..."

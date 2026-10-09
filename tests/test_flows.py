@@ -226,3 +226,50 @@ class TestPairAndConfigure:
         cmds = self._pair("Failed to pair: org.bluez.Error.AlreadyExists",
                           "Connection successful")
         assert cmds[-1] == "connect 88:B4:36:18:6F:4F"
+
+
+# ---------------------------------------------------------------------------
+# Chosen speaker persists across restarts and idle
+# ---------------------------------------------------------------------------
+
+class TestChosenSpeaker:
+    @pytest.fixture(autouse=True)
+    def _isolated_env(self, tmp_path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("")
+        clean = {"SPOTIFACTORY_DEVICE_ID": "", "SPOTIFACTORY_DEVICE_NAME": ""}
+        with patch.dict("os.environ", clean), \
+             patch("spotifactory.settings.env_path", return_value=str(env_file)):
+            self.env_file = env_file
+            yield
+
+    def test_choice_is_saved_to_env_and_read_back(self):
+        from dotenv import dotenv_values
+
+        from spotifactory.spotify import get_active_device, set_active_device
+        assert get_active_device() is None
+        set_active_device("abc_amzn_1", "Joe's Echo")
+        assert get_active_device().name == "Joe's Echo"
+        saved = dotenv_values(self.env_file)
+        assert saved["SPOTIFACTORY_DEVICE_ID"] == "abc_amzn_1"
+        assert saved["SPOTIFACTORY_DEVICE_NAME"] == "Joe's Echo"
+
+    def test_resolves_by_name_when_id_changed(self):
+        from spotifactory.spotify import ChosenDevice, resolve_chosen_device
+        sp = MagicMock()
+        sp.devices.return_value = {"devices": [{"id": "new-id", "name": "Guest Room Echo"}]}
+        with patch("spotifactory.spotify.get_client", return_value=sp):
+            assert resolve_chosen_device(ChosenDevice("old-id", "Guest Room Echo")) == "new-id"
+            assert resolve_chosen_device(ChosenDevice("old-id", "Gone")) is None
+
+    def test_choice_saved_even_if_speaker_is_asleep(self):
+        from spotifactory.spotify import get_active_device
+        from spotifactory.tasks.speaker.steps import SetDeviceStep
+        ctx = TaskContext(dry_run=False, data={"selected": {"id": "e1", "name": "Guest Room Echo"}})
+        step = SetDeviceStep()
+        with patch("spotifactory.spotify.transfer_playback", side_effect=Exception("404")), \
+             patch("spotifactory.tasks.base.time.sleep"):
+            assert isinstance(step.run(ctx), Done)
+        assert get_active_device().id == "e1"
+        assert step.status == "Saved: Guest Room Echo"
+        assert step.artist == "Not responding now"

@@ -106,9 +106,15 @@ class HomeScanStep(Step):
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
             try:
+                import spotipy
+
                 from spotifactory.spotify import (
-                    get_active_device, find_device_by_name, get_current_context,
-                    get_playback_device, get_client,
+                    find_device_by_name,
+                    get_active_device,
+                    get_client,
+                    get_current_context,
+                    get_playback_device,
+                    resolve_chosen_device,
                 )
 
                 # Check if we're already in this album context (even if paused).
@@ -122,11 +128,28 @@ class HomeScanStep(Step):
                     else:
                         get_client().start_playback(context_uri=uri, device_id=device_id)
 
-                # Tier 1: User explicitly chose a device via Choose Speaker
-                if get_active_device() is not None:
-                    dev = get_playback_device()
-                    print(f"[home] {'resume' if _in_context else 'start'} {uri} on chosen device {dev.device_id!r}", flush=True)
-                    _play(dev.device_id)
+                verb = "resume" if _in_context else "start"
+
+                # Tier 1: the speaker last picked in Choose Speaker (persisted).
+                # No silent fallback — playing in a different room would be worse
+                # than saying the chosen speaker isn't reachable.
+                chosen = get_active_device()
+                if chosen is not None:
+                    label = chosen.name or "Chosen speaker"
+                    dev_id = resolve_chosen_device(chosen)
+                    if dev_id is None:
+                        print(f"[home] chosen device {label!r} not listed by Spotify", flush=True)
+                        self.status = label
+                        self.artist = "not available"
+                        return
+                    print(f"[home] {verb} {uri} on chosen device {label!r} ({dev_id})", flush=True)
+                    try:
+                        _play(dev_id)
+                    except spotipy.SpotifyException as e:
+                        # Idle Echos stay listed but 404 until woken.
+                        print(f"[home] chosen device {label!r} didn't respond: {e}", flush=True)
+                        self.status = label
+                        self.artist = "not responding"
                     _soco_speaker = None
                     return
 
@@ -134,7 +157,7 @@ class HomeScanStep(Step):
                 raspotify = find_device_by_name("Spotifactory")
                 if raspotify:
                     dev_id = raspotify["id"]
-                    print(f"[home] {'resume' if _in_context else 'start'} {uri} on Raspotify {dev_id!r}", flush=True)
+                    print(f"[home] {verb} {uri} on Raspotify {dev_id!r}", flush=True)
                     try:
                         get_client().transfer_playback(dev_id, force_play=False)
                     except Exception:
@@ -153,19 +176,21 @@ class HomeScanStep(Step):
                     self.artist = "tag removes pauses"
                     return
                 if dev.device_id is None:
-                    self.status = "Open Spotify:"
-                    self.artist = "select Spotifactory"
+                    self.status = "No speaker:"
+                    self.artist = "Up > Choose Speaker"
                     return
-                print(f"[home] {'resume' if _in_context else 'start'} {uri} on device {dev.device_id!r}", flush=True)
+                print(f"[home] {verb} {uri} on device {dev.device_id!r}", flush=True)
                 _play(dev.device_id)
                 _soco_speaker = None
             except Exception as e:
                 reason = getattr(e, "reason", None)
                 if reason == "NO_ACTIVE_DEVICE" or "restricted device" in str(e).lower():
-                    self.status = "Select speaker in"
-                    self.artist = "Spotify app first"
+                    self.status = "No speaker:"
+                    self.artist = "Up > Choose Speaker"
                 else:
                     print(f"[home] start_playback error: {e}", flush=True)
+                    self.status = "Couldn't play"
+                    self.artist = "try again"
                 _soco_speaker = None
 
         def on_remove(card: dict) -> None:

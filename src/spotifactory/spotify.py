@@ -29,7 +29,17 @@ class NowPlayingInfo:
 
 
 _client: spotipy.Spotify | None = None
-_active_device_id: str | None = None
+
+# The speaker picked in Choose Speaker. Persisted (see settings.py) because
+# Spotify forgets the "active device" after idle and the app restarts on reboot.
+_DEVICE_ID_KEY = "SPOTIFACTORY_DEVICE_ID"
+_DEVICE_NAME_KEY = "SPOTIFACTORY_DEVICE_NAME"
+
+
+@dataclass
+class ChosenDevice:
+    id: str
+    name: str
 
 
 def _make_auth_manager():
@@ -116,13 +126,35 @@ def find_device_by_name(name: str) -> dict | None:
     return None
 
 
-def set_active_device(device_id: str) -> None:
-    global _active_device_id
-    _active_device_id = device_id
+def set_active_device(device_id: str, name: str = "") -> None:
+    """Remember the speaker chosen in Choose Speaker, across idle and restarts."""
+    from spotifactory.settings import save_setting
+    save_setting(_DEVICE_ID_KEY, device_id)
+    save_setting(_DEVICE_NAME_KEY, name)
 
 
-def get_active_device() -> str | None:
-    return _active_device_id
+def get_active_device() -> ChosenDevice | None:
+    device_id = os.environ.get(_DEVICE_ID_KEY, "").strip()
+    if not device_id:
+        return None
+    return ChosenDevice(device_id, os.environ.get(_DEVICE_NAME_KEY, "").strip())
+
+
+@_with_auth_retry
+def resolve_chosen_device(chosen: ChosenDevice) -> str | None:
+    """Return the chosen speaker's current device id, or None if Spotify doesn't list it.
+
+    Matches by id first, then by name, since some speakers get a new id when
+    they reconnect.
+    """
+    devices = get_client().devices().get("devices", [])
+    for d in devices:
+        if d.get("id") == chosen.id:
+            return d["id"]
+    for d in devices:
+        if chosen.name and d.get("name") == chosen.name:
+            return d.get("id")
+    return None
 
 
 class DeviceInfo:
@@ -149,8 +181,9 @@ def get_playback_device() -> DeviceInfo:
     Never falls back to an arbitrary non-active device — that would start
     playback on the wrong speaker.
     """
-    if _active_device_id is not None:
-        return DeviceInfo(_active_device_id, restricted=False)
+    chosen = get_active_device()
+    if chosen is not None:
+        return DeviceInfo(chosen.id, restricted=False, name=chosen.name)
     sp = get_client()
     playback = sp.current_playback()
     if playback and playback.get("device"):

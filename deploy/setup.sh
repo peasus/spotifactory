@@ -104,7 +104,9 @@ After=pipewire.service pipewire-pulse.service wireplumber.service
 Wants=pipewire.service pipewire-pulse.service
 
 [Service]
-ExecStart=/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160
+# --system-cache keeps the Zeroconf login across restarts, so "Spotifactory" only
+# has to be picked in the Spotify app once. Audio caching is off to spare the SD card.
+ExecStart=/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache
 Restart=on-failure
 RestartSec=5
 

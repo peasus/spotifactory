@@ -53,26 +53,35 @@ class FetchDevicesStep(Step):
 
 
 class SetDeviceStep(Step):
+    def __init__(self) -> None:
+        super().__init__()
+        self.artist: str = ""
+
     def run(self, ctx: TaskContext) -> StepOutcome:
         device = ctx.data.get("selected")
         if not device:
             return Done()
 
         name = device.get("name", "device")
-        if len(name) > 14:
-            name = name[:13] + "…"
 
         if ctx.dry_run:
-            self.show_for(f"Would switch to\n{name}", 2.0)
+            self.artist = name
+            self.show_for("Would switch to", 2.0)
             return Done()
+
+        from spotifactory.spotify import set_active_device, transfer_playback
+
+        # Save first: the choice stands even if the speaker is asleep right now
+        # (idle Echos are listed but return 404 until something wakes them).
+        set_active_device(device["id"], name)
 
         self.status = "Switching..."
         try:
-            from spotifactory.spotify import set_active_device, transfer_playback
             transfer_playback(device["id"])
-            set_active_device(device["id"])
         except Exception as e:
-            self.show_for(f"Error: {str(e)[:20]}", 3.0)
+            print(f"[speaker] transfer to {name!r} failed: {e}", flush=True)
+            self.artist = "Not responding now"
+            self.show_for(f"Saved: {name}", 3.0)
             return Done()
 
         self.show_for(f"Now on {name}", 2.0)
