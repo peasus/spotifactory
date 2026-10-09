@@ -10,6 +10,10 @@ WorkingDirectory=/home/spotifactory/spotifactory
 ExecStart=/home/spotifactory/spotifactory/.venv/bin/python -m spotifactory.startup
 Restart=on-failure
 RestartSec=10
+# Stop with SIGINT so the app's Ctrl+C handler closes the RFID reader cleanly;
+# SIGTERM skips it, which can leave the CH340 needing a physical replug.
+KillSignal=SIGINT
+TimeoutStopSec=15
 Environment=PYTHONUNBUFFERED=1
 # pactl needs this to find the user's PipeWire session (the autologin session
 # that also runs Raspotify). setup.sh patches 1000 to the real UID.
