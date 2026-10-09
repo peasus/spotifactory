@@ -1,6 +1,7 @@
 [Unit]
 Description=Spotifactory
-After=network.target bluetooth.target
+Wants=network-online.target
+After=network-online.target bluetooth.target
 
 [Service]
 Type=simple
@@ -10,6 +11,9 @@ ExecStart=/home/spotifactory/spotifactory/.venv/bin/python -m spotifactory.start
 Restart=on-failure
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1
+# pactl needs this to find the user's PipeWire session (the autologin session
+# that also runs Raspotify). setup.sh patches 1000 to the real UID.
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 
 [Install]
 WantedBy=multi-user.target

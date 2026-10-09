@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # startup._has_network
 # ---------------------------------------------------------------------------
@@ -45,77 +44,118 @@ class TestHasValidToken:
 # startup.main() flow
 # ---------------------------------------------------------------------------
 
+class TestWaitForNetwork:
+    def test_returns_true_once_network_comes_up(self):
+        from spotifactory.startup import _wait_for_network
+        with patch("spotifactory.startup._has_network", side_effect=[False, False, True]), \
+             patch("spotifactory.startup.time.sleep") as mock_sleep:
+            assert _wait_for_network(timeout=60) is True
+        assert mock_sleep.call_count == 2
+
+    def test_returns_false_after_timeout(self):
+        from spotifactory.startup import _wait_for_network
+        with patch("spotifactory.startup._has_network", return_value=False), \
+             patch("spotifactory.startup.time.sleep"):
+            assert _wait_for_network(timeout=0.0) is False
+
+
+class TestBtReconnectLoop:
+    class _Stop(Exception):
+        pass
+
+    def _run(self, sleeps, **bt):
+        from spotifactory.startup import _bt_reconnect_loop
+        side = [None] * (sleeps - 1) + [self._Stop()]
+        with patch("spotifactory.hardware.bluetooth.is_connected", **bt["is_connected"]), \
+             patch("spotifactory.hardware.bluetooth.reconnect"), \
+             patch("spotifactory.hardware.bluetooth.set_bt_audio_output",
+                   **bt["set_out"]) as set_out, \
+             patch("spotifactory.hardware.bluetooth.move_sink_inputs") as move, \
+             patch("spotifactory.startup.time.sleep", side_effect=side), \
+             pytest.raises(self._Stop):
+            _bt_reconnect_loop("AA:BB:CC:DD:EE:FF")
+        return set_out, move
+
+    def test_routes_once_when_already_connected(self):
+        # BlueZ auto-reconnected before the loop ran — audio must still be routed, once.
+        set_out, move = self._run(
+            3, is_connected={"return_value": True}, set_out={"return_value": True},
+        )
+        set_out.assert_called_once()
+        move.assert_called_once()
+
+    def test_retries_routing_until_pactl_succeeds(self):
+        set_out, move = self._run(
+            3, is_connected={"return_value": True}, set_out={"side_effect": [False, True]},
+        )
+        assert set_out.call_count == 2
+        move.assert_called_once()
+
+
 class TestStartupMain:
     """Integration-style tests for the startup sequencing logic.
 
-    All hardware and external calls are mocked so these run on Mac.
+    The display and platform launcher are stubbed so main() returns instead of
+    entering the real hardware loop; no BT speaker MAC so no reconnect thread.
     """
 
-    def test_runs_pi_when_network_and_token_present(self):
-        display = MagicMock()
-        with patch("spotifactory.startup._has_network", return_value=True), \
-             patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.platforms.pi.main") as mock_run_pi, \
-             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
-             patch("subprocess.run"), \
-             patch("dotenv.load_dotenv"):
-            from spotifactory import startup
+    @staticmethod
+    def _patches(network_up=True, token_valid=True):
+        from contextlib import ExitStack
+        stack = ExitStack()
+        stack.enter_context(patch.dict("os.environ", {"SPOTIFACTORY_SPEAKER_MAC": ""}))
+        stack.enter_context(patch("dotenv.load_dotenv"))
+        s = "spotifactory.startup"
+        stack.enter_context(patch(f"{s}._make_display", return_value=MagicMock()))
+        stack.enter_context(patch(f"{s}._wait_for_network", return_value=network_up))
+        stack.enter_context(patch(f"{s}._has_valid_token", return_value=token_valid))
+        mocks = {
+            "run_platform": stack.enter_context(patch("spotifactory.startup._run_platform")),
+            "auth": stack.enter_context(patch("spotifactory.auth_server.run_pkce_auth")),
+            "subprocess": stack.enter_context(patch("subprocess.run")),
+        }
+        return stack, mocks
+
+    def test_runs_platform_when_network_and_token_present(self):
+        from spotifactory import startup
+        stack, m = self._patches()
+        with stack:
             startup.main()
-        mock_run_pi.assert_called_once()
-        mock_auth.assert_not_called()
+        m["run_platform"].assert_called_once()
+        m["auth"].assert_not_called()
+        m["subprocess"].assert_not_called()
 
     def test_launches_wifi_connect_when_offline(self):
-        display = MagicMock()
-        # First call: no network; second call: connected (after wifi-connect)
-        with patch("spotifactory.startup._has_network", side_effect=[False, True]), \
-             patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.platforms.pi.main"), \
-             patch("spotifactory.auth_server.run_pkce_auth"), \
-             patch("subprocess.run") as mock_sub, \
-             patch("dotenv.load_dotenv"):
-            from spotifactory import startup
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=True):
             startup.main()
-        cmd = mock_sub.call_args[0][0]
+        cmd = m["subprocess"].call_args[0][0]
         assert cmd[0] == "wifi-connect"
         assert "--portal-ssid" in cmd
+        m["run_platform"].assert_called_once()
 
     def test_exits_if_still_offline_after_wifi_connect(self):
-        display = MagicMock()
-        with patch("spotifactory.startup._has_network", return_value=False), \
-             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
-             patch("subprocess.run"), \
-             patch("dotenv.load_dotenv"), \
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=False), \
              pytest.raises(SystemExit):
-            from spotifactory import startup
             startup.main()
+        m["run_platform"].assert_not_called()
 
     def test_launches_pkce_auth_when_no_token(self):
-        display = MagicMock()
-        with patch("spotifactory.startup._has_network", return_value=True), \
-             patch("spotifactory.startup._has_valid_token", return_value=False), \
-             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.platforms.pi.main"), \
-             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
-             patch("subprocess.run"), \
-             patch("dotenv.load_dotenv"):
-            from spotifactory import startup
+        from spotifactory import startup
+        stack, m = self._patches(token_valid=False)
+        with stack:
             startup.main()
-        mock_auth.assert_called_once()
+        m["auth"].assert_called_once()
 
     def test_skips_auth_when_token_present(self):
-        display = MagicMock()
-        with patch("spotifactory.startup._has_network", return_value=True), \
-             patch("spotifactory.startup._has_valid_token", return_value=True), \
-             patch("spotifactory.display.oled.DisplayOLED", return_value=display), \
-             patch("spotifactory.platforms.pi.main"), \
-             patch("spotifactory.auth_server.run_pkce_auth") as mock_auth, \
-             patch("subprocess.run"), \
-             patch("dotenv.load_dotenv"):
-            from spotifactory import startup
+        from spotifactory import startup
+        stack, m = self._patches(token_valid=True)
+        with stack:
             startup.main()
-        mock_auth.assert_not_called()
+        m["auth"].assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +181,7 @@ class TestPkceAuth:
              patch.object(mod, "_poll_for_code", return_value="mycode"):
             result = mod.run_pkce_auth()
         assert result is True
-        mock_pkce.get_access_token.assert_called_once_with(
-            "mycode", as_dict=False, check_cache=False
-        )
+        mock_pkce.get_access_token.assert_called_once_with("mycode", check_cache=False)
 
     def test_on_session_ready_receives_session_url(self):
         import spotifactory.auth_server as mod
