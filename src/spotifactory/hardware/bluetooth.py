@@ -197,20 +197,27 @@ def scan_devices(timeout: int = 10) -> list[dict]:
     ]
 
 
-def pair_and_configure(mac: str) -> None:
-    """Pair, trust, and connect to a Bluetooth device.
+def pair_and_configure(mac: str, connect: bool = True) -> None:
+    """Pair, trust, and (optionally) connect to a Bluetooth device.
 
     Scan must remain active during pairing so BlueZ can reach the device.
     Auto-confirms passkey prompts (numeric comparison pairing).
+    Pass connect=False for devices with no BlueZ profile to connect, like the
+    Instax printer — it's reached over a raw RFCOMM socket at print time, and
+    `bluetoothctl connect` fails on it with NotAvailable.
     """
     pair_out = _pair_interactive(mac)
     print(f"[bluetooth] pair output:\n{pair_out}", flush=True)
-    if "Failed to pair" in pair_out or "not available" in pair_out.lower():
-        raise RuntimeError("Keep speaker in pairing mode and try again")
+    already_paired = "AlreadyExists" in pair_out
+    if not already_paired and (
+        "Failed to pair" in pair_out or "not available" in pair_out.lower()
+    ):
+        raise RuntimeError("Keep the device in pairing mode and try again")
 
-    conn_out = _pty_session([f"trust {mac}", f"connect {mac}"], read_duration=10.0)
+    commands = [f"trust {mac}"] + ([f"connect {mac}"] if connect else [])
+    conn_out = _pty_session(commands, read_duration=10.0 if connect else 1.0)
     print(f"[bluetooth] connect output:\n{conn_out}", flush=True)
-    if "Failed to connect" in conn_out:
+    if connect and "Failed to connect" in conn_out:
         raise RuntimeError("Paired but could not connect — try again")
 
 

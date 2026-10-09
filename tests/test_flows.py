@@ -198,3 +198,31 @@ class TestPauseWhilePrinting:
     def test_does_not_resume_if_it_was_already_paused(self):
         sp = self._run_print("Spotifactory", is_playing=False)
         sp.start_playback.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Bluetooth pairing
+# ---------------------------------------------------------------------------
+
+class TestPairAndConfigure:
+    def _pair(self, pair_out, conn_out, connect=True):
+        from spotifactory.hardware import bluetooth
+        with patch.object(bluetooth, "_pair_interactive", return_value=pair_out), \
+             patch.object(bluetooth, "_pty_session", return_value=conn_out) as session:
+            bluetooth.pair_and_configure("88:B4:36:18:6F:4F", connect=connect)
+        return session.call_args[0][0]
+
+    def test_printer_pairs_without_connect(self):
+        # The Instax has no BlueZ profile to connect; NotAvailable must not fail pairing.
+        cmds = self._pair("Pairing successful", "Failed to connect: NotAvailable",
+                          connect=False)
+        assert cmds == ["trust 88:B4:36:18:6F:4F"]
+
+    def test_speaker_connect_failure_raises(self):
+        with pytest.raises(RuntimeError, match="could not connect"):
+            self._pair("Pairing successful", "Failed to connect: br-connection")
+
+    def test_already_paired_is_not_a_failure(self):
+        cmds = self._pair("Failed to pair: org.bluez.Error.AlreadyExists",
+                          "Connection successful")
+        assert cmds[-1] == "connect 88:B4:36:18:6F:4F"
