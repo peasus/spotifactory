@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import pty
 import re
 import select
 import subprocess
+import threading
 import time
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*[mKABCDHJ]|\r")
@@ -42,6 +44,67 @@ def _is_real_name(name: str, mac: str) -> bool:
     if _HEX_NAME.match(name):  # anonymous BLE devices broadcast hex strings as names
         return False
     return True
+
+
+@contextlib.contextmanager
+def auto_accept_agent():
+    """Run a bluetoothctl agent that answers yes to pairing confirmations.
+
+    The Instax asks to confirm a passkey whenever an RFCOMM connection opens.
+    With no agent registered, BlueZ refuses ("No agent available") and connect()
+    fails with EACCES. Scoped to the connection so the Pi isn't left accepting
+    pairings from any nearby device.
+    """
+    master_fd, slave_fd = pty.openpty()
+    proc = subprocess.Popen(
+        ["bluetoothctl"],
+        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        close_fds=True,
+    )
+    os.close(slave_fd)
+    stop = threading.Event()
+
+    def answer_prompts() -> None:
+        buf = ""
+        while not stop.is_set():
+            try:
+                ready, _, _ = select.select([master_fd], [], [], 0.2)
+            except (ValueError, OSError):
+                break
+            if not ready:
+                continue
+            try:
+                chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
+            except OSError:
+                break
+            buf = (buf + _ANSI.sub("", chunk))[-512:]
+            if "(yes/no)" in buf:
+                os.write(master_fd, b"yes\n")
+                buf = ""
+
+    reader = threading.Thread(target=answer_prompts, daemon=True)
+    reader.start()
+    try:
+        for cmd in ("agent NoInputNoOutput", "default-agent"):
+            os.write(master_fd, (cmd + "\n").encode())
+            time.sleep(0.5)
+        yield
+    finally:
+        stop.set()
+        try:
+            os.write(master_fd, b"quit\n")
+        except OSError:
+            pass
+        reader.join(timeout=1)
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            proc.kill()
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
 
 
 def _pty_session(commands: list[str], read_duration: float = 0.0) -> str:

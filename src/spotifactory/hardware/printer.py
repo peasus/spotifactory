@@ -85,7 +85,13 @@ def print_image(
     instax = _make_instax(print_enabled=not dry_run, quiet=True)
     try:
         _report("Connecting...")
-        instax.connect(timeout=CONNECT_TIMEOUT)
+        if sys.platform == "linux":
+            # The printer asks to confirm a passkey on every RFCOMM connect.
+            from spotifactory.hardware.bluetooth import auto_accept_agent
+            with auto_accept_agent():
+                instax.connect(timeout=CONNECT_TIMEOUT)
+        else:
+            instax.connect(timeout=CONNECT_TIMEOUT)
 
         if not instax.peripheral.is_connected():
             return PrintResult(printer_found=False, error="Printer not found")
