@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from spotifactory.tasks.base import (
     Cancel,
     Continue,
@@ -90,18 +92,20 @@ class PairStep(Step):
         classic_mac = instax_classic_addr(ios_mac)
         self.status = f"Pairing {name}..."
         try:
-            pair_and_configure(classic_mac)
+            pair_and_configure(classic_mac, connect=False)
         except Exception as e:
             print(f"[bluetooth] instax pair error: {e}", flush=True)
-            self.show_for(str(e)[:20], 3.0)
+            self.show_for(str(e), 3.0)
             return
 
+        # Save for next boot, and apply now so printing skips the BLE scan.
+        os.environ["INSTAX_BT_ADDRESS"] = classic_mac
         try:
             set_key(_find_env_path(), "INSTAX_BT_ADDRESS", classic_mac)
         except Exception:
             pass
 
-        self.show_for(f"Printer ready!", 2.0)
+        self.show_for("Printer ready!", 2.0)
 
     def _pair_speaker(self, mac, name, pair_and_configure, set_bt_audio_output, move_sink_inputs, set_key):
         self.status = f"Pairing {name}..."
@@ -110,7 +114,7 @@ class PairStep(Step):
             set_bt_audio_output(mac)
         except Exception as e:
             print(f"[bluetooth] speaker pair error: {e}", flush=True)
-            self.show_for(str(e)[:20], 3.0)
+            self.show_for(str(e), 3.0)
             return
 
         try:
