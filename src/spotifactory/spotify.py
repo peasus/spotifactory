@@ -102,11 +102,15 @@ def next_track() -> None:
 
 
 @_with_auth_retry
-def toggle_shuffle() -> None:
+def toggle_shuffle() -> bool | None:
+    """Flip shuffle; return the new state, or None if nothing is playing."""
     sp = get_client()
     state = sp.current_playback()
-    if state:
-        sp.shuffle(not state["shuffle_state"])
+    if not state:
+        return None
+    new_state = not state["shuffle_state"]
+    sp.shuffle(new_state)
+    return new_state
 
 
 @_with_auth_retry

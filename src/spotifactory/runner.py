@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from typing import Any, Optional, Type
 
@@ -46,6 +47,7 @@ class Runner:
         self._home_task_class = home_task_class
         self._home_blanked: bool = False
         self._last_input: float = time.monotonic()
+        self._shuffle_busy: bool = False
 
         if home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
@@ -266,11 +268,25 @@ class Runner:
             pass
 
     def _toggle_shuffle(self) -> None:
-        try:
-            from spotifactory.spotify import toggle_shuffle
-            toggle_shuffle()
-        except Exception:
-            pass
+        """Flip the shuffle icon now, then confirm (or revert) from Spotify off the UI thread."""
+        if self._shuffle_busy:
+            return  # one change at a time — Spotify's state is stale mid-change
+        step = self._task.current_step
+        previous = step.shuffle_active
+        step.set_shuffle(not previous)
+        self._shuffle_busy = True
+
+        def work() -> None:
+            try:
+                from spotifactory.spotify import toggle_shuffle
+                confirmed = toggle_shuffle()
+            except Exception as e:
+                print(f"[runner] toggle_shuffle failed: {e}", flush=True)
+                confirmed = None
+            step.set_shuffle(previous if confirmed is None else confirmed)
+            self._shuffle_busy = False
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _wake_if_sleeping(self) -> bool:
         """Blank the display and eat the button press if the home screen is sleeping."""

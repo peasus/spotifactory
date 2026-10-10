@@ -273,3 +273,39 @@ class TestChosenSpeaker:
         assert get_active_device().id == "e1"
         assert step.status == "Saved: Guest Room Echo"
         assert step.artist == "Not responding now"
+
+
+# ---------------------------------------------------------------------------
+# Shuffle icon responds instantly on the home screen
+# ---------------------------------------------------------------------------
+
+class TestShuffleIcon:
+    def _runner_with_home_step(self):
+        from spotifactory.tasks.home.steps import HomeScanStep
+        r = _runner()
+        step = HomeScanStep()
+        r._task = MagicMock(current_step=step)
+        return r, step
+
+    def test_icon_flips_before_spotify_answers_then_confirms(self):
+        r, step = self._runner_with_home_step()
+        release = threading.Event()
+
+        def slow_toggle():
+            release.wait(2)
+            return True
+
+        with patch("spotifactory.spotify.toggle_shuffle", side_effect=slow_toggle):
+            r._toggle_shuffle()
+            assert step.shuffle_active is True       # instant, Spotify hasn't answered
+            r._toggle_shuffle()                      # ignored while the first is in flight
+            release.set()
+            assert _wait_for(lambda: not r._shuffle_busy)
+        assert step.shuffle_active is True
+
+    def test_icon_reverts_when_nothing_is_playing(self):
+        r, step = self._runner_with_home_step()
+        with patch("spotifactory.spotify.toggle_shuffle", return_value=None):
+            r._toggle_shuffle()
+            assert _wait_for(lambda: not r._shuffle_busy)
+        assert step.shuffle_active is False
