@@ -13,6 +13,7 @@ from spotifactory.tasks.base import (
 
 _POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
 _SCREEN_OFF_SECS = 600.0    # blank display after this many idle seconds
+_SHUFFLE_SETTLE_SECS = 3.0  # Spotify can report the old shuffle state briefly after a change
 
 
 class HomeScanStep(Step):
@@ -36,6 +37,12 @@ class HomeScanStep(Step):
         self.shuffle_active: bool = False
         self.screen_off: bool = False
         self._idle_since: float = time.monotonic()
+        self._shuffle_set_at: float = 0.0
+
+    def set_shuffle(self, active: bool) -> None:
+        """Show a shuffle state we just set; polls won't override it while Spotify settles."""
+        self.shuffle_active = active
+        self._shuffle_set_at = time.monotonic()
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -79,7 +86,8 @@ class HomeScanStep(Step):
                 if info:
                     self.status = info.track_name
                     self.artist = info.artist_name
-                    self.shuffle_active = info.shuffle_active
+                    if time.monotonic() - self._shuffle_set_at >= _SHUFFLE_SETTLE_SECS:
+                        self.shuffle_active = info.shuffle_active
                 elif _active_uri is None:
                     # Tag was removed between poll scheduling and this call.
                     self.status = "Place tag..."
