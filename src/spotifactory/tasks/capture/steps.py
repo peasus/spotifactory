@@ -168,7 +168,7 @@ class _WriteTagStep(Step):
 
         while not stop():
             self.status = "Place tag to write"
-            self.artist = "Back to skip"
+            self.artist = "< to skip"
             try:
                 if write_uri(self._uri(ctx), terminate=stop):
                     self.artist = ""

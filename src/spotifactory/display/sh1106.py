@@ -63,5 +63,9 @@ class DisplaySH1106:
     def draw_circle(self, cx: int, cy: int, r: int) -> None:
         self.draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=255)
 
+    def draw_rect(self, x1: int, y1: int, x2: int, y2: int, on: bool = True) -> None:
+        """Filled rectangle, corners inclusive; on=False draws black."""
+        self.draw.rectangle((x1, y1, x2, y2), fill=255 if on else 0)
+
     def update(self):
         self.device.display(self.image)
