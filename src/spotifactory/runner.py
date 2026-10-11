@@ -20,6 +20,7 @@ from spotifactory.tasks.base import (
 # Tags only work on the home screen, so a menu left open would make the
 # device look broken — return home after this long without input.
 _MENU_IDLE_SECS = 60.0
+_SCROLL_X = 125           # scrollbar occupies x 125-127 on the 128 px display
 
 
 class Runner:
@@ -438,9 +439,25 @@ class Runner:
             y = 24
         else:
             y = 14
+        list_top = y
         for idx, item in state.visible_items:
             self.display.draw_text(
                 2, y, item.label, selected=(idx == state.selected_index)
             )
             y += 12
+        self._draw_scrollbar(state, list_top, y - 2)
         self.display.update()
+
+    def _draw_scrollbar(self, state, top: int, bottom: int) -> None:
+        """Slim bar on the right edge when the menu has more items than fit."""
+        total, rows = len(state.menu.items), state.menu.visible_rows
+        if total <= rows:
+            return
+        # Clear a strip so the bar stays visible beside a highlighted row.
+        self.display.draw_rect(_SCROLL_X - 2, top, 127, bottom, on=False)
+        for dot_y in range(top, bottom + 1, 3):          # dotted track
+            self.display.draw_rect(_SCROLL_X + 1, dot_y, _SCROLL_X + 1, dot_y)
+        track = bottom - top + 1
+        thumb = max(6, round(track * rows / total))
+        thumb_top = top + round((track - thumb) * state.scroll_offset / (total - rows))
+        self.display.draw_rect(_SCROLL_X, thumb_top, _SCROLL_X + 2, thumb_top + thumb - 1)

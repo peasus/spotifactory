@@ -106,6 +106,6 @@ class ZeroconfPromptStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Open Spotify app:"
         self.artist = "tap Spotifactory"
-        self.detail = "Back when done"
+        self.detail = "< when done"
         self._cancel.wait(timeout=30.0)
         return Done()

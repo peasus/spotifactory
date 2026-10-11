@@ -87,6 +87,14 @@ class DisplaySim:
             fill="white", outline="",
         )
 
+    def draw_rect(self, x1: int, y1: int, x2: int, y2: int, on: bool = True) -> None:
+        """Filled rectangle, corners inclusive; on=False draws black."""
+        self.canvas.create_rectangle(
+            x1 * self.scale, y1 * self.scale,
+            (x2 + 1) * self.scale, (y2 + 1) * self.scale,
+            fill="white" if on else "black", outline="",
+        )
+
     def update(self):
         self.root.update_idletasks()
         self.root.update()

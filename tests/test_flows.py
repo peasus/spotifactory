@@ -309,3 +309,34 @@ class TestShuffleIcon:
             r._toggle_shuffle()
             assert _wait_for(lambda: not r._shuffle_busy)
         assert step.shuffle_active is False
+
+
+# ---------------------------------------------------------------------------
+# Menu scrollbar
+# ---------------------------------------------------------------------------
+
+class TestMenuScrollbar:
+    def _thumb(self, r):
+        """(top, bottom) of the solid thumb: the draw_rect call 3 px wide."""
+        calls = [c.args for c in r.display.draw_rect.call_args_list
+                 if c.args[2] - c.args[0] == 2 and c.kwargs.get("on", True)]
+        assert len(calls) == 1
+        return calls[0][1], calls[0][3]
+
+    def test_long_menu_shows_bar_that_tracks_position(self):
+        r = _runner()
+        r._render_menu()
+        top_at_start, _ = self._thumb(r)
+        for _ in range(len(r.nav.current.menu.items)):
+            r.nav.current.move_down()
+        r.display.draw_rect.reset_mock()
+        r._render_menu()
+        _, bottom_at_end = self._thumb(r)
+        assert top_at_start == 14                  # top of the first list row
+        assert bottom_at_end == 14 + 4 * 12 - 2    # bottom of the last list row
+
+    def test_short_menu_has_no_bar(self):
+        r = _runner()
+        r.nav.push(r.menus["confirm_reboot"])
+        r._render_menu()
+        r.display.draw_rect.assert_not_called()
