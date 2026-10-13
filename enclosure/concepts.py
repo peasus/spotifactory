@@ -133,6 +133,8 @@ COLORS = {
     "cover": "#5c7fa3",
     "antenna": "#d4a017",
     "bed": "#c9b38a",
+    "spacers": "#b08d57",
+    "plugs": "#3a3a3a",
 }
 
 
