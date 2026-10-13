@@ -263,8 +263,11 @@ class HomeScanStep(Step):
                         watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
                         if not self._cancel.is_set():
                             # nfcpy exited without cancel — PN532 supervision dropped.
-                            # Reopen the reader so the home screen keeps working.
+                            # Reopen the reader so the home screen keeps working, with
+                            # a pause so a reader that keeps failing instantly doesn't
+                            # spin reopening the serial port.
                             print("[home] RFID: restarting after unexpected exit", flush=True)
+                            self._cancel.wait(1.0)
                 except Exception as exc:
                     _rfid_exc.append(exc)
                 finally:

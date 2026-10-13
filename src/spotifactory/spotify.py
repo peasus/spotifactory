@@ -21,9 +21,9 @@ SCOPES = [
 class NowPlayingInfo:
     track_name: str
     artist_name: str
-    album_name: str
-    album_uri: str
-    artwork_url: str
+    album_name: str               # for a podcast episode: the show
+    album_uri: str | None         # None for local files
+    artwork_url: str | None
     shuffle_active: bool = False
     context_uri: str | None = None  # playlist/album/artist the track is playing from
 
@@ -42,6 +42,19 @@ class ChosenDevice:
     name: str
 
 
+class _DevicePKCE(SpotifyPKCE):
+    """PKCE auth that never asks for input on the terminal.
+
+    With no saved login and no code, spotipy falls back to printing a URL and
+    waiting on input() for the redirect — which hangs a hand-run app (and gets
+    an EOF under systemd). On the device, login is the QR/relay flow, so raise
+    instead; callers treat it as "not logged in".
+    """
+
+    def _get_auth_response_interactive(self, open_browser=False):
+        raise SpotifyOauthError("No saved Spotify login — use Connect Spotify (QR code)")
+
+
 def _make_auth_manager():
     # Mac dev: client secret in env → standard OAuth with browser flow
     # Pi: no client secret → PKCE flow (no secret needed, relay handles redirect)
@@ -54,7 +67,7 @@ def _make_auth_manager():
             scope=" ".join(SCOPES),
         )
     relay_url = os.environ["RELAY_URL"].rstrip("/")
-    return SpotifyPKCE(
+    return _DevicePKCE(
         client_id=os.environ["SPOTIPY_CLIENT_ID"],
         redirect_uri=f"{relay_url}/callback",
         scope=" ".join(SCOPES),
@@ -230,19 +243,28 @@ def get_current_context() -> tuple[str | None, str | None]:
 
 @_with_auth_retry
 def get_now_playing() -> NowPlayingInfo | None:
+    """What's playing, or None. Handles podcast episodes (the show stands in for
+    the album) and items with no artwork or URI, such as local files."""
     sp = get_client()
-    playback = sp.current_playback()
+    playback = sp.current_playback(additional_types="episode")
     if not playback or not playback.get("is_playing") or playback.get("item") is None:
         return None
     item = playback["item"]
-    album = item["album"]
     context = playback.get("context")
+    if item.get("type") == "episode":
+        show = item.get("show") or {}
+        collection, images = show, item.get("images") or show.get("images") or []
+        artist = show.get("publisher") or show.get("name", "")
+    else:
+        collection = item.get("album") or {}
+        images = collection.get("images") or []
+        artist = ", ".join(a["name"] for a in item.get("artists", []))
     return NowPlayingInfo(
-        track_name=item["name"],
-        artist_name=", ".join(a["name"] for a in item["artists"]),
-        album_name=album["name"],
-        album_uri=album["uri"],
-        artwork_url=album["images"][0]["url"],
+        track_name=item.get("name", ""),
+        artist_name=artist,
+        album_name=collection.get("name", ""),
+        album_uri=collection.get("uri"),
+        artwork_url=images[0]["url"] if images else None,
         shuffle_active=bool(playback.get("shuffle_state", False)),
         context_uri=context.get("uri") if context else None,
     )

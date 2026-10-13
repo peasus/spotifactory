@@ -31,6 +31,16 @@ const SUCCESS_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+function isSpotifyAuthorizeUrl(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && u.hostname === 'accounts.spotify.com'
+      && u.pathname === '/authorize';
+  } catch {
+    return false;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -48,6 +58,12 @@ export default {
       }
       const { session_id, authorize_url } = body;
       if (!session_id || !authorize_url) {
+        return new Response('Bad Request', { status: 400 });
+      }
+      // GET /:session_id redirects to this URL, so only accept Spotify's own
+      // authorize page — otherwise anyone could use this domain to redirect
+      // people to an arbitrary site (open redirect).
+      if (!/^[0-9a-f]{8,32}$/.test(session_id) || !isSpotifyAuthorizeUrl(authorize_url)) {
         return new Response('Bad Request', { status: 400 });
       }
       await env.SESSIONS.put(
