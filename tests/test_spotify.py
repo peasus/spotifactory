@@ -81,3 +81,25 @@ def test_print_album_stops_early_when_it_cant_print(uri, art, reason):
     with patch("spotifactory.spotify.get_now_playing", return_value=info):
         assert isinstance(step.run(TaskContext()), Done)
     assert seen == {"status": "Can't print this", "artist": reason}
+
+
+# ---------------------------------------------------------------------------
+# NFC reader port
+# ---------------------------------------------------------------------------
+
+def test_stale_nfc_port_falls_back_to_the_device_that_exists():
+    """Linux can renumber the reader (ttyUSB0 -> ttyUSB1); a stale NFC_PORT must not stick."""
+    from spotifactory.hardware import rfid
+    with patch.dict("os.environ", {"NFC_PORT": "tty:USB0"}), \
+         patch.object(rfid.sys, "platform", "linux"), \
+         patch("os.path.exists", side_effect=lambda p: p == "/dev/ttyUSB1"), \
+         patch("glob.glob", side_effect=lambda pat: ["/dev/ttyUSB1"] if "USB" in pat else []):
+        assert rfid.current_port() == "tty:USB1"
+
+
+def test_nfc_port_override_kept_when_present():
+    from spotifactory.hardware import rfid
+    with patch.dict("os.environ", {"NFC_PORT": "tty:USB0"}), \
+         patch.object(rfid.sys, "platform", "linux"), \
+         patch("os.path.exists", return_value=True):
+        assert rfid.current_port() == "tty:USB0"
