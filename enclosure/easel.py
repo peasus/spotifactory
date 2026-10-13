@@ -138,9 +138,26 @@ ZS = HF + YS * math.tan(_A)
 _S, _C = math.sin(math.radians(LEAN)), math.cos(math.radians(LEAN))
 GY = YS + STEP                            # panel front-bottom
 TOP_Y, TOP_Z = GY + PANEL_LEN * _S, ZS + PANEL_LEN * _C
-BACK_Y = TOP_Y + TOP_T                    # vertical back wall, outside
-WALL_IN_Y = BACK_Y - WALL
-PWR_BOARD_TOP_Y = WALL_IN_Y - 0.2 - PWR_RISE   # socket ends just inside the wall
+# The back leans in at the same angle as the sides; the top keeps TOP_T of
+# depth, so the base reaches further back.
+BACK_LEAN = math.atan((W - TOP_W) / 2 / TOP_Z)
+_BT = math.tan(BACK_LEAN)
+BACK_Y = TOP_Y + TOP_T + TOP_Z * _BT      # outside of the back wall, at the bed
+
+
+def back_out_y(z: float) -> float:
+    """y of the outside of the (leaning) back wall at height z."""
+    return BACK_Y - z * _BT
+
+
+def back_in_y(z: float) -> float:
+    """y of the inside of the back wall at height z."""
+    return back_out_y(z) - WALL / math.cos(BACK_LEAN)
+
+
+WALL_IN_Y = back_in_y(0)
+# Socket ends just inside the wall, measured at its top (the wall leans in).
+PWR_BOARD_TOP_Y = back_in_y(PWR_Z + PWR_SHELL[1] / 2) - 0.2 - PWR_RISE
 
 
 def _box(x0, x1, y0, y1, z0, z1):
@@ -206,6 +223,8 @@ def outer(chamfered: bool = True):
             Polyline((-W / 2, 0), (W / 2, 0), (W / 2 - h * t, h), (-W / 2 + h * t, h), close=True)
         make_face()
     solid = solid & extrude(tk.sketch, amount=200, both=True)
+    solid &= _yz_prism([(-50, -1), (back_out_y(-1), -1), (back_out_y(TOP_Z + 1), TOP_Z + 1),
+                        (-50, TOP_Z + 1)])
 
     # Round the outside edges, except the bottom and the corner the print stands in.
     def rounded(e) -> bool:
@@ -312,7 +331,7 @@ def body():
 
     # Peaked (45°) roof inside the panel top, so it prints without supports.
     zc = TOP_Z - WALL
-    mid = (inner_front_y(zc) + WALL_IN_Y) / 2
+    mid = (inner_front_y(zc) + back_in_y(zc)) / 2
     shell += _yz_prism([(mid - 40, zc - 40), (mid, zc), (mid + 40, zc - 40),
                         (mid + 40, zc + 10), (mid - 40, zc + 10)]) & cavity
 
@@ -324,11 +343,11 @@ def body():
     # USB-C: opening in the back wall; the board itself rides on the base plate.
     opening = _rounded(Box(PLUG_OPENING[0], WALL * 3, PLUG_OPENING[1], align=CC),
                        PLUG_OPENING[1] / 2 - 0.05, Axis.Y)
-    shell -= Pos(PWR_X, BACK_Y, PWR_Z) * opening
+    shell -= Pos(PWR_X, back_out_y(PWR_Z), PWR_Z) * opening
 
     # Vents low on the back.
     for i in range(5):
-        shell -= Pos(-(14 + 5 * i), BACK_Y, 6) * _rounded(Box(2.4, WALL * 3, 14, align=C), 1.15, Axis.Y)
+        shell -= Pos(-(14 + 5 * i), back_out_y(13), 6) * _rounded(Box(2.4, WALL * 3, 14, align=C), 1.15, Axis.Y)
 
     # Corner bosses for the base plate's heat-set inserts: merged into both
     # walls and standing on the bed.
@@ -402,8 +421,9 @@ def baseplate():
 def power_bracket():
     """Upright bracket the USB-C breakout screws to, standing just inside the back wall."""
     bw, bh, _ = PWR_BOARD
-    y0, y1 = PWR_BOARD_TOP_Y, WALL_IN_Y - 0.3
-    bracket = _box(PWR_X - bw / 2 - 2, PWR_X + bw / 2 + 2, y0, y1, 0, PWR_Z + bh / 2 + 2)
+    top = PWR_Z + bh / 2 + 2
+    y0, y1 = PWR_BOARD_TOP_Y, back_in_y(top) - 0.3      # clears the leaning wall at its top
+    bracket = _box(PWR_X - bw / 2 - 2, PWR_X + bw / 2 + 2, y0, y1, 0, top)
     window = _rounded(Box(PWR_COLLAR[0] + 0.6, 40, PWR_COLLAR[1] + 0.6, align=CC),
                       (PWR_COLLAR[1] + 0.6) / 2 - 0.05, Axis.Y)
     bracket -= Pos(PWR_X, y1, PWR_Z) * window
