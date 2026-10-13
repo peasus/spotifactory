@@ -34,12 +34,23 @@ def _printer_off_menu():
 
 
 class FetchInfoStep(Step):
+    def __init__(self) -> None:
+        super().__init__()
+        self.artist: str = ""
+
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotifactory.spotify import get_now_playing
         self.status = "Checking Spotify..."
         info = get_now_playing()
         if info is None:
             self.show_for("Nothing playing", 2.0)
+            return Done()
+        # A print needs artwork and a tag needs a Spotify link; local files have
+        # neither, and some tracks have no artwork. Stop before asking to print.
+        if not info.album_uri or not info.artwork_url:
+            self.artist = "no artwork" if info.album_uri else "local file"
+            self.show_for("Can't print this", 2.5)
+            self.artist = ""
             return Done()
         ctx.data["info"] = info
         return Continue()

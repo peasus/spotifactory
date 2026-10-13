@@ -1,0 +1,83 @@
+"""Spotify helpers: non-interactive login, and what's-playing parsing edge cases."""
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from spotifactory.tasks.base import Done, TaskContext
+
+
+def test_device_login_raises_instead_of_waiting_for_input():
+    """With no saved login, the Pi's auth manager must not block on input()."""
+    from spotipy.cache_handler import MemoryCacheHandler
+    from spotipy.oauth2 import SpotifyOauthError
+
+    from spotifactory import spotify
+
+    env = {"SPOTIPY_CLIENT_ID": "cid", "RELAY_URL": "https://relay.test", "SPOTIPY_CLIENT_SECRET": ""}
+    with patch.dict("os.environ", env), \
+         patch("builtins.input", side_effect=AssertionError("prompted on the terminal")):
+        auth = spotify._make_auth_manager()
+        auth.cache_handler = MemoryCacheHandler()
+        with pytest.raises(SpotifyOauthError):
+            auth.get_access_token()
+
+
+def _now_playing(item):
+    from spotifactory import spotify
+    sp = MagicMock()
+    sp.current_playback.return_value = {"is_playing": True, "item": item, "context": None}
+    with patch("spotifactory.spotify.get_client", return_value=sp):
+        info = spotify.get_now_playing()
+    sp.current_playback.assert_called_once_with(additional_types="episode")
+    return info
+
+
+def test_podcast_episode_uses_the_show_as_the_album():
+    info = _now_playing({
+        "type": "episode", "name": "Ep 12",
+        "images": [{"url": "https://img/ep.jpg"}],
+        "show": {"name": "The Show", "publisher": "Some Network", "uri": "spotify:show:abc",
+                 "images": [{"url": "https://img/show.jpg"}]},
+    })
+    assert (info.track_name, info.artist_name, info.album_name) == ("Ep 12", "Some Network", "The Show")
+    assert info.album_uri == "spotify:show:abc"
+    assert info.artwork_url == "https://img/ep.jpg"
+
+
+def test_track_without_artwork_does_not_crash():
+    info = _now_playing({
+        "type": "track", "name": "Song", "artists": [{"name": "A"}, {"name": "B"}],
+        "album": {"name": "Album", "uri": "spotify:album:x", "images": []},
+    })
+    assert info.artist_name == "A, B"
+    assert info.artwork_url is None
+
+
+def test_local_file_has_no_uri():
+    info = _now_playing({
+        "type": "track", "name": "Demo", "artists": [{"name": "Me"}], "is_local": True,
+        "album": {"name": "Local", "uri": None, "images": []},
+    })
+    assert info.album_uri is None
+
+
+@pytest.mark.parametrize("uri,art,reason", [
+    (None, None, "local file"),
+    ("spotify:album:x", None, "no artwork"),
+])
+def test_print_album_stops_early_when_it_cant_print(uri, art, reason):
+    from spotifactory.spotify import NowPlayingInfo
+    from spotifactory.tasks.capture.steps import FetchInfoStep
+    info = NowPlayingInfo("T", "A", "Al", uri, art)
+    step = FetchInfoStep()
+    seen = {}
+
+    def show_for(message, seconds):
+        seen["status"], seen["artist"] = message, step.artist
+
+    step.show_for = show_for
+    with patch("spotifactory.spotify.get_now_playing", return_value=info):
+        assert isinstance(step.run(TaskContext()), Done)
+    assert seen == {"status": "Can't print this", "artist": reason}
