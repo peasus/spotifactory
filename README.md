@@ -1,56 +1,90 @@
-# spotifactory
+# Spotifactory
 
-A Python project scaffold for Spotifactory.
+A Raspberry Pi music box that plays albums from instant photos. Print an
+album's cover on an Instax Square printer, stick an NFC tag on the back, and
+from then on standing that photo on Spotifactory plays the album; lifting it
+off pauses.
 
-## Quick start
+## How it works
 
-- Create a virtual env: `python -m venv .venv`
-- Activate it: `source .venv/bin/activate`
-- Install editable package: `pip install -e .`
-- Run tests: `pytest`
+- **Raspberry Pi Zero 2 W** with a **SeenGreat 1.3" OLED HAT** (SH1106 screen,
+  5-way joystick) runs the app (`spotifactory.startup`) as a systemd service.
+- A **PN532 NFC reader** (USB-C, CH340 serial) behind the photo reads the
+  tag's `spotify:album:` / `spotify:playlist:` URI and starts playback through
+  the Spotify Web API.
+- Music plays on whichever speaker you pick in **Choose Speaker** (remembered
+  across restarts), or by default on the Pi itself via **Raspotify**
+  (librespot, shown in the Spotify app as "Spotifactory") and a paired
+  Bluetooth speaker.
+- **Print Album / Print Playlist** prints the current artwork on a paired
+  **Instax Square Link** and then writes the tag.
+- First-run setup needs no keyboard: a captive portal (Balena WiFi Connect)
+  for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
+  Worker relay (`deploy/relay/`, PKCE — no client secret on the device).
 
-## GUI & platform-specific dependencies
+## Controls
 
-This project includes both a simple simulated GUI (uses `tkinter`) and code that runs on Raspberry Pi hardware (uses Adafruit libraries).
+| Screen | Up | Down | Left / Right | Press |
+|---|---|---|---|---|
+| Home (now playing) | open menu | shuffle on/off | previous / next track | — |
+| Menus | move | move | back / select | select |
+| Running tasks | — | — | Left cancels where possible | — |
 
-- tkinter: This is part of the Python standard library (the Tk/Tcl GUI binding) and is generally not installed via pip. If your Python build includes tkinter you can use the simulator; otherwise install the platform package:
-	- Debian/Ubuntu: `sudo apt install python3-tk`
-	- Fedora: `sudo dnf install python3-tkinter`
-	- macOS: install a Python that includes Tcl/Tk or use Homebrew to install `tcl-tk` and ensure your Python is built/linked against it.
-	- Windows: Python from python.org usually includes tkinter; if missing reinstall Python with Tcl/Tk support.
+Menus return to the home screen after a minute idle (tags only work there),
+and the screen sleeps after ten minutes with nothing playing.
 
-- Pillow: the project uses Pillow for image handling. Install the GUI extras to ensure Pillow is available:
+## Setting up a Pi
 
-	```bash
-	pip install .[gui]
-	# or, directly
-	pip install Pillow
-	```
+1. Flash Raspberry Pi OS Lite (64-bit) with hostname `spotifactory`, user
+   `spotifactory`, SSH and WiFi set in Imager.
+2. On the Pi:
+   ```
+   sudo apt-get update && sudo apt-get install -y git
+   git clone https://github.com/peasus/spotifactory.git ~/spotifactory
+   cd ~/spotifactory && bash deploy/setup.sh
+   ```
+3. Set `SPOTIPY_CLIENT_ID` in `~/spotifactory/.env` (only that line; see
+   `deploy/env.example`).
+4. Reboot, scan the QR code to log in, then in the Spotify app pick the
+   **Spotifactory** device once. Use **Pair Device** for the speaker and printer.
 
-- Raspberry Pi / hardware extras: components that talk to GPIO and the SSD1306 OLED are optional and grouped under the `rpi` extras. To install them:
+To deploy an update: `cd ~/spotifactory && git pull && sudo systemctl restart spotifactory`
+(the setup script allows that restart without a password). Logs:
+`journalctl -u spotifactory -f`.
 
-	```bash
-	pip install .[rpi]
-	# or
-	pip install Adafruit-Blinka adafruit-circuitpython-ssd1306
-	```
-
-Note: extras are optional to keep the package install lightweight on non-RPi systems.
-
-## GitHub
-
-To create a GitHub repo and push, either use the `gh` CLI or create a new repo on github.com and add the remote:
-
-Using `gh` (if installed and authenticated):
+## Development (Mac)
 
 ```
-cd spotifactory
-gh repo create yourusername/spotifactory --public --source=. --remote=origin --push
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m pytest -q          # tests
+.venv/bin/spotifactory --sim           # Tk simulator (arrow keys, Enter, T = fake tag)
 ```
 
-Or manually:
+On a Mac, put `SPOTIPY_CLIENT_SECRET` and `SPOTIPY_REDIRECT_URI` in `.env` to
+log in through the browser instead of the relay.
+
+## Enclosure
+
+`enclosure/` holds a parametric build123d model of the case: a body, a
+faceplate and a base plate, designed to print without supports.
 
 ```
-git remote add origin https://github.com/<your-username>/spotifactory.git
-git push -u origin main
+python3 -m venv enclosure/.venv && enclosure/.venv/bin/pip install build123d trimesh matplotlib networkx
+enclosure/.venv/bin/python enclosure/easel.py   # renders + STL/STEP into enclosure/out/
+enclosure/.venv/bin/python enclosure/check.py   # fit, assembly and printability checks
 ```
+
+Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus
+4× M2.5×8 and 4× M3×6 screws and a spare micro-USB cable for the power lead.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `src/spotifactory/runner.py` | Platform-independent UI loop: input, tasks, rendering |
+| `src/spotifactory/tasks/` | Home screen, printing, speakers, Bluetooth pairing, Spotify login |
+| `src/spotifactory/hardware/` | NFC reader, Instax printer, Bluetooth, Sonos |
+| `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
+| `deploy/` | Pi setup script, systemd unit, auth relay Worker |
+| `enclosure/` | Case model, checks and parts list |
+| `docs/sonos.md` | What does and doesn't work with Sonos speakers |

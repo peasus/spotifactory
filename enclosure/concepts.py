@@ -132,6 +132,7 @@ COLORS = {
     "port": "#555555",
     "cover": "#5c7fa3",
     "antenna": "#d4a017",
+    "bed": "#c9b38a",
 }
 
 
@@ -154,7 +155,8 @@ def _meshes(parts: dict):
 
 
 def render(concepts: dict[str, dict], path: Path,
-           views: list[tuple[float, float]] | None = None) -> None:
+           views: list[tuple[float, float]] | None = None, columns: int | None = None,
+           show_dims: bool = True) -> None:
     """Render each concept in its own panel; views gives (elev, azim) per panel."""
     import matplotlib
 
@@ -166,9 +168,11 @@ def render(concepts: dict[str, dict], path: Path,
 
     light = np.array([-0.4, -0.6, 0.8])
     light /= np.linalg.norm(light)
-    fig = plt.figure(figsize=(13, 6.5))
+    cols = columns or len(concepts)
+    rows = math.ceil(len(concepts) / cols)
+    fig = plt.figure(figsize=(13, 6.5 * rows))
     for i, (title, parts) in enumerate(concepts.items(), start=1):
-        ax = fig.add_subplot(1, len(concepts), i, projection="3d")
+        ax = fig.add_subplot(rows, cols, i, projection="3d")
         # One collection for everything so faces are depth-sorted together;
         # separate collections let the body paint over parts sitting on it.
         tris, colors = [], []
@@ -190,7 +194,8 @@ def render(concepts: dict[str, dict], path: Path,
         ax.view_init(elev=elev, azim=azim)
         ax.set_axis_off()
         dims = hi - lo
-        ax.set_title(f"{title}\n{dims[0]:.0f} W × {dims[1]:.0f} D × {dims[2]:.0f} H mm", fontsize=13)
+        size = f"\n{dims[0]:.0f} W × {dims[1]:.0f} D × {dims[2]:.0f} H mm" if show_dims else ""
+        ax.set_title(title + size, fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(path, dpi=130, bbox_inches="tight", pad_inches=0.3)
 

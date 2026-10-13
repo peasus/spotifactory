@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spotifactory"
 version = "0.1.0"
-description = "A small Python project scaffold for Spotifactory"
-authors = [ { name = "Joseph Pease", email = "you@example.com" } ]
+description = "Raspberry Pi music box that plays Spotify albums from NFC-tagged instant photos"
+authors = [ { name = "Joseph Pease" } ]
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "spotipy>=2.22.0",
     "python-dotenv>=1.0",
