@@ -96,14 +96,15 @@ JOY_TOP = 9.9             # measured: joystick top above HAT board top
 JOY_KNOB_D = 7.3
 BUTTON_H = 2.0            # measured
 STACK = 11.5              # measured: HAT board top to Pi board bottom
-PI_T, PI_UNDER = 1.4, 1.6 # Pi board thickness; parts on its underside (estimate)
-BOARD_GAP = STACK - HAT_T - PI_T    # ASSUMED 8.5: HAT underside to Pi top = spacer length
+BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
+PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
+PI_UNDER = 1.6            # parts on the Pi's underside (estimate)
 PI_PORTS_X = (-21.5, -8.9)          # PWR, USB micro-USB ports on the back edge (Pi Zero layout)
 MICRO_USB_PLUG = (11.0, 7.0, 28.0)  # overmold w, h, length incl. cable bend
 
 READER_W, READER_H = 38.15, 60.0  # measured PN532 board; stands upright, USB end down
 READER_HOLES = (33.2, 54.5)       # measured hole spacing
-READER_HOLE_D = 3.0               # ASSUMED: check against the board
+READER_HOLE_D = 3.0               # measured
 ANTENNA_FROM_USB_END = 39.5       # measured
 ANTENNA_H = 31.0                  # measured: loop height (spans full width)
 READER_PCB = 1.6
