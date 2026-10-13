@@ -51,14 +51,30 @@ def _default_port() -> str:
     return "tty:USB0"
 
 
-PORT = os.environ.get("NFC_PORT") or _default_port()
-
-
 def _dev_path(nfcpy_port: str) -> str | None:
     """'tty:USB0' → '/dev/ttyUSB0', etc. Returns None for non-tty ports."""
     if nfcpy_port.startswith("tty:"):
         return "/dev/tty" + nfcpy_port[4:]
     return None
+
+
+def current_port() -> str:
+    """The reader's port right now: NFC_PORT if that device exists, else auto-detected.
+
+    Checked on every open rather than once at import, because Linux can renumber
+    the reader after a replug (ttyUSB0 → ttyUSB1) and a stale NFC_PORT would
+    otherwise keep failing until the app restarts.
+    """
+    override = os.environ.get("NFC_PORT")
+    if override:
+        dev = _dev_path(override)
+        if sys.platform == "darwin" or dev is None or os.path.exists(dev):
+            return override
+        print(f"[rfid] NFC_PORT {override} not present — auto-detecting", flush=True)
+    return _default_port()
+
+
+PORT = current_port()   # for scripts and the __main__ helper below
 
 
 def _reset_uart(dev_path: str) -> None:
@@ -87,7 +103,7 @@ def watch_tags(
     on_place: "Callable[[dict], None]",
     on_remove: "Callable[[dict], None] | None" = None,
     terminate: "Callable[[], bool] | None" = None,
-    port: str = PORT,
+    port: str | None = None,
 ) -> None:
     """Block until terminate() returns True, firing on_place/on_remove as tags enter/leave.
 
@@ -98,6 +114,7 @@ def watch_tags(
     on_remove(card) — same card dict, tag has left the field
     terminate() — called periodically; return True to stop
     """
+    port = port or current_port()
     _current: list[dict] = []
 
     def on_connect(tag) -> bool:
@@ -137,8 +154,9 @@ def watch_tags(
     raise last_exc
 
 
-def read_card(port: str = PORT) -> dict | None:
+def read_card(port: str | None = None) -> dict | None:
     """Block until a card is scanned. Returns dict with uid and uri (if written)."""
+    port = port or current_port()
     result = []
 
     def on_connect(tag):
@@ -157,7 +175,7 @@ class TagWriteError(Exception):
 
 def write_uri(
     uri: str,
-    port: str = PORT,
+    port: str | None = None,
     terminate: "Callable[[], bool] | None" = None,
 ) -> str | None:
     """Write a URI to the next tag placed on the reader.
@@ -166,6 +184,7 @@ def write_uri(
     Raises TagWriteError if a tag was found but couldn't be written
     (not NDEF-formatted, read-only, or too small for the URI).
     """
+    port = port or current_port()
     result: list[str] = []
     errors: list[str] = []
 

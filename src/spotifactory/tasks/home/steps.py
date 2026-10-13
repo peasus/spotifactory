@@ -251,8 +251,8 @@ class HomeScanStep(Step):
         # so we can return Cancel() the instant cancel is set without waiting
         # for hardware teardown to complete.
         try:
-            from spotifactory.hardware.rfid import PORT, watch_tags
-            print(f"[home] opening RFID reader on {PORT!r}…", flush=True)
+            from spotifactory.hardware.rfid import current_port, watch_tags
+            print(f"[home] opening RFID reader on {current_port()!r}…", flush=True)
 
             _rfid_exc: list[Exception] = []
             _rfid_done = threading.Event()
@@ -260,7 +260,7 @@ class HomeScanStep(Step):
             def _run_rfid() -> None:
                 try:
                     while not self._cancel.is_set():
-                        watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate, port=PORT)
+                        watch_tags(on_place=on_place, on_remove=on_remove, terminate=terminate)
                         if not self._cancel.is_set():
                             # nfcpy exited without cancel — PN532 supervision dropped.
                             # Reopen the reader so the home screen keeps working, with
@@ -315,7 +315,7 @@ class HomeScanStep(Step):
                     try:
                         watch_tags(
                             on_place=on_place, on_remove=on_remove,
-                            terminate=terminate, port=PORT,
+                            terminate=terminate,
                         )
                         # watch_tags exited cleanly — terminate() returned True
                         break
