@@ -410,6 +410,36 @@ def print_orientation():
     return {"body": b, "faceplate": fp_flat, "baseplate": bp_flat}
 
 
+def render_print_layout() -> Path:
+    """Each part sitting on a print bed, from above and from bed level."""
+    flat = print_orientation()
+
+    def on_bed(part, colour_key):
+        bb = part.bounding_box()
+        bed = Pos(bb.center().X, bb.center().Y, -0.6) * Box(
+            bb.size.X + 30, bb.size.Y + 30, 0.6, align=C)
+        return {"bed": bed, colour_key: part}
+
+    def size(part):
+        b = part.bounding_box().size
+        return f"{b.X:.0f} × {b.Y:.0f} × {b.Z:.0f} mm"
+
+    scenes = {
+        f"Body: upright, open bottom on the bed\n{size(flat['body'])}": on_bed(flat["body"], "body"),
+        f"Faceplate: visible face DOWN, pins up\n{size(flat['faceplate'])}":
+            on_bed(flat["faceplate"], "cover"),
+        f"Base plate: flat side down, posts up\n{size(flat['baseplate'])}":
+            on_bed(flat["baseplate"], "port"),
+    }
+    path = OUT / "print_layout.png"
+    titles = list(scenes)
+    render({**{t: scenes[t] for t in titles},
+            **{f"{t}\n(bed level)": scenes[t] for t in titles}},
+           path, views=[(30, -50), (35, -50), (35, -50), (4, -50), (6, -50), (6, -50)],
+           columns=3, show_dims=False)
+    return path
+
+
 def export_parts() -> dict[str, Path]:
     PRINT_DIR.mkdir(parents=True, exist_ok=True)
     out = {}
@@ -440,14 +470,5 @@ if __name__ == "__main__":
         views=[(22, -55), (20, 130), (0, 0)],
     )
     files = export_parts()
-    flat = print_orientation()
-    render(
-        {
-            "Body (upright)": {"body": flat["body"]},
-            "Faceplate (face down)": {"cover": flat["faceplate"]},
-            "Base plate (flat)": {"port": flat["baseplate"]},
-        },
-        OUT / "parts.png",
-        views=[(25, -55), (35, -55), (35, -55)],
-    )
+    render_print_layout()
     print("wrote", OUT / "easel.png", OUT / "parts.png", "and", ", ".join(p.name for p in files.values()))
