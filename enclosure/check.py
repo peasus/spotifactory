@@ -144,8 +144,9 @@ def main() -> int:
     if not clashes:
         check(True, "boards, spacers, reader, sockets, plugs and the print all clear the parts")
     shell_end = inside["port"][0].bounding_box().max.Y
-    check(easel.WALL_IN_Y - 0.5 < shell_end <= easel.WALL_IN_Y,
-          f"USB-C socket ends {easel.WALL_IN_Y - shell_end:.1f} mm inside the back wall")
+    wall_in = easel.back_in_y(easel.PWR_Z + easel.PWR_SHELL[1] / 2)
+    check(wall_in - 0.5 < shell_end <= wall_in,
+          f"USB-C socket ends {wall_in - shell_end:.1f} mm inside the back wall")
 
     print("Assembly")
     a = math.radians(easel.SLOPE)
