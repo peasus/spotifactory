@@ -69,6 +69,22 @@ def overhangs(part, name: str) -> None:
           f"(limit {MAX_SPAN:.0f})")
 
 
+def manifold(part, name: str) -> None:
+    """Every edge of the exported STL is shared by exactly two triangles (what
+    the slicer calls non-manifold edges). Near-duplicate vertices from the
+    tessellation are merged first; slicers do the same."""
+    path = easel.PRINT_DIR / f"_check_{name}.stl"
+    export_stl(part, str(path))
+    mesh = trimesh.load(path)
+    path.unlink()
+    mesh.merge_vertices(digits_vertex=3)
+    mesh.update_faces(mesh.nondegenerate_faces(height=1e-6))
+    edges = np.sort(mesh.edges, axis=1)
+    _, counts = np.unique(edges, axis=0, return_counts=True)
+    bad = int((counts != 2).sum())
+    check(bad == 0, f"{name}: STL is watertight" if not bad else f"{name}: {bad} non-manifold edges in the STL")
+
+
 LAYER = 0.3
 MAX_REACH = 5.0   # mm a layer may extend past supported material (ledge, or half a bridge)
 
@@ -180,6 +196,7 @@ def main() -> int:
     print("Printability (as oriented in out/print)")
     parts = easel.print_orientation()
     for name in ("body", "faceplate", "baseplate", "spacers"):
+        manifold(parts[name], name)
         overhangs(parts[name], name)
         unsupported(parts[name], name)
     for name, part in parts.items():

@@ -74,8 +74,15 @@ enclosure/.venv/bin/python enclosure/easel.py   # renders + STL/STEP into enclos
 enclosure/.venv/bin/python enclosure/check.py   # fit, assembly and printability checks
 ```
 
-Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus
-4× M2.5×8 and 4× M3×6 screws and a spare micro-USB cable for the power lead.
+Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus screws
+and a spare micro-USB cable for the power lead:
+
+- 4× M2.5×14 pan or button head: up through the Pi, spacers and HAT into the
+  faceplate. The heads sit in the pockets on top of the base plate's posts,
+  which are 5.5 mm wide and 2 mm deep, so socket-cap heads (2.5 mm tall) won't fit.
+- 4× M2.5×8: USB-C power board to its bracket.
+- 4× M3×6 flat (countersunk) head: base plate into the heat-set inserts in
+  the body's corners.
 
 ## Layout
 
