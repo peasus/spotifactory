@@ -1,9 +1,10 @@
 """Crate for the Instax prints: flip through the albums like a record bin.
 
-The prints stand on their 72 mm edge with the art facing the front. The side
-walls slope down toward the front so the covers show as you flip. Saw-tooth
-ridges on the floor catch the prints' bottom edges, so they fan out when you
-tip them forward instead of sliding flat. The walls lean in like the easel's.
+The prints stand on their 72 mm edge with the art facing the front, one per
+slot between low fins that lean back a little. The fins hold the bottoms; above
+them the prints are free to bend forward so you can look through them. The
+side walls slope down toward the front so the covers show, and lean in like
+the easel's.
 
 Print: open side up, no supports.
 
@@ -38,11 +39,18 @@ from concepts import OUT, PRINT_H, PRINT_T, PRINT_W, render
 C = (Align.CENTER, Align.CENTER, Align.MIN)
 PRINT_DIR = OUT / "print"
 
-# ---------------------------------------------------------------- size
-CAPACITY = 40                 # prints
-SIDE_CLEAR = 1.5              # each side of a print, so they flip without rubbing
+# ---------------------------------------------------------------- slots
+CAPACITY = 40                 # prints, one per slot
+SLOT_W = 1.8                  # a ~1 mm print slides in and can rock
+FIN_T = 1.2                   # 2 lines at 0.6 mm nozzle
+FIN_H = 20.0
+FIN_LEAN = 3.0                # degrees back: prints settle back but still drop straight in
+FRONT_ROOM = 25.0             # open floor in front of the first slot, for bending prints forward
+PITCH = SLOT_W + FIN_T
+
+# ---------------------------------------------------------------- box
+SIDE_CLEAR = 1.5              # each side of a print, so they slide without rubbing
 IW = PRINT_W + 2 * SIDE_CLEAR # inner width at the rim
-IL = 100.0                    # inner length at the rim: ~40 mm of prints + room to fan them
 WALL = 2.4                    # 4 lines at 0.6 mm nozzle
 FLOOR = 2.4
 H_BACK, H_FRONT = 60.0, 38.0  # rim height at the back and front (prints are 86 tall)
@@ -50,11 +58,12 @@ TAPER = 4.0                   # walls lean in, degrees
 FILLET = 6.0                  # outside corner radius (matches the easel)
 RIM_FILLET = 1.0
 BOTTOM_CHAMFER = 1.0
-
-# ---------------------------------------------------------------- floor ridges
-PITCH = 5.0                   # a valley every 5 mm
-RIDGE_H = 1.5                 # vertical face toward the front catches a print's bottom edge
-RIDGE_MARGIN = 3.0            # keep the ridges off the front and back walls
+_L = math.radians(FIN_LEAN)
+# Behind the last slot: the prints lean back while the back wall leans in.
+BACK_GAP = 1.0 + H_BACK * (math.tan(_L) + math.tan(math.radians(TAPER)))
+FLOOR_LEN = (FRONT_ROOM + (CAPACITY + 1) * FIN_T + CAPACITY * SLOT_W + BACK_GAP
+             + FIN_H * math.sin(_L))
+IL = FLOOR_LEN - 2 * (H_BACK - FLOOR) * math.tan(math.radians(TAPER))   # inner length at the rim
 
 
 def _grow(z: float) -> float:
@@ -86,19 +95,25 @@ def _rim_cut():
     return _yz_prism([(y0, z(y0)), (y1, z(y1)), (y1, 200), (y0, 200)])
 
 
-def ridges():
-    """Saw-tooth strip across the floor: vertical face toward the front, ramp down behind."""
-    y_front = -IL / 2 - _grow(FLOOR) + RIDGE_MARGIN
-    y_back = IL / 2 + _grow(FLOOR) - RIDGE_MARGIN
-    # One outline, sunk 0.5 mm into the floor so it fuses: up each vertical face,
-    # down each ramp to the next.
-    pts, y = [(y_front, FLOOR - 0.5), (y_front, FLOOR)], y_front + PITCH
-    while y + PITCH <= y_back:
-        pts += [(y, FLOOR), (y, FLOOR + RIDGE_H), (y + PITCH, FLOOR)]
-        y += PITCH
-    pts += [(y_back, FLOOR), (y_back, FLOOR - 0.5)]
-    pts = [p for i, p in enumerate(pts) if i == 0 or p != pts[i - 1]]
-    return _yz_prism(pts, IW / 2 + _grow(FLOOR) + 1)
+def _fin_frame(i: int):
+    """(u, v) on fin i -> (y, z): u through the fin, toward the back; v up it."""
+    y0 = -FLOOR_LEN / 2 + FRONT_ROOM + i * PITCH
+    return lambda u, v: (y0 + u * math.cos(_L) + v * math.sin(_L), FLOOR + v * math.cos(_L) - u * math.sin(_L))
+
+
+def fins(half_width: float):
+    """CAPACITY + 1 fins with round tops, sunk 1 mm into the floor."""
+    r = FIN_T / 2
+    out = None
+    for i in range(CAPACITY + 1):
+        to = _fin_frame(i)
+        pts = [to(0, -1), to(FIN_T, -1), to(FIN_T, FIN_H - r)]
+        pts += [to(r + r * math.cos(t), FIN_H - r + r * math.sin(t))
+                for t in (math.pi * k / 8 for k in range(1, 8))]
+        pts.append(to(0, FIN_H - r))
+        fin = _yz_prism(pts, half_width)
+        out = fin if out is None else out + fin
+    return out
 
 
 def crate():
@@ -106,8 +121,8 @@ def crate():
     solid = _tapered(ow, ol, FILLET, 0, H_BACK + 1)
     solid = chamfer([e for e in solid.edges() if e.center().Z < 0.01], length=BOTTOM_CHAMFER)
     cavity = _tapered(IW, IL, FILLET - WALL, FLOOR, H_BACK + 5)
-    floor_strip = ridges() & cavity
-    solid = solid - cavity + floor_strip
+    outside = solid
+    solid = solid - cavity + (fins(IW / 2 + 10) & outside)   # fins run into the side walls
     solid -= _rim_cut()
     # Soften the rim: the edges left by the sloping cut.
     a = math.atan2(H_BACK - H_FRONT, IL)
@@ -120,29 +135,31 @@ def crate():
     return solid
 
 
-def prints(n: int = CAPACITY, lean: float = 14.0):
-    """n prints packed at the back, leaning back (for the render and the fit check)."""
-    a = math.radians(lean)
-    out, y = [], IL / 2 + _grow(FLOOR) - RIDGE_MARGIN - PRINT_H * math.sin(a) - 1.0
-    for i in range(n):
-        card = Pos(0, y - i * PRINT_T / math.cos(a), FLOOR + RIDGE_H + 0.3) * Rot(-lean, 0, 0) * Box(
-            PRINT_W, PRINT_T, PRINT_H, align=(Align.CENTER, Align.MIN, Align.MIN))
-        out.append(card)
-    return out
+def _card(i: int, lift: float = 0.2):
+    """Print standing in slot i, leaning back with the fins."""
+    y, _ = _fin_frame(i)(FIN_T + (SLOT_W - PRINT_T) / 2, 0)
+    return Pos(0, y, FLOOR + lift) * Rot(-FIN_LEAN, 0, 0) * Box(
+        PRINT_W, PRINT_T, PRINT_H, align=(Align.CENTER, Align.MIN, Align.MIN))
 
 
-def fanned():
-    """The front 8 prints tipped forward, as when flipping."""
-    cards = prints()
-    front = cards[-8:]
-    a = math.radians(14)
-    tipped = []
-    for i, c in enumerate(front):
-        ang = -14 + 26 + i * 3     # leaning forward
-        y = c.bounding_box().min.Y
-        tipped.append(Pos(0, y - 2, FLOOR + RIDGE_H) * Rot(ang, 0, 0) * Box(
-            PRINT_W, PRINT_T, PRINT_H, align=(Align.CENTER, Align.MAX, Align.MIN)))
-    return cards[:-8], tipped
+def prints():
+    return [_card(i) for i in range(CAPACITY)]
+
+
+def flipping(n: int = 6):
+    """The front n prints bent forward over the fin tops, as when looking through."""
+    standing, bent = [], []
+    for i in range(CAPACITY):
+        if i >= n:
+            standing.append(_card(i))
+            continue
+        y, z = _fin_frame(i)(FIN_T + (SLOT_W - PRINT_T) / 2, FIN_H)
+        lower = Pos(*_card(i).location.position) * Rot(-FIN_LEAN, 0, 0) * Box(
+            PRINT_W, PRINT_T, FIN_H, align=(Align.CENTER, Align.MIN, Align.MIN))
+        upper = Pos(0, y, z) * Rot(30 + (n - i) * 4, 0, 0) * Box(
+            PRINT_W, PRINT_T, PRINT_H - FIN_H, align=(Align.CENTER, Align.MIN, Align.MIN))
+        bent += [lower, upper]
+    return standing, bent
 
 
 if __name__ == "__main__":
@@ -154,13 +171,12 @@ if __name__ == "__main__":
     full = prints()
     clash = sum((box & c).volume for c in full)
     print(f"crate {bb.size.X:.0f} x {bb.size.Y:.0f} x {bb.size.Z:.0f} mm; "
-          f"{CAPACITY} prints packed at the back overlap the walls by {clash:.2f} mm³; "
-          f"free length in front: {full[-1].bounding_box().min.Y - (-IL / 2):.0f} mm")
-    standing, tipped = fanned()
+          f"{CAPACITY} prints in their slots overlap the crate by {clash:.2f} mm³")
+    standing, tipped = flipping()
     render(
         {
-            "Crate, 40 prints": {"body": box, "print": full},
-            "Flipping": {"body": box, "print": standing + tipped},
+            "Crate, 40 prints in slots": {"body": box, "print": full},
+            "Looking through": {"body": box, "print": standing + tipped},
             "Side": {"body": box, "print": full},
         },
         OUT / "crate.png",

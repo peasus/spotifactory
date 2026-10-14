@@ -52,6 +52,7 @@ PRINT_DIR = OUT / "print"
 W = 104.0                 # width at the base
 TOP_W = 81.0              # width at the top of the panel (print is 72)
 WALL = 2.4                # 4 lines at 0.6 mm nozzle (wood-fill PLA)
+PARTITION_T = 3.6         # wall under the shelf
 FILLET = 6.0              # outside edge radius (panel top is 14 mm deep, so < 7)
 BOTTOM_CHAMFER = 1.0      # bottom outside edge: with the inset base plate, a clean shadow line
 SLOPE = 12.0              # control face angle, degrees
@@ -286,7 +287,9 @@ def _partition(cavity):
     """
     top = ZS - WALL
     y0 = inner_front_y(top)
-    wall = _yz_prism([(y0, 0), (y0 + WALL, 0), (y0 + WALL, top), (y0, top)]) & cavity
+    # PARTITION_T, not WALL: at WALL thick its back face passed 0.4 mm from the
+    # panel's inside fillet and the STL came out with non-manifold edges.
+    wall = _yz_prism([(y0, 0), (y0 + PARTITION_T, 0), (y0 + PARTITION_T, top), (y0, top)]) & cavity
     # Opening sized to the plugs, measured where they cross the wall.
     plugs = pi_plugs()
     x0 = min(p.bounding_box().min.X for p in plugs) - 2.0
