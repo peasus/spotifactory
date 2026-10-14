@@ -77,7 +77,9 @@ UNDER_CLEAR = 1.5         # lowest point of the Pi above the base plate
 BOSS_R, BOSS_H = 4.0, 8.0
 INSERT_D, INSERT_DEPTH = 4.0, 5.5   # Adafruit 4255 M3 x 4 mm heat-set insert
 SCREW_CLEAR = 3.4                   # M3
+CSK_D = 6.4                         # M3 flat-head countersink (90°, so it prints face down)
 HEAD_D, HEAD_H = 5.2, 2.0           # M2.5 pan head under the Pi (posts clear it)
+POST_R = 3.95                       # widest that clears the Pi; ~1.2 mm wall round the head pocket
 
 # ---------------------------------------------------------------- boards (measured / datasheet)
 HAT_W, HAT_D, HAT_T = 65.0, 30.0, 1.6
@@ -398,16 +400,19 @@ def baseplate():
     plate = extrude(foot, amount=PLATE_T, dir=(0, 0, -1))
     for bx, by in boss_positions():
         plate -= Pos(bx, by, -PLATE_T - 1) * Cylinder(SCREW_CLEAR / 2, PLATE_T + 2, align=C)
+        # 90° cone: its 45° sides print without support, unlike a flat counterbore.
+        csk = (CSK_D - SCREW_CLEAR) / 2
+        plate -= Pos(bx, by, -PLATE_T - 0.01) * Cone(CSK_D / 2 + 0.01, SCREW_CLEAR / 2, csk + 0.01, align=C)
 
-    # Posts under the Pi's mounting holes, topped with the Pi's tilt and
-    # recessed for the screw heads.
+    # Posts under the Pi's mounting holes, leaning with the Pi so the
+    # screw-head pocket is coaxial and the wall round it stays even.
     f = hat_frame()
-    below_pi = f * _box(-60, 60, -60, 60, PI_BOTTOM - 60, PI_BOTTOM)
+    above_plate = _box(-100, 100, -100, 200, -PLATE_T, 100)
     for hx, hy in _hole_positions(HOLE_DX, HOLE_DY):
-        at = (f * Pos(hx, hy, PI_BOTTOM)).position
-        post = (Pos(at.X, at.Y, 0) * Cylinder(3.5, at.Z + 2, align=C)) & below_pi
-        head = f * Pos(hx, hy, PI_BOTTOM - HEAD_H) * Cylinder(HEAD_D / 2 + 0.3, HEAD_H + 1, align=C)
-        plate += post - head
+        post = f * Pos(hx, hy, PI_BOTTOM) * Cylinder(
+            POST_R, 40, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        head = f * Pos(hx, hy, PI_BOTTOM - HEAD_H) * Cylinder(HEAD_D / 2 + 0.15, HEAD_H + 1, align=C)
+        plate += (post & above_plate) - head
 
     # Vents under the Pi.
     centre_y = (f * Pos(0, 0, 0)).position.Y
