@@ -108,6 +108,10 @@ def unsupported(part, name: str) -> None:
         if prev is not None:
             support = prev.buffer(LAYER)       # each layer may step out ~one layer (45°)
             for p in polys:
+                # A piece touching nothing below is floating, however small (slicers flag these).
+                if p.distance(prev) > 0.05:
+                    bad.append((z, p.centroid, float("inf"), p.area))
+                    continue
                 loose = p.difference(support)
                 if loose.area < 1.0:
                     continue
@@ -176,15 +180,37 @@ def main() -> int:
     hit = sweep(body, module, path)
     check(hit is None, "faceplate + Pi stack goes in from below" +
           ("" if hit is None else f" (blocked at {path[hit]})"))
-    # Reader: off the nubs (away from the wall), then straight down and out.
-    rf = easel._reader_frame()
-    back = (rf * Pos(0, 0, -4)).position - rf.position
+    # Reader, plug in: down the wall out of the caps, away from the wall, then
+    # straight down and out (the reverse of putting it in).
+    mf = easel._mount_frame()
+    vec = lambda v: (mf * Pos(*v)).position - mf.position
+    down, back = vec((0, -1, 0)), vec((0, 0, -4))
     reader = [inside["reader"], inside["port"][1], inside["plugs"][-1]]
-    path = [(back.X * t, back.Y * t, back.Z * t) for t in (0.25, 0.5, 0.75, 1.0)]
-    path += [(back.X, back.Y, back.Z - d) for d in range(2, 120, 2)]
+    s = easel.READER_SLIDE
+    path = [(down.X * d, down.Y * d, down.Z * d) for d in (s * 0.25, s * 0.5, s * 0.75, s)]
+    at = (down.X * s, down.Y * s, down.Z * s)
+    path += [(at[0] + back.X * t, at[1] + back.Y * t, at[2] + back.Z * t) for t in (0.25, 0.5, 0.75, 1.0)]
+    at = (at[0] + back.X, at[1] + back.Y, at[2] + back.Z)
+    path += [(at[0], at[1], at[2] - d) for d in range(2, 120, 2)]
     hit = sweep(body, reader, path)
-    check(hit is None, "reader (with its right-angle plug) goes in from below onto the nubs" +
+    check(hit is None, "reader (with its right-angle plug) goes in from below and up into the caps" +
           ("" if hit is None else f" (blocked at {path[hit]})"))
+    # Keepers: up the screw axis into place; the screwdriver reaches from below.
+    keepers = [easel.keeper(-1), easel.keeper(1)]
+    v, away = vec((0, -1, 0)), vec((0, 0, -3))
+    kpath = [(v.X * d, v.Y * d, v.Z * d) for d in range(1, 8)]
+    at = (v.X * 7, v.Y * 7, v.Z * 7)
+    kpath += [(at[0] + away.X * t, at[1] + away.Y * t, at[2] + away.Z * t) for t in (0.5, 1.0)]
+    at = (at[0] + away.X, at[1] + away.Y, at[2] + away.Z)
+    kpath += [(at[0], at[1], at[2] - d) for d in range(2, 40, 2)]
+    hit = sweep(body, keepers, kpath)
+    check(hit is None, "keepers go in from below and up their screw axes" + ("" if hit is None else f" (blocked at {kpath[hit]})"))
+    drv = overlap(body, [easel.keeper_screw_path(-1), easel.keeper_screw_path(1)])
+    check(drv < TOUCH, f"screwdriver reaches both keeper screws from below ({drv:.2f} mm³ in the way)")
+    k_hits = overlap(inside["reader"], keepers) + overlap(inside["plugs"][-1], keepers) + overlap(body, keepers)
+    check(k_hits < TOUCH, f"keepers clear the reader, its plug and the body ({k_hits:.2f} mm³)")
+    dropped = overlap(Pos(down.X, down.Y, down.Z) * inside["reader"], keepers)
+    check(dropped > 1, "reader can't slide down out of the caps: 1 mm down, it lands on the keepers")
     # Base plate, with the power board on its bracket, lifts straight in.
     hit = sweep(body, [bp, inside["pi"][2], inside["port"][0]], [(0, 0, -d) for d in range(1, 40, 2)])
     check(hit is None, "base plate + power board lifts straight in")
@@ -195,7 +221,7 @@ def main() -> int:
 
     print("Printability (as oriented in out/print)")
     parts = easel.print_orientation()
-    for name in ("body", "faceplate", "baseplate", "spacers"):
+    for name in ("body", "faceplate", "baseplate", "spacers", "keepers"):
         manifold(parts[name], name)
         overhangs(parts[name], name)
         unsupported(parts[name], name)

@@ -8,7 +8,10 @@ Parts and print orientation:
   body       upright, no supports
   faceplate  face down; the Pi + HAT stack screws to it (through spacers) and
              the assembly goes in from below, under a 1.2 mm lip
-  spacers    4 tubes between the HAT and the Pi
+  spacers    4 tubes between the HAT and the Pi, plus 4 washers (only for
+             M2.5 x 16 stack screws)
+  keepers    2 blocks under the reader's bottom corners; each takes an
+             M2.5 x 12 screw up into a post in the body
   baseplate  flat, under the body; screws into M3 heat-set inserts in the
              body's corners, carries the USB-C power board on a bracket, and
              its posts press the stack up against the lip
@@ -52,7 +55,6 @@ PRINT_DIR = OUT / "print"
 W = 104.0                 # width at the base
 TOP_W = 81.0              # width at the top of the panel (print is 72)
 WALL = 2.4                # 4 lines at 0.6 mm nozzle (wood-fill PLA)
-PARTITION_T = 3.6         # wall under the shelf
 FILLET = 6.0              # outside edge radius (panel top is 14 mm deep, so < 7)
 BOTTOM_CHAMFER = 1.0      # bottom outside edge: with the inset base plate, a clean shadow line
 SLOPE = 12.0              # control face angle, degrees
@@ -131,6 +133,13 @@ _A = math.radians(SLOPE)
 FP_FACE = -LIP_T                          # faceplate top, below the slope surface
 HAT_TOP = FP_FACE - FP_T - GLASS_H        # in the slope frame
 PI_BOTTOM = HAT_TOP - STACK
+# Stack screws: up through the Pi, a spacer and the HAT into a blind pilot in
+# the faceplate. M2.5 pan heads come in 12 and 16 mm (14 isn't a standard
+# length), so 16 mm screws get a printed washer under the head that takes up
+# the extra and puts the tip at the bottom of the pilot.
+STACK_SCREW = 16.0
+PILOT_DEPTH = GLASS_H + FP_T - 0.8                 # leaves 0.8 mm under the visible face
+WASHER_T = STACK_SCREW - (STACK + PILOT_DEPTH)
 STACK_DEPTH = -PI_BOTTOM + PI_UNDER       # slope surface to the Pi's underside
 # Boards start as close to the front as they can: the stack hangs below a
 # tilted face, so its lower edge leans forward; keep that 1 mm off the wall.
@@ -206,8 +215,35 @@ def _reader_frame():
 
 # Depths behind the print plane (negative z in the print/reader frame).
 SKIN_IN = -(GAP + WALL)                    # inside of the panel's front wall
-BOARD_FRONT = SKIN_IN - 0.3                # reader wedged on the nubs, antenna side forward
-NUB_LEN = READER_PCB + 0.8
+BOARD_FRONT = SKIN_IN - 0.3                # reader's antenna side, just off the panel's inside
+
+# Reader mount (proven with keeper_test.py): caps over the board's top corners,
+# and keepers under its bottom corners, each held by an M2.5 x 12 screw driven
+# straight up into a post. The reader goes in from below with its plug in,
+# slides READER_SLIDE up the wall into the caps, then the keepers go in.
+MOUNT_CLEAR = 0.4             # board to the lips, and each side of its width
+CAP_LIP = 1.3                 # overlap onto the board's back: its 1.5 mm edge strips are component-free
+CAP_LIP_T = 1.2
+CAP_SIDE_T = 1.8
+CAP_LEN = 4.4                 # caps reach this far down the board's long edges (<= slide + 0.5)
+TOP_GAP = 0.3                 # stop above the board's top edge
+STUB_T, STUB_X = 3.6, 33.0    # wall under the shelf, kept only beyond |x| > STUB_X (see body())
+READER_SLIDE = 4.0            # the plug meets the shelf's chamfer at ~4.5
+KPOST_X = READER_W / 2 + MOUNT_CLEAR + CAP_SIDE_T + 2.75
+KPOST_Z = -4.0                 # pilot axis, behind the board's front face
+KPOST_R = 2.75
+KPOST_LEN = 14.0
+KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 12: ~7 mm through the keeper, ~5 mm into the post
+# Posts (and the caps' bottoms) stick out behind a wall leaning back, so a square
+# underside would start printing at its back edge, in mid-air. Instead the
+# underside is level for LEDGE mm off the wall, then rises at 45° (in the
+# printer); the keeper's top matches, and tightening wedges it toward the wall.
+LEDGE = 2.0
+KEEPER_T = 3.0
+KEEPER_GAP = 0.2              # keeper below the board's bottom edge
+KEEPER_LIP_H = 3.0            # keeper lip behind the board's bottom corner
+KEEPER_X0 = READER_W / 2 - 3.0
+SCREW_CLEAR_M25 = 2.9
 
 
 def _hole_positions(dx, dy):
@@ -254,20 +290,103 @@ def boss_positions():
             for y in (WALL + BOSS_R - 1.0, WALL_IN_Y - BOSS_R + 1.0)]
 
 
-def nubs():
-    """Four slightly tapered nubs on the inside of the panel; the reader presses on."""
-    rb = (READER_HOLE_D + 0.15) / 2      # wedges just before the board reaches the wall
-    rt = (READER_HOLE_D - 0.6) / 2
-    rf = _reader_frame()
+def _mount_frame():
+    """x across the reader, y up the wall from its bottom edge, z out of the
+    wall; the board's front face is z = 0 (it lies in z < 0)."""
+    return _reader_frame() * Pos(0, -READER_H / 2, BOARD_FRONT)
+
+
+def _prism_x(points_yz, x0: float, x1: float):
+    """Polygon in (y, z), extruded across x0..x1."""
+    with BuildSketch(Plane.YZ.offset(x0)) as sk:
+        with BuildLine():
+            Polyline(*points_yz, close=True)
+        make_face()
+    return extrude(sk.sketch, amount=x1 - x0)
+
+
+def _underside(z: float, y0: float) -> float:
+    """Height up the wall of a sloped underside starting at y0, at depth z behind the board's face."""
+    d = max(-z, 0.0)
+    flat, rise = math.tan(math.radians(LEAN)), math.tan(math.radians(45 + LEAN))
+    return y0 + flat * min(d, LEDGE) + rise * max(d - LEDGE, 0.0)
+
+
+def _under_outline(y0: float, depth: float, front: float):
+    """(y, z) points along the sloped underside, from `front` back to -depth."""
+    return [(y0, front), (_underside(-LEDGE, y0), -LEDGE), (_underside(-depth, y0), -depth)]
+
+
+def _xs(s: int, a: float, b: float):
+    return min(s * a, s * b), max(s * a, s * b)
+
+
+def reader_mount():
+    """Caps over the reader's top corners and the keepers' posts (mount frame)."""
+    half, back = READER_W / 2, -(READER_PCB + MOUNT_CLEAR)
+    into = 0.6                                   # into the panel's skin (the board sits 0.3 off it)
+    side0 = half + MOUNT_CLEAR
     out = None
-    for hx, hy in _hole_positions(*READER_HOLES):
-        nub = rf * Pos(hx, hy, SKIN_IN) * Rot(180, 0, 0) * Cone(rb, rt, NUB_LEN, align=C)
-        # On a wall leaning back, the nub points slightly down, so its tip would
-        # start printing in mid-air: flatten its underside level with its base.
-        base_low = (rf * Pos(hx, hy - rb, SKIN_IN)).position.Z
-        nub &= Pos(0, 0, base_low) * Box(400, 400, 400, align=C)
-        out = nub if out is None else out + nub
+    for s in (-1, 1):
+        y0, top = READER_H - CAP_LEN, READER_H + TOP_GAP + 2
+        cap = _prism_x([(y0, into), (top, into), (top, back - CAP_LIP_T), (y0, back - CAP_LIP_T)],
+                       *_xs(s, side0, side0 + CAP_SIDE_T))
+        cap += _prism_x([(y0, back), (top, back), (top, back - CAP_LIP_T), (y0, back - CAP_LIP_T)],
+                        *_xs(s, half - CAP_LIP, side0 + 0.01))
+        stop = _prism_x([(READER_H + TOP_GAP, into), (top, into), (top, back), (READER_H + TOP_GAP, back)],
+                        *_xs(s, half - 4, side0 + 0.01))
+        stop -= _prism_x(_under_outline(READER_H + TOP_GAP, 15, 1.0) + [(0, -15), (0, 1.0)],
+                         *_xs(s, half - 5, side0 + 1))
+        cap += stop
+        below = _under_outline(y0, 15, 1.0) + [(y0 - 60, -15), (y0 - 60, 1.0)]
+        cap -= _prism_x(below, *_xs(s, half - CAP_LIP - 1, side0 + CAP_SIDE_T + 1))
+
+        p0, depth = -KEEPER_GAP, -(KPOST_Z - KPOST_R)
+        post = _prism_x(_under_outline(p0, depth, into) + [(p0 + KPOST_LEN, -depth), (p0 + KPOST_LEN, into)],
+                        *_xs(s, side0 + CAP_SIDE_T - 0.01, KPOST_X + KPOST_R))
+        post -= Pos(s * KPOST_X, _underside(KPOST_Z + PILOT_M25 / 2, p0) - 1, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(
+            PILOT_M25 / 2, KEEPER_PILOT_DEPTH + 1, align=C)
+        out = cap + post if out is None else out + cap + post
+    return _mount_frame() * out
+
+
+def _keeper_local(s: int):
+    half, back = READER_W / 2, -(READER_PCB + MOUNT_CLEAR)
+    p0, depth, front = -KEEPER_GAP, -(KPOST_Z - KPOST_R), 0.1     # 0.2 mm off the skin
+    bottom = p0 - KEEPER_T                       # flat: the screw head bears here
+    side_x = half + MOUNT_CLEAR + CAP_SIDE_T     # where the post starts
+    # Under the board's corner: flat top just below the board, and a lip behind it.
+    k = _prism_x([(bottom, front), (p0, front), (p0, -depth), (bottom, -depth)], *_xs(s, KEEPER_X0, side_x))
+    k += _prism_x([(p0 - 0.01, back), (p0 + KEEPER_LIP_H, back), (p0 + KEEPER_LIP_H, back - CAP_LIP_T),
+                   (p0 - 0.01, back - CAP_LIP_T)], *_xs(s, half - CAP_LIP, half + MOUNT_CLEAR))
+    # Under the post: top follows the post's sloped underside.
+    k += _prism_x(_under_outline(p0, depth, front) + [(bottom, -depth), (bottom, front)],
+                  *_xs(s, side_x - 0.01, KPOST_X + KPOST_R))
+    k -= Pos(s * KPOST_X, bottom - 1, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(SCREW_CLEAR_M25 / 2, 30, align=C)
+    return k
+
+
+def keeper(s: int):
+    """Keeper under one of the reader's bottom corners, in place."""
+    return _mount_frame() * _keeper_local(s)
+
+
+def keepers_flat():
+    """Both keepers lying on their screw-head faces (holes vertical), side by side."""
+    out = None
+    for i, s in enumerate((-1, 1)):
+        k = Rot(90, 0, 0) * _keeper_local(s)          # mount y (the screw axis) becomes z
+        bb = k.bounding_box()
+        k = Pos(-bb.center().X + (i - 0.5) * 20, -bb.center().Y, -bb.min.Z) * k
+        out = k if out is None else out + k
     return out
+
+
+def keeper_screw_path(s: int, length: float = 60.0):
+    """A screwdriver shaft (3.2 mm) from under keeper s straight down the screw axis."""
+    y = -KEEPER_GAP - KEEPER_T - 1.6
+    return _mount_frame() * Pos(s * KPOST_X, y, KPOST_Z) * Rot(90, 0, 0) * Cylinder(
+        1.6, length, align=C)
 
 
 def pi_plugs():
@@ -276,31 +395,6 @@ def pi_plugs():
     port_z = PI_BOTTOM + PI_T + 1.3
     return [hat_frame() * _box(px - w / 2, px + w / 2, HAT_D / 2, HAT_D / 2 + length,
                                port_z - h / 2, port_z + h / 2) for px in PI_PORTS_X]
-
-
-def _partition(cavity):
-    """Vertical wall under the shelf, from the panel's inner face down to the bed.
-
-    It holds up the shelf (which otherwise prints as a long unsupported
-    ceiling) and splits the base into a front bay (Pi) and a back bay (reader
-    cable, power). An opening with 45° shoulders lets the Pi's cables through.
-    """
-    top = ZS - WALL
-    y0 = inner_front_y(top)
-    # PARTITION_T, not WALL: at WALL thick its back face passed 0.4 mm from the
-    # panel's inside fillet and the STL came out with non-manifold edges.
-    wall = _yz_prism([(y0, 0), (y0 + PARTITION_T, 0), (y0 + PARTITION_T, top), (y0, top)]) & cavity
-    # Opening sized to the plugs, measured where they cross the wall.
-    plugs = pi_plugs()
-    x0 = min(p.bounding_box().min.X for p in plugs) - 2.0
-    x1 = max(p.bounding_box().max.X for p in plugs) + 2.0
-    z1 = max(p.bounding_box().max.Z for p in plugs) + 2.0
-    with BuildSketch(Plane.XZ) as ok:
-        with BuildLine():
-            Polyline((x0, -1), (x1, -1), (x1, z1 - 4), (x1 - 4, z1), (x0 + 4, z1), (x0, z1 - 4),
-                     close=True)
-        make_face()
-    return wall - extrude(ok.sketch, amount=200, both=True)
 
 
 def body():
@@ -326,9 +420,16 @@ def body():
         wedge = Pos(0, FP_Y1, 0) * extrude(wk.sketch, amount=FP_Y1 - FP_Y0 + 40)
         shell += (f * wedge) & cavity
 
-    # Wall under the shelf, plus a 45° chamfer so the shelf's front edge
-    # (beside the faceplate) isn't a bare ledge.
-    shell += _partition(cavity)
+    # 45° chamfer under the shelf, so its front edge (beside the faceplate)
+    # isn't a bare ledge. There used to be a full wall under it too; it blocked
+    # the reader's plug and the keeper screws, and the chamfer holds the shelf
+    # alone. Short stubs of it stay at the side walls: where the panel's inside
+    # fillet meets the side walls, the bare shell meshes with non-manifold edges.
+    top = ZS - WALL
+    y0 = inner_front_y(top)
+    stub = _yz_prism([(y0, 0), (y0 + STUB_T, 0), (y0 + STUB_T, top), (y0, top)]) & cavity
+    sides = Box(400, 400, 400, align=C) - Box(2 * STUB_X, 400, 400, align=C)
+    shell += stub & sides
     fp_back = (f * Pos(0, FP_Y1 + FP_CLEAR, FP_FACE - FP_T)).position.Y + 0.3
     top = ZS - WALL
     drop = inner_front_y(top) - fp_back
@@ -341,8 +442,8 @@ def body():
     shell += _yz_prism([(mid - 40, zc - 40), (mid, zc), (mid + 40, zc - 40),
                         (mid + 40, zc + 10), (mid - 40, zc + 10)]) & cavity
 
-    # Reader nubs; lip at the front of the print's groove.
-    shell += nubs()
+    # Reader caps and keeper posts; lip at the front of the print's groove.
+    shell += reader_mount() & solid
     lip = Pos(0, YS + LIP_W / 2, ZS - 1) * Box(PRINT_W + 8, LIP_W, LIP_H + 1, align=C)
     shell += fillet(lip.edges().filter_by(Axis.Z, reverse=True).group_by(Axis.Z)[-1], radius=1.0)
 
@@ -379,7 +480,7 @@ def faceplate():
     pocket = BUTTON_H - GLASS_H + 0.4
     plate -= Pos(BUTTONS[0][0], (max(ys) + min(ys)) / 2, FP_FACE - FP_T) * Box(
         BUTTON_FOOT[0] + 1.5, max(ys) - min(ys) + BUTTON_FOOT[1] + 1.5, pocket, align=C)
-    blind = GLASS_H + FP_T - 0.8                     # leaves 0.8 mm under the visible face
+    blind = PILOT_DEPTH
     for hx, hy in _hole_positions(HOLE_DX, HOLE_DY):
         plate += Pos(hx, hy, HAT_TOP) * Cylinder(2.75, GLASS_H, align=C)
         plate -= Pos(hx, hy, HAT_TOP) * Cylinder(PILOT_M25 / 2, blind, align=C)
@@ -387,11 +488,13 @@ def faceplate():
 
 
 def spacers():
-    """Four tubes for between the HAT and the Pi (M2.5 screws pass through)."""
+    """Four tubes for between the HAT and the Pi, and (second row) four washers
+    for under the screw heads (M2.5 screws pass through both)."""
     out = None
-    for i in range(4):
-        tube = Pos(i * 8.0, 0, 0) * (Cylinder(2.5, BOARD_GAP, align=C) - Cylinder(1.45, BOARD_GAP, align=C))
-        out = tube if out is None else out + tube
+    for row, length in ((0, BOARD_GAP), (1, WASHER_T)):
+        for i in range(4):
+            tube = Pos(i * 8.0, row * 8.0, 0) * (Cylinder(2.5, length, align=C) - Cylinder(1.45, length, align=C))
+            out = tube if out is None else out + tube
     return out
 
 
@@ -414,7 +517,8 @@ def baseplate():
     for hx, hy in _hole_positions(HOLE_DX, HOLE_DY):
         post = f * Pos(hx, hy, PI_BOTTOM) * Cylinder(
             POST_R, 40, align=(Align.CENTER, Align.CENTER, Align.MAX))
-        head = f * Pos(hx, hy, PI_BOTTOM - HEAD_H) * Cylinder(HEAD_D / 2 + 0.15, HEAD_H + 1, align=C)
+        sink = HEAD_H + WASHER_T                     # washer and screw head
+        head = f * Pos(hx, hy, PI_BOTTOM - sink) * Cylinder(HEAD_D / 2 + 0.15, sink + 1, align=C)
         plate += (post & above_plate) - head
 
     # Vents under the Pi.
@@ -470,8 +574,7 @@ def internals():
     rf = _reader_frame()
     reader = Box(READER_W, READER_H, READER_PCB, align=C)
     for hx, hy in _hole_positions(*READER_HOLES):
-        # Hole as wide as the nub's base, so the press fit doesn't count as a clash.
-        reader -= Pos(hx, hy, 0) * Cylinder((READER_HOLE_D + 0.15) / 2, 10, align=CC)
+        reader -= Pos(hx, hy, 0) * Cylinder(READER_HOLE_D / 2, 10, align=CC)
     reader = rf * Pos(0, 0, BOARD_FRONT - READER_PCB) * reader
     socket = rf * Pos(0, -READER_H / 2 + 3, BOARD_FRONT - READER_PCB - SOCKET_H) * Box(
         9, 7, SOCKET_H, align=C)
@@ -522,6 +625,7 @@ def print_orientation():
         "body": body(),
         "faceplate": fp_flat,
         "spacers": spacers(),
+        "keepers": keepers_flat(),
         "baseplate": Pos(0, 0, PLATE_T) * baseplate(),
     }
 
