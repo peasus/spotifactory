@@ -66,7 +66,10 @@ log in through the browser instead of the relay.
 ## Enclosure
 
 `enclosure/` holds a parametric build123d model of the case: a body, a
-faceplate and a base plate, designed to print without supports.
+faceplate, a base plate, spacers and two reader keepers, all designed to print
+without supports. There are also models for a print crate (`crate.py`) and a
+tag-sticker dispenser (`dispenser.py`), and small fit-test prints
+(`keeper_test.py`, `crate_test.py`).
 
 ```
 python3 -m venv enclosure/.venv && enclosure/.venv/bin/pip install build123d trimesh matplotlib networkx
@@ -78,11 +81,26 @@ Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus screws
 and a spare micro-USB cable for the power lead:
 
 - 4× M2.5×14 pan or button head: up through the Pi, spacers and HAT into the
-  faceplate. The heads sit in the pockets on top of the base plate's posts,
-  which are 5.5 mm wide and 2 mm deep, so socket-cap heads (2.5 mm tall) won't fit.
+  faceplate. M2.5×16 also works with one of the printed 2 mm washers (second
+  row of the spacers print) under each head. The heads sit in the pockets on
+  top of the base plate's posts, which are 5.5 mm wide and 4 mm deep. Pan or
+  button heads only: don't use countersunk heads.
 - 4× M2.5×8: USB-C power board to its bracket.
+- 2× M2.5×12: the reader keepers into their posts.
 - 4× M3×6 flat (countersunk) head: base plate into the heat-set inserts in
   the body's corners.
+
+Assembly order, with the body upside down or on its back:
+
+1. Plug the right-angle USB-C cable into the reader. Bring the reader in from
+   below, antenna side to the panel. Slide it about 4 mm up the panel until its
+   top corners are in the caps.
+2. Put a keeper under each bottom corner and drive an M2.5×12 straight up
+   through it into the post.
+3. Screw the Pi stack to the faceplate. Plug in its cables, then fit it from
+   below into the pocket under the screen window.
+4. Fit the base plate (with the power board on its bracket) and screw it into
+   the corner inserts.
 
 ## Layout
 

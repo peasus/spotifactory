@@ -43,9 +43,9 @@ PRINT_DIR = OUT / "print"
 CAPACITY = 40                 # prints, one per slot
 SLOT_W = 1.8                  # a ~1 mm print slides in and can rock
 FIN_T = 1.2                   # 2 lines at 0.6 mm nozzle
-FIN_H = 20.0
+FIN_H = 14.0                  # below the image: an Instax Square's bottom border is ~18 mm
 FIN_LEAN = 3.0                # degrees back: prints settle back but still drop straight in
-FRONT_ROOM = 25.0             # open floor in front of the first slot, for bending prints forward
+FRONT_ROOM = 10.0             # open floor in front of the first slot, for bending prints forward
 PITCH = SLOT_W + FIN_T
 
 # ---------------------------------------------------------------- box
@@ -95,24 +95,32 @@ def _rim_cut():
     return _yz_prism([(y0, z(y0)), (y1, z(y1)), (y1, 200), (y0, 200)])
 
 
+def _lean_frame(y0: float, floor: float = FLOOR):
+    """(u, v) -> (y, z) for a fin whose front-bottom edge is at y0: u through
+    the fin toward the back, v up it."""
+    return lambda u, v: (y0 + u * math.cos(_L) + v * math.sin(_L), floor + v * math.cos(_L) - u * math.sin(_L))
+
+
 def _fin_frame(i: int):
-    """(u, v) on fin i -> (y, z): u through the fin, toward the back; v up it."""
-    y0 = -FLOOR_LEN / 2 + FRONT_ROOM + i * PITCH
-    return lambda u, v: (y0 + u * math.cos(_L) + v * math.sin(_L), FLOOR + v * math.cos(_L) - u * math.sin(_L))
+    return _lean_frame(-FLOOR_LEN / 2 + FRONT_ROOM + i * PITCH)
+
+
+def fin(y0: float, height: float, half_width: float, floor: float = FLOOR):
+    """One fin with a round top, sunk 1 mm into the floor. Shared with crate_test.py."""
+    to, r = _lean_frame(y0, floor), FIN_T / 2
+    pts = [to(0, -1), to(FIN_T, -1), to(FIN_T, height - r)]
+    pts += [to(r + r * math.cos(t), height - r + r * math.sin(t))
+            for t in (math.pi * k / 8 for k in range(1, 8))]
+    pts.append(to(0, height - r))
+    return _yz_prism(pts, half_width)
 
 
 def fins(half_width: float):
-    """CAPACITY + 1 fins with round tops, sunk 1 mm into the floor."""
-    r = FIN_T / 2
+    """CAPACITY + 1 fins."""
     out = None
     for i in range(CAPACITY + 1):
-        to = _fin_frame(i)
-        pts = [to(0, -1), to(FIN_T, -1), to(FIN_T, FIN_H - r)]
-        pts += [to(r + r * math.cos(t), FIN_H - r + r * math.sin(t))
-                for t in (math.pi * k / 8 for k in range(1, 8))]
-        pts.append(to(0, FIN_H - r))
-        fin = _yz_prism(pts, half_width)
-        out = fin if out is None else out + fin
+        f = fin(-FLOOR_LEN / 2 + FRONT_ROOM + i * PITCH, FIN_H, half_width)
+        out = f if out is None else out + f
     return out
 
 
