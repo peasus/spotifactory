@@ -106,6 +106,7 @@ PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
 PI_UNDER = 1.6            # parts on the Pi's underside (estimate)
 PI_PORTS_X = (-21.5, -8.9)          # PWR, USB micro-USB ports on the back edge (Pi Zero layout)
 MICRO_USB_PLUG = (11.0, 7.0, 28.0)  # overmold w, h, length incl. cable bend
+RA_MICRO_LEN = 7.0                  # right-angle micro-USB head (the reader cable's Pi end), out from the port
 
 READER_W, READER_H = 38.15, 60.0  # measured PN532 board; stands upright, USB end down
 READER_HOLES = (33.2, 54.5)       # measured hole spacing
@@ -210,8 +211,17 @@ def _print_frame():
 def _reader_frame():
     """Reader centre in the print frame: antenna behind the tag, USB end down."""
     centre_up = TAG_UP - (ANTENNA_FROM_USB_END - READER_H / 2)
-    return _print_frame() * Pos(0, centre_up, 0)
+    return _print_frame() * Pos(READER_X, centre_up, 0)
 
+
+# The reader's cable: a regular straight USB-C plug, centred on the socket,
+# straight down from the port; the cable bends back below it.
+PLUG_W, PLUG_DOWN, PLUG_T = 12.5, 28.0, 6.5   # 6.5 thick sits flush with the antenna side
+# Reader sits off-centre so its plug's channel clears the Pi's USB plug's tunnel
+# (the antenna is far bigger than the 25 mm tag, so 6 mm doesn't matter).
+READER_X = 6.0
+PLUG_CLEAR = 0.8              # round the plug, in its channel
+OPENING_CLEAR = 0.6           # round the Pi's plugs, in the wall under the shelf
 
 # Depths behind the print plane (negative z in the print/reader frame).
 SKIN_IN = -(GAP + WALL)                    # inside of the panel's front wall
@@ -221,17 +231,20 @@ BOARD_FRONT = SKIN_IN - 0.3                # reader's antenna side, just off the
 # and keepers under its bottom corners, each held by an M2.5 x 12 screw driven
 # straight up into a post. The reader goes in from below with its plug in,
 # slides READER_SLIDE up the wall into the caps, then the keepers go in.
-MOUNT_CLEAR = 0.4             # board to the lips, and each side of its width
+MOUNT_CLEAR = 0.4             # board's back to the lips
+EDGE_CLEAR = 0.15             # each side of the board's width (first section print: 0.4 was loose)
 CAP_LIP = 1.3                 # overlap onto the board's back: its 1.5 mm edge strips are component-free
 CAP_LIP_T = 1.2
 CAP_SIDE_T = 1.8
-CAP_LEN = 4.4                 # caps reach this far down the board's long edges (<= slide + 0.5)
+CAP_LEN = 9.4                 # caps reach this far down the board's long edges
 TOP_GAP = 0.3                 # stop above the board's top edge
-STUB_T, STUB_X = 3.6, 33.0    # wall under the shelf, kept only beyond |x| > STUB_X (see body())
-READER_SLIDE = 4.0            # the plug meets the shelf's chamfer at ~4.5
-KPOST_X = READER_W / 2 + MOUNT_CLEAR + CAP_SIDE_T + 2.75
-KPOST_Z = -4.0                 # pilot axis, behind the board's front face
+SHELF_WALL_BACK = 5.0         # partition thickness, behind the panel's inside face line
+# The board has to drop this far for its top corners to clear the caps' lips
+# (whose lowest point is ~1.06 above the caps' bottom, the underside being sloped).
+READER_SLIDE = CAP_LEN - 1.06 + 0.5
 KPOST_R = 2.75
+KPOST_X = READER_W / 2 + EDGE_CLEAR + KPOST_R   # posts touch the board's edges: they guide its bottom
+KPOST_Z = -5.0                 # pilot axis behind the board's front face: clears a 7 mm screwdriver shaft
 KPOST_LEN = 14.0
 KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 12: ~7 mm through the keeper, ~5 mm into the post
 # Posts (and the caps' bottoms) stick out behind a wall leaning back, so a square
@@ -240,10 +253,11 @@ KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 12: ~7 mm through the keeper, ~5 mm into 
 # printer); the keeper's top matches, and tightening wedges it toward the wall.
 LEDGE = 2.0
 KEEPER_T = 3.0
-KEEPER_GAP = 0.2              # keeper below the board's bottom edge
-KEEPER_LIP_H = 3.0            # keeper lip behind the board's bottom corner
-KEEPER_X0 = READER_W / 2 - 3.0
+KEEPER_GAP = -0.1             # keeper top 0.1 above the board's bottom edge: it pushes the board up to the stops
+KEEPER_LIP_H = 5.0            # keeper lip behind the board's bottom corner (the corners are rounded)
+KEEPER_X0 = READER_W / 2 - 8.0      # keepers reach 8 mm in under the board, past its rounded corners
 SCREW_CLEAR_M25 = 2.9
+KEEPER_DRIVER_R = 3.5         # room for a 7 mm screwdriver shaft
 
 
 def _hole_positions(dx, dy):
@@ -305,16 +319,23 @@ def _prism_x(points_yz, x0: float, x1: float):
     return extrude(sk.sketch, amount=x1 - x0)
 
 
+SKIN_GAP = SKIN_IN - BOARD_FRONT     # the board sits this far off the panel's inside
+
+
 def _underside(z: float, y0: float) -> float:
-    """Height up the wall of a sloped underside starting at y0, at depth z behind the board's face."""
-    d = max(-z, 0.0)
+    """Height up the wall of a sloped underside that starts at y0 on the panel's
+    inside face, at depth z behind the board's face (the panel is z = SKIN_GAP)."""
+    d = max(SKIN_GAP - z, 0.0)
     flat, rise = math.tan(math.radians(LEAN)), math.tan(math.radians(45 + LEAN))
     return y0 + flat * min(d, LEDGE) + rise * max(d - LEDGE, 0.0)
 
 
 def _under_outline(y0: float, depth: float, front: float):
     """(y, z) points along the sloped underside, from `front` back to -depth."""
-    return [(y0, front), (_underside(-LEDGE, y0), -LEDGE), (_underside(-depth, y0), -depth)]
+    pts = [(_underside(front, y0), front)]
+    if front > SKIN_GAP:
+        pts.append((y0, SKIN_GAP))
+    return pts + [(_underside(SKIN_GAP - LEDGE, y0), SKIN_GAP - LEDGE), (_underside(-depth, y0), -depth)]
 
 
 def _xs(s: int, a: float, b: float):
@@ -325,7 +346,7 @@ def reader_mount():
     """Caps over the reader's top corners and the keepers' posts (mount frame)."""
     half, back = READER_W / 2, -(READER_PCB + MOUNT_CLEAR)
     into = 0.6                                   # into the panel's skin (the board sits 0.3 off it)
-    side0 = half + MOUNT_CLEAR
+    side0 = half + EDGE_CLEAR
     out = None
     for s in (-1, 1):
         y0, top = READER_H - CAP_LEN, READER_H + TOP_GAP + 2
@@ -343,7 +364,7 @@ def reader_mount():
 
         p0, depth = -KEEPER_GAP, -(KPOST_Z - KPOST_R)
         post = _prism_x(_under_outline(p0, depth, into) + [(p0 + KPOST_LEN, -depth), (p0 + KPOST_LEN, into)],
-                        *_xs(s, side0 + CAP_SIDE_T - 0.01, KPOST_X + KPOST_R))
+                        *_xs(s, side0 - 0.01, KPOST_X + KPOST_R))
         post -= Pos(s * KPOST_X, _underside(KPOST_Z + PILOT_M25 / 2, p0) - 1, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(
             PILOT_M25 / 2, KEEPER_PILOT_DEPTH + 1, align=C)
         out = cap + post if out is None else out + cap + post
@@ -354,16 +375,101 @@ def _keeper_local(s: int):
     half, back = READER_W / 2, -(READER_PCB + MOUNT_CLEAR)
     p0, depth, front = -KEEPER_GAP, -(KPOST_Z - KPOST_R), 0.1     # 0.2 mm off the skin
     bottom = p0 - KEEPER_T                       # flat: the screw head bears here
-    side_x = half + MOUNT_CLEAR + CAP_SIDE_T     # where the post starts
+    side_x = half + EDGE_CLEAR                   # where the post starts
     # Under the board's corner: flat top just below the board, and a lip behind it.
     k = _prism_x([(bottom, front), (p0, front), (p0, -depth), (bottom, -depth)], *_xs(s, KEEPER_X0, side_x))
     k += _prism_x([(p0 - 0.01, back), (p0 + KEEPER_LIP_H, back), (p0 + KEEPER_LIP_H, back - CAP_LIP_T),
-                   (p0 - 0.01, back - CAP_LIP_T)], *_xs(s, half - CAP_LIP, half + MOUNT_CLEAR))
+                   (p0 - 0.01, back - CAP_LIP_T)], *_xs(s, half - CAP_LIP, half))
     # Under the post: top follows the post's sloped underside.
     k += _prism_x(_under_outline(p0, depth, front) + [(bottom, -depth), (bottom, front)],
                   *_xs(s, side_x - 0.01, KPOST_X + KPOST_R))
     k -= Pos(s * KPOST_X, bottom - 1, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(SCREW_CLEAR_M25 / 2, 30, align=C)
     return k
+
+
+def reader_plug():
+    """The reader's USB-C plug, in place."""
+    zc = BOARD_FRONT - READER_PCB - SOCKET_H / 2          # socket's centre line
+    return _reader_frame() * _box(-PLUG_W / 2, PLUG_W / 2, -READER_H / 2 - PLUG_DOWN, -READER_H / 2,
+                                  zc - PLUG_T / 2, zc + PLUG_T / 2)
+
+
+def shelf_geometry():
+    """(shelf underside z, panel's inside face y there, wall front y)."""
+    top = ZS - WALL
+    fp_back = (hat_frame() * Pos(0, FP_Y1 + FP_CLEAR, FP_FACE - FP_T)).position.Y + 0.3
+    return top, inner_front_y(top), fp_back
+
+
+def plug_relief():
+    """Room in the back of the shelf's chamfer for the reader's plug as the
+    reader slides into the caps. Its roof rises at 45° to the shelf's
+    underside, so it prints without support; the plug runs along the panel's
+    15° line, which stays behind that roof."""
+    mf = _mount_frame()
+    front = -READER_PCB - SOCKET_H / 2 + PLUG_T / 2 + PLUG_CLEAR      # plug's front, mount frame
+    lowest = (mf * Pos(0, -PLUG_DOWN - READER_SLIDE, front)).position
+    top, yb, _ = shelf_geometry()
+    y0 = lowest.Y - 0.5
+    yr = yb - 1.0                 # roof starts just in front of the plug's line, then drops at 45°
+    x = mf.position.X
+    half = PLUG_W / 2 + PLUG_CLEAR
+    return _prism_x([(yb + SHELF_WALL_BACK + 1, top), (yr, top), (y0, top - (yr - y0)), (y0, -1),
+                     (yb + SHELF_WALL_BACK + 1, -1)], x - half, x + half)
+
+
+def partition_gaps(slab, margin: float = OPENING_CLEAR, min_wall: float = 6.0):
+    """x-ranges where the partition has to be open: where the Pi's power plug
+    or the reader's plug crosses it. Gaps closer than min_wall are merged (a
+    thin post of wall between them doesn't print)."""
+    spans = []
+    for t in (pi_plugs()[0], plug_relief()):
+        hit = t & slab
+        if hit.volume > 0.01:
+            bb = hit.bounding_box()
+            spans.append([bb.min.X - margin, bb.max.X + margin])
+    spans.sort()
+    merged = []
+    for a, b in spans:
+        if merged and a <= merged[-1][1] + min_wall:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    return [tuple(s) for s in merged]
+
+
+def _halfspace(point, normal):
+    """Everything on the `normal` side of the plane through `point`."""
+    return Plane(origin=point, z_dir=normal) * Box(1000, 1000, 1000, align=C)
+
+
+def _gap_chamfer(chamfer, a: float, b: float, top: float, fp_back: float):
+    """The chamfer over the gap a..b, also sloped at 45° up from each side of
+    the gap, so it grows out from the partition on both sides instead of
+    spanning the gap. Leaves a short flat bridge in the middle of wide gaps."""
+    gap = chamfer & _box(a, b, -500, 500, -500, 500)
+    # The chamfer's underside is z = top - (y - fp_back); keep z >= that plus the
+    # distance to the nearer edge of the gap (above either edge's 45° slope).
+    return gap & (_halfspace((a, fp_back, top), (-1, 1, 1)) + _halfspace((b, fp_back, top), (1, 1, 1)))
+
+
+def under_shelf(cavity):
+    """The partition (shelf's back edge down to the bed) and the 45° chamfer in
+    front of it. The partition has gaps for the Pi's power plug and the
+    reader's plug, with the chamfer sloped up from both sides over each, and
+    round holes for the keeper screwdrivers."""
+    top, yb, fp_back = shelf_geometry()
+    slab = _yz_prism([(yb, 0), (yb + SHELF_WALL_BACK, 0), (yb + SHELF_WALL_BACK, top), (yb, top)]) & cavity
+    gaps = partition_gaps(slab)
+    for a, b in gaps:
+        slab -= _box(a, b, -50, 400, -1, top + 1)
+    for s in (-1, 1):
+        slab -= keeper_screw_path(s, 80, KEEPER_DRIVER_R + 0.1)
+    chamfer = _yz_prism([(fp_back, top), (yb, top), (yb, top - (yb - fp_back))]) & cavity
+    kept = chamfer
+    for a, b in gaps:
+        kept = kept - _box(a, b, -500, 500, -500, 500) + _gap_chamfer(chamfer, a, b, top, fp_back)
+    return slab + kept - plug_relief()
 
 
 def keeper(s: int):
@@ -382,19 +488,23 @@ def keepers_flat():
     return out
 
 
-def keeper_screw_path(s: int, length: float = 60.0):
-    """A screwdriver shaft (3.2 mm) from under keeper s straight down the screw axis."""
+def keeper_screw_path(s: int, length: float = 60.0, r: float = None):
+    """A 7 mm screwdriver shaft from under keeper s straight down the screw axis."""
+    r = KEEPER_DRIVER_R if r is None else r
     y = -KEEPER_GAP - KEEPER_T - 1.6
     return _mount_frame() * Pos(s * KPOST_X, y, KPOST_Z) * Rot(90, 0, 0) * Cylinder(
-        1.6, length, align=C)
+        r, length, align=C)
 
 
 def pi_plugs():
-    """Straight micro-USB plugs in the Pi's PWR and USB ports (for clearance)."""
+    """The Pi's micro-USB plugs (for clearance): a straight one in PWR (the power
+    lead), a right-angle one in USB (the reader cable's Pi end, whose cable
+    turns away right at the port)."""
     w, h, length = MICRO_USB_PLUG
     port_z = PI_BOTTOM + PI_T + 1.3
-    return [hat_frame() * _box(px - w / 2, px + w / 2, HAT_D / 2, HAT_D / 2 + length,
-                               port_z - h / 2, port_z + h / 2) for px in PI_PORTS_X]
+    lengths = (length, RA_MICRO_LEN)
+    return [hat_frame() * _box(px - w / 2, px + w / 2, HAT_D / 2, HAT_D / 2 + n,
+                               port_z - h / 2, port_z + h / 2) for px, n in zip(PI_PORTS_X, lengths)]
 
 
 def body():
@@ -420,21 +530,9 @@ def body():
         wedge = Pos(0, FP_Y1, 0) * extrude(wk.sketch, amount=FP_Y1 - FP_Y0 + 40)
         shell += (f * wedge) & cavity
 
-    # 45° chamfer under the shelf, so its front edge (beside the faceplate)
-    # isn't a bare ledge. There used to be a full wall under it too; it blocked
-    # the reader's plug and the keeper screws, and the chamfer holds the shelf
-    # alone. Short stubs of it stay at the side walls: where the panel's inside
-    # fillet meets the side walls, the bare shell meshes with non-manifold edges.
-    top = ZS - WALL
-    y0 = inner_front_y(top)
-    stub = _yz_prism([(y0, 0), (y0 + STUB_T, 0), (y0 + STUB_T, top), (y0, top)]) & cavity
-    sides = Box(400, 400, 400, align=C) - Box(2 * STUB_X, 400, 400, align=C)
-    shell += stub & sides
-    fp_back = (f * Pos(0, FP_Y1 + FP_CLEAR, FP_FACE - FP_T)).position.Y + 0.3
-    top = ZS - WALL
-    drop = inner_front_y(top) - fp_back
-    shell += _yz_prism([(fp_back, top), (inner_front_y(top), top),
-                        (inner_front_y(top), top - drop)]) & cavity
+    # Under the shelf: the partition and chamfer, with openings for the
+    # reader's plug, the keeper screwdrivers and the Pi's power plug.
+    shell += under_shelf(cavity)
 
     # Peaked (45°) roof inside the panel top, so it prints without supports.
     zc = TOP_Z - WALL
@@ -578,9 +676,7 @@ def internals():
     reader = rf * Pos(0, 0, BOARD_FRONT - READER_PCB) * reader
     socket = rf * Pos(0, -READER_H / 2 + 3, BOARD_FRONT - READER_PCB - SOCKET_H) * Box(
         9, 7, SOCKET_H, align=C)
-    # Right-angle USB-C plug, turned so its cable leaves towards the back.
-    plug = rf * _box(-6.5, 6.5, -READER_H / 2 - 9, -READER_H / 2 + 2,
-                     BOARD_FRONT - READER_PCB - 16, BOARD_FRONT - 0.3)
+    plug = reader_plug()
     antenna = rf * Pos(0, ANTENNA_FROM_USB_END - READER_H / 2, BOARD_FRONT - 0.2) * Box(
         READER_W - 1, ANTENNA_H, 0.2, align=C)
 

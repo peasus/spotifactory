@@ -1,8 +1,8 @@
 """Dispenser for the roll of NFC tag stickers.
 
 The roll sits loose in a curved cradle and turns as you pull. The backing paper
-feeds up through a slit near the front of the lid. Pulling it down over the
-lid's crisp front edge bends it sharply, and the sticker peels off the backing.
+feeds up through a slit near the front of the lid; tear off a sticker, peel
+it, and stick it on the print.
 Rounded corners, inward-leaning walls and a bottom chamfer match the easel and
 the crate.
 
@@ -61,7 +61,7 @@ H = FLOOR + ROLL_OD + 2 * ROLL_CLEAR + LIP_DEPTH   # base height: the lid's skir
 
 # ---------------------------------------------------------------- lid
 LID_T = 3.0
-LID_FILLET = 2.0              # top edges, except the front one (the peel edge)
+LID_FILLET = 2.0              # top edges
 LIP_WALL = 1.8
 LIP_CLEAR = 0.25
 # Snap: a bead on each long side of the skirt squeezes past the rim, then sits
@@ -110,10 +110,7 @@ def lid():
     with BuildSketch(Plane.XY.offset(H)) as sk:
         RectangleRounded(tw, tl, FILLET)
     plate = extrude(sk.sketch, amount=LID_T)
-    front_y = -tl / 2
-    top_edges = [e for e in plate.edges() if e.center().Z > H + LID_T - 0.01]
-    soft = [e for e in top_edges if not (abs(e.center().Y - front_y) < 0.01)]
-    plate = fillet(soft, radius=LID_FILLET)
+    plate = fillet([e for e in plate.edges() if e.center().Z > H + LID_T - 0.01], radius=LID_FILLET)
 
     sw, sl = IW - 2 * LIP_CLEAR, IL - 2 * LIP_CLEAR
     with BuildSketch(Plane.XY.offset(H - LIP_DEPTH)) as sk:
