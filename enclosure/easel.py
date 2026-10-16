@@ -11,7 +11,7 @@ Parts and print orientation:
   spacers    4 tubes between the HAT and the Pi, plus 4 washers (only for
              M2.5 x 16 stack screws)
   keepers    2 blocks under the reader's bottom corners; each takes an
-             M2.5 x 12 screw up into a post in the body
+             M2.5 x 14 screw up into a post in the body
   baseplate  flat, under the body; screws into M3 heat-set inserts in the
              body's corners, carries the USB-C power board on a bracket, and
              its posts press the stack up against the lip
@@ -105,8 +105,7 @@ BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
 PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
 PI_UNDER = 1.6            # parts on the Pi's underside (estimate)
 PI_PORTS_X = (-21.5, -8.9)          # PWR, USB micro-USB ports on the back edge (Pi Zero layout)
-MICRO_USB_PLUG = (11.0, 7.0, 28.0)  # overmold w, h, length incl. cable bend
-RA_MICRO_LEN = 7.0                  # right-angle micro-USB head (the reader cable's Pi end), out from the port
+MICRO_USB_PLUG = (10.5, 7.0, 28.0)  # overmold w, h, length incl. cable bend
 
 READER_W, READER_H = 38.15, 60.0  # measured PN532 board; stands upright, USB end down
 READER_HOLES = (33.2, 54.5)       # measured hole spacing
@@ -216,10 +215,11 @@ def _reader_frame():
 
 # The reader's cable: a regular straight USB-C plug, centred on the socket,
 # straight down from the port; the cable bends back below it.
-PLUG_W, PLUG_DOWN, PLUG_T = 12.5, 28.0, 6.5   # 6.5 thick sits flush with the antenna side
-# Reader sits off-centre so its plug's channel clears the Pi's USB plug's tunnel
-# (the antenna is far bigger than the 25 mm tag, so 6 mm doesn't matter).
-READER_X = 6.0
+PLUG_W, PLUG_DOWN, PLUG_T = 10.5, 28.0, 6.5   # measured 10.2 wide; 6.5 thick sits flush with the antenna side
+# Reader sits off-centre so its plug clears the Pi's USB plug beside it. At 6 mm
+# the real plugs had 5 mm between them, so 2.5 leaves ~1.5 mm and keeps the
+# 25 mm tag well inside the ~37 mm antenna either way.
+READER_X = 2.5
 PLUG_CLEAR = 0.8              # round the plug, in its channel
 OPENING_CLEAR = 0.6           # round the Pi's plugs, in the wall under the shelf
 
@@ -228,7 +228,7 @@ SKIN_IN = -(GAP + WALL)                    # inside of the panel's front wall
 BOARD_FRONT = SKIN_IN - 0.3                # reader's antenna side, just off the panel's inside
 
 # Reader mount (proven with keeper_test.py): caps over the board's top corners,
-# and keepers under its bottom corners, each held by an M2.5 x 12 screw driven
+# and keepers under its bottom corners, each held by an M2.5 x 14 screw driven
 # straight up into a post. The reader goes in from below with its plug in,
 # slides READER_SLIDE up the wall into the caps, then the keepers go in.
 MOUNT_CLEAR = 0.4             # board's back to the lips
@@ -246,7 +246,7 @@ KPOST_R = 2.75
 KPOST_X = READER_W / 2 + EDGE_CLEAR + KPOST_R   # posts touch the board's edges: they guide its bottom
 KPOST_Z = -5.0                 # pilot axis behind the board's front face: clears a 7 mm screwdriver shaft
 KPOST_LEN = 14.0
-KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 12: ~7 mm through the keeper, ~5 mm into the post
+KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 14: ~9.25 mm through the keeper, ~4.75 into the post, tip inside the pilot
 # Posts (and the caps' bottoms) stick out behind a wall leaning back, so a square
 # underside would start printing at its back edge, in mid-air. Instead the
 # underside is level for LEDGE mm off the wall, then rises at 45° (in the
@@ -419,11 +419,13 @@ def plug_relief():
 
 
 def partition_gaps(slab, margin: float = OPENING_CLEAR, min_wall: float = 6.0):
-    """x-ranges where the partition has to be open: where the Pi's power plug
-    or the reader's plug crosses it. Gaps closer than min_wall are merged (a
-    thin post of wall between them doesn't print)."""
+    """x-ranges where the partition has to be open: where the Pi's plugs or the
+    reader's plug cross it. Gaps closer than min_wall are merged (a thin post of
+    wall between them doesn't print). With straight micro-USB plugs at the Pi
+    this is one wide opening: in its middle the chamfer is gone and the shelf's
+    underside is only a ~3 mm ledge off the material in front, which prints."""
     spans = []
-    for t in (pi_plugs()[0], plug_relief()):
+    for t in (*pi_plugs(), plug_relief()):
         hit = t & slab
         if hit.volume > 0.01:
             bb = hit.bounding_box()
@@ -497,14 +499,11 @@ def keeper_screw_path(s: int, length: float = 60.0, r: float = None):
 
 
 def pi_plugs():
-    """The Pi's micro-USB plugs (for clearance): a straight one in PWR (the power
-    lead), a right-angle one in USB (the reader cable's Pi end, whose cable
-    turns away right at the port)."""
+    """Straight micro-USB plugs in the Pi's PWR and USB ports (for clearance)."""
     w, h, length = MICRO_USB_PLUG
     port_z = PI_BOTTOM + PI_T + 1.3
-    lengths = (length, RA_MICRO_LEN)
-    return [hat_frame() * _box(px - w / 2, px + w / 2, HAT_D / 2, HAT_D / 2 + n,
-                               port_z - h / 2, port_z + h / 2) for px, n in zip(PI_PORTS_X, lengths)]
+    return [hat_frame() * _box(px - w / 2, px + w / 2, HAT_D / 2, HAT_D / 2 + length,
+                               port_z - h / 2, port_z + h / 2) for px in PI_PORTS_X]
 
 
 def body():

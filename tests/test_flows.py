@@ -101,12 +101,45 @@ class TestRebootShutdownConfirm:
         r = _runner()
         labels = [i.label for i in r.nav.current.menu.items]
         r.nav.current.selected_index = labels.index(label)
-        with patch("spotifactory.runner.os.system") as system:
+        with patch("spotifactory.runner.subprocess.run") as run:
             r.handle_select()
             assert r.nav.current.menu.title == title
             r.handle_select()  # default item is Cancel
-        system.assert_not_called()
+        run.assert_not_called()
         assert r.nav.current.menu.title == "Main Menu"
+
+    def _confirm(self, r, label):
+        labels = [i.label for i in r.nav.current.menu.items]
+        r.nav.current.selected_index = labels.index(label)
+        r.handle_select()                      # into the confirm menu
+        r.nav.current.move_down()              # Cancel -> the action
+        r.handle_select()
+
+    @pytest.mark.parametrize("label,verb", [("Reboot", "reboot"), ("Shutdown", "poweroff")])
+    def test_confirmed_runs_systemctl_without_waiting_for_a_password(self, label, verb):
+        r = _runner()
+        with patch("spotifactory.runner.sys.platform", "linux"), \
+             patch("spotifactory.runner.subprocess.run") as run:
+            run.return_value = MagicMock(returncode=0, stderr="")
+            self._confirm(r, label)
+        run.assert_called_once()
+        assert run.call_args.args[0] == ["sudo", "-n", "systemctl", verb]
+        assert r._message[0] in ("Rebooting...", "Shutting down...")
+
+    def test_failure_is_shown_not_swallowed(self):
+        r = _runner()
+        with patch("spotifactory.runner.sys.platform", "linux"), \
+             patch("spotifactory.runner.subprocess.run") as run:
+            run.return_value = MagicMock(returncode=1, stderr="sudo: a password is required")
+            self._confirm(r, "Shutdown")
+        assert r._message[0] == "Couldn't shut down"
+
+    def test_simulator_never_powers_off_the_computer(self):
+        r = _runner()
+        with patch("spotifactory.runner.sys.platform", "darwin"), \
+             patch("spotifactory.runner.subprocess.run") as run:
+            self._confirm(r, "Shutdown")
+        run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

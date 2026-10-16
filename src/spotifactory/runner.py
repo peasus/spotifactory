@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import os
+import subprocess
+import sys
 import threading
 import time
 from typing import Any, Optional, Type
@@ -21,6 +22,10 @@ from spotifactory.tasks.base import (
 # device look broken — return home after this long without input.
 _MENU_IDLE_SECS = 60.0
 _SCROLL_X = 125           # scrollbar occupies x 125-127 on the 128 px display
+
+# Menu action -> (systemctl verb, what the screen says meanwhile). Needs the
+# passwordless sudo rule for these from deploy/setup.sh.
+_POWER = {"reboot": ("reboot", "Rebooting..."), "shutdown": ("poweroff", "Shutting down...")}
 
 
 class Runner:
@@ -49,6 +54,7 @@ class Runner:
         self._home_blanked: bool = False
         self._last_input: float = time.monotonic()
         self._shuffle_busy: bool = False
+        self._message: tuple[str, str, float | None] | None = None   # (line 1, line 2, until)
 
         if home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
@@ -130,10 +136,8 @@ class Runner:
             self.nav.pop()
         elif item.action == "home":
             self._return_home()
-        elif item.action == "reboot":
-            os.system("sudo reboot")
-        elif item.action == "shutdown":
-            os.system("sudo shutdown -h now")
+        elif item.action in _POWER:
+            self._power(item.action)
 
     def handle_tag_scan_sim(self, uri: str = "spotify:album:5Z9iiGl2FcIfa3BMiv6OIw") -> None:
         """Simulate an RFID tag scan (sim / dry_run mode). Press T in the sim."""
@@ -176,6 +180,16 @@ class Runner:
     # ------------------------------------------------------------------
 
     def render(self) -> None:
+        if self._message is not None:
+            line1, line2, until = self._message
+            if until is None or time.monotonic() < until:
+                self.display.clear()
+                self.display.draw_text(2, 18, line1)
+                self.display.draw_text(2, 34, line2)
+                self.display.update()
+                return
+            self._message = None
+
         if self._in_qr_auth():
             self._render_qr_auth()
             return
@@ -253,6 +267,30 @@ class Runner:
             while self.nav.pop():
                 pass
             self._start_task(self._home_task_class)
+
+    def _show(self, line1: str, line2: str = "", seconds: float | None = None) -> None:
+        """A full-screen message; stays up until `seconds` pass (or for good if None)."""
+        self._message = (line1, line2, None if seconds is None else time.monotonic() + seconds)
+        self.render()
+
+    def _power(self, action: str) -> None:
+        """Reboot or power off the Pi. Off the Pi (the simulator), just say so."""
+        verb, label = _POWER[action]
+        if not sys.platform.startswith("linux"):
+            print(f"[runner] {action}: not on the Pi, ignoring", flush=True)
+            self._show(label, "(simulator: no)", 2.0)
+            return
+        self._show(label, "")
+        try:
+            # -n: fail at once rather than wait for a password nobody can type
+            result = subprocess.run(["sudo", "-n", "systemctl", verb],
+                                    capture_output=True, text=True, timeout=15)
+            error = "" if result.returncode == 0 else (result.stderr.strip() or f"exit {result.returncode}")
+        except Exception as e:
+            error = str(e)
+        if error:
+            print(f"[runner] {action} failed: {error}", flush=True)
+            self._show(f"Couldn't {'reboot' if action == 'reboot' else 'shut down'}", "Run setup.sh again", 5.0)
 
     def _prev_track(self) -> None:
         try:

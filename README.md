@@ -52,6 +52,9 @@ To deploy an update: `cd ~/spotifactory && git pull && sudo systemctl restart sp
 (the setup script allows that restart without a password). Logs:
 `journalctl -u spotifactory -f`.
 
+A Pi set up before the Reboot/Shutdown menu items worked needs its sudo rule
+updated once (asks for your password): `cd ~/spotifactory && bash deploy/sudoers.sh`
+
 ## Development (Mac)
 
 ```
@@ -86,21 +89,18 @@ and a spare micro-USB cable for the power lead:
   top of the base plate's posts, which are 5.5 mm wide and 4 mm deep. Pan or
   button heads only: don't use countersunk heads.
 - 4× M2.5×8: USB-C power board to its bracket.
-- 2× M2.5×12: the reader keepers into their posts.
+- 2× M2.5×14 (pan or button head): the reader keepers into their posts. Not 12 (too little thread in the post) or 16 (runs past the pilot hole).
 
 The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
-cable with a **straight** USB-C plug up to 12.5 mm wide and 6.5 mm thick (the
-plug and its strain relief up to 28 mm long), and a **right-angle** micro-USB
-plug at the Pi whose head sticks out no more than about 7 mm from the port.
-A straight micro-USB plug there would need its own gap in the wall under the
-shelf, right beside the reader plug's, leaving a sliver of wall between them.
+straight cable: a USB-C plug up to 12.5 mm wide and 6.5 mm thick (plug and
+strain relief up to 28 mm long), and any straight micro-USB plug at the Pi.
 
 Assembly order, with the body upside down or on its back:
 
 1. Plug the right-angle USB-C cable into the reader. Bring the reader in from
    below, antenna side to the panel. Slide it about 4 mm up the panel until its
    top corners are in the caps.
-2. Put a keeper under each bottom corner and drive an M2.5×12 straight up
+2. Put a keeper under each bottom corner and drive an M2.5×14 straight up
    through it into the post.
 3. Screw the Pi stack to the faceplate. Plug in its cables, then fit it from
    below into the pocket under the screen window.

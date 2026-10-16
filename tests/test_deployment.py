@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -237,3 +238,14 @@ class TestPkceAuth:
             # timeout=0.0 → deadline is already past on first check
             code = mod._poll_for_code("https://relay.test", "sess02", timeout=0.0)
         assert code is None
+
+
+def test_sudo_rule_covers_every_power_action():
+    """The Reboot/Shutdown menu items run `sudo -n systemctl <verb>`; each verb
+    must be in the passwordless rule, or the item silently does nothing."""
+    from spotifactory.runner import _POWER
+    rule = (Path(__file__).parent.parent / "deploy" / "sudoers.sh").read_text()
+    for verb, _ in _POWER.values():
+        assert f'"/usr/bin/systemctl {verb}"' in rule, verb
+    setup = (Path(__file__).parent.parent / "deploy" / "setup.sh").read_text()
+    assert "deploy/sudoers.sh" in setup
