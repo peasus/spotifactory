@@ -87,6 +87,9 @@ def manifold(part, name: str) -> None:
 
 LAYER = 0.3
 MAX_REACH = 5.0   # mm a layer may extend past supported material (ledge, or half a bridge)
+# Even a hairline counts: the knife-edge of a 45° wedge starts as a sliver a
+# fraction of a layer wide, and if it spans a gap, the printer has to bridge it.
+MIN_LOOSE = 0.05
 
 
 def unsupported(part, name: str) -> None:
@@ -98,10 +101,18 @@ def unsupported(part, name: str) -> None:
     export_stl(part, str(path))
     mesh = trimesh.load(path)
     path.unlink()
+    bad = []
+    # Two passes, half a layer apart, so a thin feature can't fall between slices.
+    for start in (LAYER / 2, LAYER):
+        heights = np.arange(start, mesh.bounds[1][2], LAYER)
+        sections = mesh.section_multiplane(plane_origin=[0, 0, 0], plane_normal=[0, 0, 1], heights=heights)
+        bad += _unsupported_pass(heights, sections)
+    report_unsupported(bad, name)
+
+
+def _unsupported_pass(heights, sections):
     from shapely.geometry import Point
     from shapely.ops import unary_union
-    heights = np.arange(LAYER / 2, mesh.bounds[1][2], LAYER)
-    sections = mesh.section_multiplane(plane_origin=[0, 0, 0], plane_normal=[0, 0, 1], heights=heights)
     prev, bad = None, []
     for z, sec in zip(heights, sections):
         polys = [p for p in (sec.polygons_full if sec is not None else []) if p.area > 0.01]
@@ -113,11 +124,11 @@ def unsupported(part, name: str) -> None:
                     bad.append((z, p.centroid, float("inf"), p.area))
                     continue
                 loose = p.difference(support)
-                if loose.area < 1.0:
+                if loose.area < MIN_LOOSE:
                     continue
                 held = p.intersection(support)
                 for piece in getattr(loose, "geoms", [loose]):
-                    if piece.area < 1.0:
+                    if piece.area < MIN_LOOSE:
                         continue
                     if held.is_empty:
                         reach = float("inf")
@@ -126,6 +137,10 @@ def unsupported(part, name: str) -> None:
                     if reach > MAX_REACH:
                         bad.append((z, piece.centroid, reach, piece.area))
         prev = unary_union(polys) if polys else None
+    return bad
+
+
+def report_unsupported(bad, name: str) -> None:
     # One line per place, not per layer.
     seen, report = [], []
     for z, c, reach, area in bad:
@@ -184,7 +199,7 @@ def main() -> int:
     # straight down and out (the reverse of putting it in).
     mf = easel._mount_frame()
     vec = lambda v: (mf * Pos(*v)).position - mf.position
-    down, back = vec((0, -1, 0)), vec((0, 0, -4))
+    down, back = vec((0, -1, 0)), vec((0, 0, -(easel.SHELF_WALL_BACK + 1.5)))   # back past the partition
     reader = [inside["reader"], inside["port"][1], inside["plugs"][-1]]
     s = easel.READER_SLIDE
     path = [(down.X * d, down.Y * d, down.Z * d) for d in (s * 0.25, s * 0.5, s * 0.75, s)]
@@ -193,11 +208,11 @@ def main() -> int:
     at = (at[0] + back.X, at[1] + back.Y, at[2] + back.Z)
     path += [(at[0], at[1], at[2] - d) for d in range(2, 120, 2)]
     hit = sweep(body, reader, path)
-    check(hit is None, "reader (with its right-angle plug) goes in from below and up into the caps" +
+    check(hit is None, "reader (with its USB-C plug in) goes in from below and up into the caps" +
           ("" if hit is None else f" (blocked at {path[hit]})"))
     # Keepers: up the screw axis into place; the screwdriver reaches from below.
     keepers = [easel.keeper(-1), easel.keeper(1)]
-    v, away = vec((0, -1, 0)), vec((0, 0, -3))
+    v, away = vec((0, -1, 0)), vec((0, 0, -(easel.SHELF_WALL_BACK + 1.5)))     # back past the partition
     kpath = [(v.X * d, v.Y * d, v.Z * d) for d in range(1, 8)]
     at = (v.X * 7, v.Y * 7, v.Z * 7)
     kpath += [(at[0] + away.X * t, at[1] + away.Y * t, at[2] + away.Z * t) for t in (0.5, 1.0)]
@@ -207,7 +222,13 @@ def main() -> int:
     check(hit is None, "keepers go in from below and up their screw axes" + ("" if hit is None else f" (blocked at {kpath[hit]})"))
     drv = overlap(body, [easel.keeper_screw_path(-1), easel.keeper_screw_path(1)])
     check(drv < TOUCH, f"screwdriver reaches both keeper screws from below ({drv:.2f} mm³ in the way)")
-    k_hits = overlap(inside["reader"], keepers) + overlap(inside["plugs"][-1], keepers) + overlap(body, keepers)
+    # The keepers push the reader up against the stops (KEEPER_GAP < 0): check it seated there.
+    lift = max(0.0, -easel.KEEPER_GAP) + 0.01
+    up = vec((0, lift, 0))
+    seated = [Pos(up.X, up.Y, up.Z) * inside["reader"], Pos(up.X, up.Y, up.Z) * inside["plugs"][-1]]
+    k_hits = overlap(seated[0], keepers) + overlap(seated[1], keepers) + overlap(body, keepers)
+    top_gap = overlap(body, seated[0])
+    check(top_gap < TOUCH, f"pushed up by the keepers, the reader still clears the stops ({top_gap:.2f} mm³)")
     check(k_hits < TOUCH, f"keepers clear the reader, its plug and the body ({k_hits:.2f} mm³)")
     dropped = overlap(Pos(down.X, down.Y, down.Z) * inside["reader"], keepers)
     check(dropped > 1, "reader can't slide down out of the caps: 1 mm down, it lands on the keepers")

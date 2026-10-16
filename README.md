@@ -87,8 +87,13 @@ and a spare micro-USB cable for the power lead:
   button heads only: don't use countersunk heads.
 - 4× M2.5×8: USB-C power board to its bracket.
 - 2× M2.5×12: the reader keepers into their posts.
-- 4× M3×6 flat (countersunk) head: base plate into the heat-set inserts in
-  the body's corners.
+
+The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
+cable with a **straight** USB-C plug up to 12.5 mm wide and 6.5 mm thick (the
+plug and its strain relief up to 28 mm long), and a **right-angle** micro-USB
+plug at the Pi whose head sticks out no more than about 7 mm from the port.
+A straight micro-USB plug there would need its own gap in the wall under the
+shelf, right beside the reader plug's, leaving a sliver of wall between them.
 
 Assembly order, with the body upside down or on its back:
 
