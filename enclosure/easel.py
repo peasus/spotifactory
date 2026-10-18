@@ -123,7 +123,12 @@ TAG_UP = 49.0                     # tag centre above the print's bottom edge
 PWR_BOARD = (30.48, 15.24, 1.57)
 PWR_HOLES = (25.4, 10.16)
 PWR_SHELL = (9.35, 4.44)
-PWR_COLLAR = (12.0, 5.0)            # plastic around the shell, 8.8 mm tall
+PWR_COLLAR = (12.0, 5.0)            # measured: square-cornered base of the socket
+PWR_COLLAR_DEPTH = 1.5              # measured: how far the collar stands off the board
+PWR_COLLAR_CLEAR = 0.3              # round the collar in the bracket (0.2 was tight)
+PWR_SHELL_CLEAR = 0.1               # round the metal shell in its slot (0.2 was loose)
+PWR_RELIEF_DEPTH = 1.5              # recess behind the board for its solder joints
+PWR_PAD_R = 2.0                     # the board rests on pads this far round each screw hole
 PWR_RISE = 9.30                     # shell top above the board's top surface
 PWR_X, PWR_Z = W / 2 - 30, 13.0     # board centre (lower left, seen from behind)
 PLUG_OPENING = (13.5, 8.0)          # wall opening: fits most USB-C plug overmolds
@@ -634,9 +639,19 @@ def power_bracket():
     top = PWR_Z + bh / 2 + 2
     y0, y1 = PWR_BOARD_TOP_Y, back_in_y(top) - 0.3      # clears the leaning wall at its top
     bracket = _box(PWR_X - bw / 2 - 2, PWR_X + bw / 2 + 2, y0, y1, 0, top)
-    window = _rounded(Box(PWR_COLLAR[0] + 0.6, 40, PWR_COLLAR[1] + 0.6, align=CC),
-                      (PWR_COLLAR[1] + 0.6) / 2 - 0.05, Axis.Y)
-    bracket -= Pos(PWR_X, y1, PWR_Z) * window
+    # Stepped window: a square-cornered pocket the socket's collar seats in,
+    # then a snug slot that holds the metal shell along its length.
+    cw, ch = PWR_COLLAR[0] + 2 * PWR_COLLAR_CLEAR, PWR_COLLAR[1] + 2 * PWR_COLLAR_CLEAR
+    bracket -= _box(PWR_X - cw / 2, PWR_X + cw / 2, y0 - 1, y0 + PWR_COLLAR_DEPTH + 0.2,
+                    PWR_Z - ch / 2, PWR_Z + ch / 2)
+    # Relief behind the middle of the board, so solder joints on its back don't
+    # hold it off the bracket: it rests on four pads round its screw holes.
+    rx = PWR_HOLES[0] / 2 - PWR_PAD_R
+    bracket -= _box(PWR_X - rx, PWR_X + rx, y0 - 1, y0 + PWR_RELIEF_DEPTH,
+                    PWR_Z - bh / 2 - 1, PWR_Z + bh / 2 + 1)
+    sw, sh = PWR_SHELL[0] + 2 * PWR_SHELL_CLEAR, PWR_SHELL[1] + 2 * PWR_SHELL_CLEAR
+    slot = _rounded(Box(sw, 40, sh, align=CC), sh / 2 - 0.05, Axis.Y)
+    bracket -= Pos(PWR_X, y1, PWR_Z) * slot
     for dx, dz in _hole_positions(*PWR_HOLES):
         bracket -= Pos(PWR_X + dx, y0, PWR_Z + dz) * Rot(-90, 0, 0) * Cylinder(PILOT_M25 / 2, 7, align=C)
     return bracket

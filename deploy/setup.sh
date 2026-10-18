@@ -118,6 +118,22 @@ systemctl --user daemon-reload
 systemctl --user enable raspotify
 systemctl --user start raspotify || true
 
+# ------------------------------------------------------------------------ .env
+# Start from the example, then fill in this owner's values from a provisioning
+# file kept out of git, so nothing needs typing by hand. Done before the Python
+# install, which reads the platform from .env.
+if [ ! -f "$REPO_DIR/.env" ]; then
+  cp "$REPO_DIR/deploy/env.example" "$REPO_DIR/.env"
+fi
+USER_HOME="$(getent passwd "$USER" | cut -d: -f6)"
+for PROVISION in "$REPO_DIR/deploy/provision.env" "$USER_HOME/spotifactory-provision.env"; do
+  if [ -f "$PROVISION" ]; then
+    echo "==> Filling .env from $PROVISION"
+    python3 "$REPO_DIR/deploy/apply_env.py" "$PROVISION" "$REPO_DIR/.env"
+  fi
+done
+chmod 600 "$REPO_DIR/.env"
+
 # ---------------------------------------------------- Python virtual environment
 echo "==> Setting up Python environment..."
 cd "$REPO_DIR"
@@ -132,11 +148,11 @@ echo "  Platform: $PLATFORM"
 .venv/bin/pip install -e ".[$PLATFORM]" -q
 
 # ----------------------------------------------------------------- .env check
-if [ ! -f "$REPO_DIR/.env" ]; then
-  cp "$REPO_DIR/deploy/env.example" "$REPO_DIR/.env"
+if grep -qE '^SPOTIPY_CLIENT_ID=(your_client_id_here)?$' "$REPO_DIR/.env"; then
   echo ""
   echo "  *** ACTION REQUIRED ***"
-  echo "  Edit $REPO_DIR/.env and fill in your Spotify credentials:"
+  echo "  No Spotify client ID. Put it in deploy/provision.env (see"
+  echo "  deploy/provision.env.example) and rerun, or edit .env by hand:"
   echo "    nano $REPO_DIR/.env"
   echo ""
 fi

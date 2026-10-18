@@ -35,16 +35,22 @@ and the screen sleeps after ten minutes with nothing playing.
 
 ## Setting up a Pi
 
+Once, on your computer: copy `deploy/provision.env.example` to
+`deploy/provision.env` (git-ignored) and fill in your Spotify client ID. Setup
+merges it into each box's `.env`, so nothing needs editing on the Pi.
+
 1. Flash Raspberry Pi OS Lite (64-bit) with hostname `spotifactory`, user
    `spotifactory`, SSH and WiFi set in Imager.
-2. On the Pi:
+2. From your computer, copy your values over:
+   ```
+   scp deploy/provision.env spotifactory@spotifactory.local:~/spotifactory-provision.env
+   ```
+3. On the Pi:
    ```
    sudo apt-get update && sudo apt-get install -y git
    git clone https://github.com/peasus/spotifactory.git ~/spotifactory
    cd ~/spotifactory && bash deploy/setup.sh
    ```
-3. Set `SPOTIPY_CLIENT_ID` in `~/spotifactory/.env` (only that line; see
-   `deploy/env.example`).
 4. Reboot, scan the QR code to log in, then in the Spotify app pick the
    **Spotifactory** device once. Use **Pair Device** for the speaker and printer.
 

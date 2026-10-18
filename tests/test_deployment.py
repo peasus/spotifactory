@@ -249,3 +249,26 @@ def test_sudo_rule_covers_every_power_action():
         assert f'"/usr/bin/systemctl {verb}"' in rule, verb
     setup = (Path(__file__).parent.parent / "deploy" / "setup.sh").read_text()
     assert "deploy/sudoers.sh" in setup
+
+
+def test_provisioning_file_fills_env(tmp_path):
+    """setup.sh merges deploy/provision.env into .env: placeholders and
+    commented examples are replaced in place, new keys appended, blanks ignored."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "apply_env", Path(__file__).parent.parent / "deploy" / "apply_env.py")
+    apply_env = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(apply_env)
+
+    env = tmp_path / ".env"
+    env.write_text("# Spotify\nSPOTIPY_CLIENT_ID=your_client_id_here\n"
+                   "RELAY_URL=https://old.example\n# NFC_PORT=tty:USB0\nKEEP=me\n")
+    prov = tmp_path / "provision.env"
+    prov.write_text("# mine\nSPOTIPY_CLIENT_ID=abc123\nRELAY_URL=\nNFC_PORT=tty:USB1\nNEW_KEY=x=y\n")
+    apply_env.main(str(prov), str(env))
+    lines = env.read_text().splitlines()
+    assert "SPOTIPY_CLIENT_ID=abc123" in lines
+    assert "RELAY_URL=https://old.example" in lines        # blank in provision: untouched
+    assert "NFC_PORT=tty:USB1" in lines and "# NFC_PORT=tty:USB0" not in lines
+    assert "KEEP=me" in lines and "# Spotify" in lines
+    assert lines[-1] == "NEW_KEY=x=y"

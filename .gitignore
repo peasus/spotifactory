@@ -30,3 +30,9 @@ venv/
 
 # Spotipy token cache
 .cache
+
+# Cloudflare wrangler's local cache (account id/name)
+.wrangler/
+
+# Per-owner values merged into each box's .env by deploy/setup.sh
+deploy/provision.env
