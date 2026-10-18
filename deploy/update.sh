@@ -75,21 +75,29 @@ install_rev() {   # install_rev TO FROM
   bash "$REPO_DIR/deploy/upgrade.sh" "$APP_USER" || return 1
 }
 
-# The app writes its heartbeat every few seconds once it's up and drawing.
-came_back() {   # came_back SINCE_EPOCH
+# Restart the app and wait for the new one's heartbeat. The old heartbeat is
+# removed first: the old app keeps writing it right up to the restart, which
+# would otherwise pass for the new one. Then make sure the app stays up (a
+# crashing app shows "active" for a moment after each automatic restart).
+restart_and_wait() {
+  rm -f "$HEARTBEAT"
+  systemctl restart spotifactory || return 1
+  local restarts
+  restarts="$(systemctl show -p NRestarts --value spotifactory)"
   for _ in $(seq 1 30); do
     sleep 4
-    if [ -f "$HEARTBEAT" ] && [ "$(stat -c %Y "$HEARTBEAT")" -ge "$1" ] \
-       && systemctl is-active --quiet spotifactory; then
-      return 0
+    if [ -f "$HEARTBEAT" ]; then
+      sleep 10
+      systemctl is-active --quiet spotifactory \
+        && [ "$(systemctl show -p NRestarts --value spotifactory)" = "$restarts" ]
+      return
     fi
   done
   return 1
 }
 
 log "updating ${PREV:0:7} -> ${NEW:0:7} ($BRANCH)"
-START="$(date +%s)"
-if install_rev "$NEW" "$PREV" && systemctl restart spotifactory && came_back "$START"; then
+if install_rev "$NEW" "$PREV" && restart_and_wait; then
   log "updated to ${NEW:0:7}"
   record "updated ${NEW:0:7}"
   rm -f "$BAD"

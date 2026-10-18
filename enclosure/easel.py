@@ -122,9 +122,10 @@ TAG_UP = 49.0                     # tag centre above the print's bottom edge
 # powers it). From Adafruit's published STEP model.
 PWR_BOARD = (30.48, 15.24, 1.57)
 PWR_HOLES = (25.4, 10.16)
-PWR_SHELL = (9.35, 4.44)
+PWR_SHELL = (9.35, 3.94)           # width per Adafruit's model; height from the fit tests
 PWR_COLLAR = (12.0, 5.0)            # measured: square-cornered base of the socket
 PWR_COLLAR_DEPTH = 1.5              # measured: how far the collar stands off the board
+PWR_COLLAR_POCKET = 2.5             # pocket depth for it (1.7 was too shallow in the fit test)
 PWR_COLLAR_CLEAR = 0.3              # round the collar in the bracket (0.2 was tight)
 PWR_SHELL_CLEAR = 0.1               # round the metal shell in its slot (0.2 was loose)
 PWR_RELIEF_DEPTH = 1.5              # recess behind the board for its solder joints
@@ -642,7 +643,7 @@ def power_bracket():
     # Stepped window: a square-cornered pocket the socket's collar seats in,
     # then a snug slot that holds the metal shell along its length.
     cw, ch = PWR_COLLAR[0] + 2 * PWR_COLLAR_CLEAR, PWR_COLLAR[1] + 2 * PWR_COLLAR_CLEAR
-    bracket -= _box(PWR_X - cw / 2, PWR_X + cw / 2, y0 - 1, y0 + PWR_COLLAR_DEPTH + 0.2,
+    bracket -= _box(PWR_X - cw / 2, PWR_X + cw / 2, y0 - 1, y0 + PWR_COLLAR_POCKET,
                     PWR_Z - ch / 2, PWR_Z + ch / 2)
     # Relief behind the middle of the board, so solder joints on its back don't
     # hold it off the bracket: it rests on four pads round its screw holes.
