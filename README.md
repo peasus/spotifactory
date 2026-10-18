@@ -54,12 +54,32 @@ merges it into each box's `.env`, so nothing needs editing on the Pi.
 4. Reboot, scan the QR code to log in, then in the Spotify app pick the
    **Spotifactory** device once. Use **Pair Device** for the speaker and printer.
 
-To deploy an update: `cd ~/spotifactory && git pull && sudo systemctl restart spotifactory`
-(the setup script allows that restart without a password). Logs:
-`journalctl -u spotifactory -f`.
+Logs: `journalctl -u spotifactory -f`.
 
-A Pi set up before the Reboot/Shutdown menu items worked needs its sudo rule
-updated once (asks for your password): `cd ~/spotifactory && bash deploy/sudoers.sh`
+### Updates
+
+Boxes update themselves from the **`stable`** branch: each night around 3:30
+(skipped while someone's using it), or from the menu with **Check for
+Updates**. To release, try it on your own box first, then:
+
+```
+git push origin main:stable
+```
+
+Each update pulls the code, reinstalls Python packages if `pyproject.toml`
+changed, runs `deploy/upgrade.sh` (service files and the sudo rule, so those
+reach boxes in the field too), and restarts the app. If the app doesn't come
+back within two minutes it rolls back, and won't try that release again. To
+update one now over SSH: `sudo systemctl start spotifactory-update`; to see what
+happened: `journalctl -u spotifactory-update -n 30`.
+
+Your development box can follow `main` (`SPOTIFACTORY_UPDATE_BRANCH=main` in
+`.env`) or skip the nightly run (`SPOTIFACTORY_AUTO_UPDATE=0`). Note that a box
+that has updated is on a detached checkout, not a branch: update it with the
+updater rather than `git pull`.
+
+A Pi set up before the updater existed needs the system part installed once
+(asks for your password): `cd ~/spotifactory && git pull && sudo bash deploy/upgrade.sh`
 
 ## Development (Mac)
 

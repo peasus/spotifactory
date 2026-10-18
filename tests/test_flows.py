@@ -373,3 +373,53 @@ class TestMenuScrollbar:
         r.nav.push(r.menus["confirm_reboot"])
         r._render_menu()
         r.display.draw_rect.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Auto-update: heartbeat, Check for Updates, the "Updated" note
+# ---------------------------------------------------------------------------
+
+class TestUpdates:
+    def test_check_for_updates_asks_the_updater_and_says_up_to_date(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SPOTIFACTORY_STATE", str(tmp_path))
+        r = _runner()
+        (tmp_path / "update-status").write_text("current abc1234\n")
+        with patch("spotifactory.runner.sys.platform", "linux"), \
+             patch("spotifactory.runner.subprocess.run") as run:
+            run.return_value = MagicMock(returncode=0, stderr="")
+            labels = [i.label for i in r.nav.current.menu.items]
+            r.nav.current.selected_index = labels.index("Check for Updates")
+            r.handle_select()
+            assert _wait_for(lambda: r._message and r._message[0] == "Up to date")
+        assert run.call_args.args[0] == ["sudo", "-n", "systemctl", "start", "spotifactory-update"]
+        assert (tmp_path / "update-requested").exists()     # tells update.sh not to wait for idle
+
+    def test_failed_update_is_reported(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SPOTIFACTORY_STATE", str(tmp_path))
+        r = _runner()
+        (tmp_path / "update-status").write_text("rolled back abc1234\n")
+        with patch("spotifactory.runner.sys.platform", "linux"), \
+             patch("spotifactory.runner.subprocess.run") as run:
+            run.return_value = MagicMock(returncode=1, stderr="failed")
+            r._check_for_updates()
+            assert _wait_for(lambda: r._message and r._message[0] == "Update failed")
+
+    def test_heartbeat_says_idle_or_busy_under_systemd_only(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SPOTIFACTORY_STATE", str(tmp_path))
+        r = _runner()
+        r._last_input = time.monotonic() - 600
+        r.tick()
+        assert not (tmp_path / "heartbeat").exists()        # not under systemd: no file
+        monkeypatch.setenv("INVOCATION_ID", "x")
+        r.tick()
+        assert (tmp_path / "heartbeat").read_text() == "idle\n"
+        r._last_beat = 0.0
+        r.handle_down()                                     # someone in the menus
+        r.tick()
+        assert (tmp_path / "heartbeat").read_text() == "busy\n"
+
+    def test_shows_updated_after_an_update_restart(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SPOTIFACTORY_STATE", str(tmp_path))
+        (tmp_path / "update-status").write_text("updated def5678\n")
+        r = _runner()
+        assert r._message[:2] == ("Updated", "def5678")

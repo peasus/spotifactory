@@ -36,6 +36,7 @@ class HomeScanStep(Step):
         self.artist: str = ""
         self.shuffle_active: bool = False
         self.screen_off: bool = False
+        self.tag_active: bool = False        # a tag is on the reader (the box is in use)
         self._idle_since: float = time.monotonic()
         self._shuffle_set_at: float = 0.0
 
@@ -65,6 +66,7 @@ class HomeScanStep(Step):
         self.artist = ""
         self.shuffle_active = False
         self.screen_off = False
+        self.tag_active = False
         self._idle_since = time.monotonic()
 
         _active_uri: str | None = None
@@ -104,6 +106,7 @@ class HomeScanStep(Step):
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
+            self.tag_active = True
             self.screen_off = False
             self.status = "Loading..."
             self.artist = ""
@@ -223,6 +226,7 @@ class HomeScanStep(Step):
                         print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None
             _soco_speaker = None
+            self.tag_active = False
             self.status = "Place tag..."
             self.artist = ""
             self.shuffle_active = False

@@ -1,0 +1,10 @@
+[Unit]
+Description=Spotifactory update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# upgrade.sh patches the path and user to this box's.
+ExecStart=/bin/bash /home/spotifactory/spotifactory/deploy/update.sh spotifactory
+TimeoutStartSec=20min

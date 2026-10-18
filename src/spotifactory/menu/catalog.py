@@ -12,6 +12,7 @@ MENUS: dict[str, MenuDef] = {
         ItemDef("Pair Device",    task=BluetoothTask),
         ItemDef("Connect Spotify", task=ReAuthTask),
         ItemDef("Scan Tag",       action="home"),
+        ItemDef("Check for Updates", action="update"),
         ItemDef("Reboot",         submenu="confirm_reboot"),
         ItemDef("Shutdown",       submenu="confirm_shutdown"),
     ]),

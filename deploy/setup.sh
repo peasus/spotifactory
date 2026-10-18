@@ -157,19 +157,12 @@ if grep -qE '^SPOTIPY_CLIENT_ID=(your_client_id_here)?$' "$REPO_DIR/.env"; then
   echo ""
 fi
 
-# --------------------------------------------------------------- systemd service
-echo "==> Installing systemd service..."
-sudo cp "$REPO_DIR/deploy/spotifactory.service" /etc/systemd/system/spotifactory.service
-# Patch the user and working directory to match the actual setup
-sudo sed -i "s|User=spotifactory|User=$USER|g" /etc/systemd/system/spotifactory.service
-sudo sed -i "s|/home/spotifactory/spotifactory|$REPO_DIR|g" /etc/systemd/system/spotifactory.service
-sudo sed -i "s|/run/user/1000|/run/user/$USER_ID|g" /etc/systemd/system/spotifactory.service
-sudo systemctl daemon-reload
-sudo systemctl enable spotifactory
-
-# Passwordless sudo for SSH deploys (restart the service) and the Reboot and
-# Shutdown menu items. Its own script, so an existing Pi can rerun just this.
-SUDO_USER="$USER" bash "$REPO_DIR/deploy/sudoers.sh"
+# ------------------------------------------------- services and the sudo rule
+# The app's service, the nightly updater and its timer, and passwordless sudo
+# for what the app and deploys need. The same script runs after every
+# auto-update, so boxes in the field pick up changes to these too.
+echo "==> Installing services and the sudo rule..."
+sudo bash "$REPO_DIR/deploy/upgrade.sh" "$USER"
 
 echo ""
 echo "==> Setup complete!"
@@ -186,4 +179,6 @@ echo "     (put it in pairing mode first), then the Instax printer."
 echo ""
 echo "To run by hand over SSH, stop the service first so they don't fight over"
 echo "the RFID reader and buttons: sudo systemctl stop spotifactory"
-echo "To deploy an update: cd $REPO_DIR && git pull && sudo systemctl restart spotifactory"
+echo "Updates install themselves each night from the stable branch (or from"
+echo "the menu: Check for Updates). To update now over SSH:"
+echo "  sudo systemctl start spotifactory-update && journalctl -u spotifactory-update -n 20"

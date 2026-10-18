@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for a Spotifactory update each night
+
+[Timer]
+OnCalendar=*-*-* 03:30
+# Spread the boxes out, and catch up if it was off at the time.
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

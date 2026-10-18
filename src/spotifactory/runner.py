@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any, Optional, Type
 
 from spotifactory.menu.definitions import MenuDef
@@ -26,6 +28,17 @@ _SCROLL_X = 125           # scrollbar occupies x 125-127 on the 128 px display
 # Menu action -> (systemctl verb, what the screen says meanwhile). Needs the
 # passwordless sudo rule for these from deploy/setup.sh.
 _POWER = {"reboot": ("reboot", "Rebooting..."), "shutdown": ("poweroff", "Shutting down...")}
+
+# The auto-updater (deploy/update.sh) and the app talk through files here: the
+# app's heartbeat (is it up, and is someone using it), a request for an
+# update now, and the result of the last update.
+_HEARTBEAT_SECS = 10.0
+_BUSY_AFTER_INPUT_SECS = 120.0      # menus touched this recently: someone's using it
+_UPDATED_NOTE_SECS = 15 * 60        # show "Updated" if the app restarted this soon after
+
+
+def state_dir() -> Path:
+    return Path(os.environ.get("SPOTIFACTORY_STATE", "~/.cache/spotifactory")).expanduser()
 
 
 class Runner:
@@ -55,6 +68,8 @@ class Runner:
         self._last_input: float = time.monotonic()
         self._shuffle_busy: bool = False
         self._message: tuple[str, str, float | None] | None = None   # (line 1, line 2, until)
+        self._last_beat: float = 0.0
+        self._note_recent_update()
 
         if home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
@@ -138,6 +153,8 @@ class Runner:
             self._return_home()
         elif item.action in _POWER:
             self._power(item.action)
+        elif item.action == "update":
+            self._check_for_updates()
 
     def handle_tag_scan_sim(self, uri: str = "spotify:album:5Z9iiGl2FcIfa3BMiv6OIw") -> None:
         """Simulate an RFID tag scan (sim / dry_run mode). Press T in the sim."""
@@ -165,6 +182,7 @@ class Runner:
     # ------------------------------------------------------------------
 
     def tick(self) -> None:
+        self._beat()
         self._return_home_if_idle()
         if self._task is None:
             return
@@ -291,6 +309,74 @@ class Runner:
         if error:
             print(f"[runner] {action} failed: {error}", flush=True)
             self._show(f"Couldn't {'reboot' if action == 'reboot' else 'shut down'}", "Run setup.sh again", 5.0)
+
+    def _busy(self) -> bool:
+        """Is someone using the box? Then the nightly update waits."""
+        if time.monotonic() - self._last_input < _BUSY_AFTER_INPUT_SECS:
+            return True
+        if self._in_home_scan():
+            return bool(getattr(self._task.current_step, "tag_active", False))
+        return self._task is not None and not self._in_home_mode()   # printing, pairing...
+
+    def _beat(self) -> None:
+        """Tell the updater the app is up (and whether it's in use). Only under
+        systemd, which sets INVOCATION_ID: not in tests or the simulator."""
+        if not os.environ.get("INVOCATION_ID"):
+            return
+        now = time.monotonic()
+        if now - self._last_beat < _HEARTBEAT_SECS:
+            return
+        self._last_beat = now
+        try:
+            state_dir().mkdir(parents=True, exist_ok=True)
+            (state_dir() / "heartbeat").write_text("busy\n" if self._busy() else "idle\n")
+        except OSError as e:
+            print(f"[runner] heartbeat: {e}", flush=True)
+
+    def _note_recent_update(self) -> None:
+        """Just restarted by an update? Say so for a moment."""
+        try:
+            path = state_dir() / "update-status"
+            words = path.read_text().split()
+            fresh = time.time() - path.stat().st_mtime < _UPDATED_NOTE_SECS
+        except OSError:
+            return
+        if fresh and words[:1] == ["updated"]:
+            self._message = ("Updated", words[1] if len(words) > 1 else "", time.monotonic() + 4.0)
+
+    def _check_for_updates(self) -> None:
+        """Run the updater now (even though someone's using the box). If there's
+        an update, it restarts the app; otherwise say what happened."""
+        if not sys.platform.startswith("linux"):
+            self._show("Check for updates", "(simulator: no)", 2.0)
+            return
+        self._show("Checking for", "updates...")
+
+        def work() -> None:
+            try:
+                state_dir().mkdir(parents=True, exist_ok=True)
+                (state_dir() / "update-requested").touch()
+                result = subprocess.run(["sudo", "-n", "systemctl", "start", "spotifactory-update"],
+                                        capture_output=True, text=True, timeout=900)
+                error = result.stderr.strip() if result.returncode else ""
+            except Exception as e:
+                error = str(e)
+            try:
+                words = (state_dir() / "update-status").read_text().split()
+            except OSError:
+                words = []
+            if words[:1] == ["current"]:
+                note = ("Up to date", words[1] if len(words) > 1 else "")
+            elif words[:2] == ["rolled", "back"]:
+                note = ("Update failed", "kept the old one")
+            elif words[:1] == ["error"]:
+                note = ("Couldn't update", "no internet?")
+            else:
+                print(f"[runner] update: {error or words}", flush=True)
+                note = ("Couldn't update", "Run setup.sh again")
+            self._message = (*note, time.monotonic() + 5.0)    # the main loop draws it
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _prev_track(self) -> None:
         try:

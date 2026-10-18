@@ -247,8 +247,20 @@ def test_sudo_rule_covers_every_power_action():
     rule = (Path(__file__).parent.parent / "deploy" / "sudoers.sh").read_text()
     for verb, _ in _POWER.values():
         assert f'"/usr/bin/systemctl {verb}"' in rule, verb
-    setup = (Path(__file__).parent.parent / "deploy" / "setup.sh").read_text()
-    assert "deploy/sudoers.sh" in setup
+    assert '"/usr/bin/systemctl start spotifactory-update"' in rule      # Check for Updates
+
+
+def test_setup_and_updates_share_the_system_steps():
+    """setup.sh and every auto-update run upgrade.sh, which installs all the
+    units and the sudo rule, so boxes in the field get changes to them too."""
+    deploy = Path(__file__).parent.parent / "deploy"
+    assert "deploy/upgrade.sh" in (deploy / "setup.sh").read_text()
+    assert "deploy/upgrade.sh" in (deploy / "update.sh").read_text()
+    upgrade = (deploy / "upgrade.sh").read_text()
+    for unit in ("spotifactory.service", "spotifactory-update.service", "spotifactory-update.timer"):
+        assert unit in upgrade and (deploy / unit).exists(), unit
+    assert "deploy/sudoers.sh" in upgrade
+    assert "deploy/update.sh" in (deploy / "spotifactory-update.service").read_text()
 
 
 def test_provisioning_file_fills_env(tmp_path):
