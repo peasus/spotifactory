@@ -92,7 +92,7 @@ MAX_REACH = 5.0   # mm a layer may extend past supported material (ledge, or hal
 MIN_LOOSE = 0.05
 
 
-def unsupported(part, name: str) -> None:
+def unsupported(part, name: str, supported=()) -> None:
     """Slice like a slicer and measure, for every bit of a layer that has nothing
     under it, how far it reaches from material that does. Short ledges and
     bridges between walls are fine; a long strand out into thin air (like the
@@ -107,7 +107,10 @@ def unsupported(part, name: str) -> None:
         heights = np.arange(start, mesh.bounds[1][2], LAYER)
         sections = mesh.section_multiplane(plane_origin=[0, 0, 0], plane_normal=[0, 0, 1], heights=heights)
         bad += _unsupported_pass(heights, sections)
-    report_unsupported(bad, name)
+    # Leave out spans printed on painted supports (easel.supported_bridges).
+    inside = lambda c, z: any(x0 <= c.x <= x1 and y0 <= c.y <= y1 and z0 <= z <= z1
+                              for x0, x1, y0, y1, z0, z1 in supported)
+    report_unsupported([b for b in bad if not inside(b[1], b[0])], name)
 
 
 def _unsupported_pass(heights, sections):
@@ -180,7 +183,7 @@ def main() -> int:
         check(True, "boards, spacers, reader, sockets, plugs and the print all clear the parts")
     shell_end = inside["port"][0].bounding_box().max.Y
     wall_in = easel.back_in_y(easel.PWR_Z + easel.PWR_SHELL[1] / 2)
-    check(wall_in - 0.5 < shell_end <= wall_in,
+    check(wall_in - easel.SOCKET_INSET - 0.3 < shell_end <= wall_in,
           f"USB-C socket ends {wall_in - shell_end:.1f} mm inside the back wall")
 
     print("Assembly")
@@ -245,7 +248,7 @@ def main() -> int:
     for name in ("body", "faceplate", "baseplate", "spacers", "keepers"):
         manifold(parts[name], name)
         overhangs(parts[name], name)
-        unsupported(parts[name], name)
+        unsupported(parts[name], name, easel.supported_bridges() if name == "body" else ())
     for name, part in parts.items():
         bb = part.bounding_box()
         fits = bb.size.X <= 250 and bb.size.Y <= 250 and bb.size.Z <= 250

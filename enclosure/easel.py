@@ -76,7 +76,7 @@ PILOT_M25 = 2.1           # pilot hole for M2.5 screws threading into PLA
 # ---------------------------------------------------------------- base plate
 PLATE_T = 2.4
 PLATE_INSET = 0.6         # plate edge inside the body's (chamfered) bottom edge
-UNDER_CLEAR = 1.5         # lowest point of the Pi above the base plate
+UNDER_CLEAR = 3.5         # lowest point of the Pi above the base plate (+2 for the reader's cable below it)
 BOSS_R, BOSS_H = 4.0, 8.0
 INSERT_D, INSERT_DEPTH = 4.0, 5.5   # Adafruit 4255 M3 x 4 mm heat-set insert
 SCREW_CLEAR = 3.4                   # M3
@@ -176,7 +176,8 @@ def back_in_y(z: float) -> float:
 
 WALL_IN_Y = back_in_y(0)
 # Socket ends just inside the wall, measured at its top (the wall leans in).
-PWR_BOARD_TOP_Y = back_in_y(PWR_Z + PWR_SHELL[1] / 2) - 0.2 - PWR_RISE
+SOCKET_INSET = 0.7                  # socket's end inside the back wall (0.2 left it poking out)
+PWR_BOARD_TOP_Y = back_in_y(PWR_Z + PWR_SHELL[1] / 2) - SOCKET_INSET - PWR_RISE
 
 
 def _box(x0, x1, y0, y1, z0, z1):
@@ -459,6 +460,18 @@ def _gap_chamfer(chamfer, a: float, b: float, top: float, fp_back: float):
     # The chamfer's underside is z = top - (y - fp_back); keep z >= that plus the
     # distance to the nearer edge of the gap (above either edge's 45° slope).
     return gap & (_halfspace((a, fp_back, top), (-1, 1, 1)) + _halfspace((b, fp_back, top), (1, 1, 1)))
+
+
+def supported_bridges():
+    """Boxes (x0, x1, y0, y1, z0, z1) printed on painted supports (or bridged):
+    over the wide opening the shelf is a strip with the screen's pocket in
+    front and the panel behind, and nothing under it once the chamfer's 45°
+    slopes from the opening's sides have run out. check.py leaves these out."""
+    top, yb, fp_back = shelf_geometry()
+    slab = _yz_prism([(yb, 0), (yb + SHELF_WALL_BACK, 0), (yb + SHELF_WALL_BACK, top), (yb, top)])
+    reach = yb - fp_back                     # how far the 45° slopes close in from each side
+    return [(a + reach - 1, b - reach + 1, fp_back - 1, yb + 1, top - 1, top + 1.5)
+            for a, b in partition_gaps(slab) if b - a > 2 * reach]
 
 
 def under_shelf(cavity):
