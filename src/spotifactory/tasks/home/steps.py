@@ -14,6 +14,58 @@ from spotifactory.tasks.base import (
 _POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
 _SCREEN_OFF_SECS = 600.0    # blank display after this many idle seconds
 _SHUFFLE_SETTLE_SECS = 3.0  # Spotify can report the old shuffle state briefly after a change
+_POLL_ERROR_LOG_SECS = 60.0  # log failed polls at most this often
+
+
+class PlaybackLog:
+    """Journal lines for what Spotify does while a tag is down: each track,
+    speaker or play/pause change, and tracks that aren't from the tag's album
+    (e.g. an Echo dropping into Autoplay mid-album)."""
+
+    def __init__(self) -> None:
+        self.reset(None)
+        self._error_logged_at = 0.0
+
+    def reset(self, tag_uri: str | None) -> None:
+        self._tag_uri = tag_uri
+        self._last = None
+        self._last_pos = ""
+
+    def update(self, info) -> None:
+        key = (info.track_uri, info.is_playing, info.device_name)
+        if key != self._last:
+            # Autoplay keeps reporting the album as the context, so check the
+            # track's own album; for a playlist tag, the context is all there is.
+            if not self._tag_uri:
+                off = False
+            elif self._tag_uri.startswith("spotify:album:"):
+                off = info.album_uri != self._tag_uri
+            else:
+                off = info.context_uri != self._tag_uri
+            print(f"[play] {'off-album: ' if off else ''}"
+                  f"{'playing' if info.is_playing else 'paused'} #{info.track_number} "
+                  f"{info.track_name} - {info.artist_name} ({info.album_name}) "
+                  f"| ctx {info.context_uri} | {info.device_name} "
+                  f"| at {_secs(info.progress_ms)}/{_secs(info.duration_ms)} "
+                  f"| prev last seen {self._last_pos or '-'}", flush=True)
+            self._last = key
+        self._last_pos = f"{_secs(info.progress_ms)}/{_secs(info.duration_ms)}"
+
+    def nothing(self) -> None:
+        if self._last is not None:
+            print(f"[play] nothing playing | prev last seen {self._last_pos or '-'}", flush=True)
+            self._last = None
+
+    def error(self, e: Exception) -> None:
+        now = time.monotonic()
+        if now - self._error_logged_at >= _POLL_ERROR_LOG_SECS:
+            print(f"[play] poll failed: {type(e).__name__}: {e}", flush=True)
+            self._error_logged_at = now
+
+
+def _secs(ms: int) -> str:
+    s = ms // 1000
+    return f"{s // 60}:{s % 60:02d}"
 
 
 class HomeScanStep(Step):
@@ -72,6 +124,7 @@ class HomeScanStep(Step):
         _active_uri: str | None = None
         _soco_speaker: str | None = None  # set when active device is Sonos (restricted)
         last_poll = 0.0
+        playlog = PlaybackLog()
 
         def on_poll() -> None:
             nonlocal last_poll
@@ -84,7 +137,13 @@ class HomeScanStep(Step):
             last_poll = now
             try:
                 from spotifactory.spotify import get_now_playing
-                info = get_now_playing()
+                info = get_now_playing(include_paused=True)
+                if info:
+                    playlog.update(info)
+                else:
+                    playlog.nothing()
+                if info and not info.is_playing:
+                    info = None
                 if info:
                     self.status = info.track_name
                     self.artist = info.artist_name
@@ -96,8 +155,8 @@ class HomeScanStep(Step):
                     self.artist = ""
                     self.shuffle_active = False
                 # else: tag still present but Spotify not reflecting playback yet — keep "Loading..."
-            except Exception:
-                pass
+            except Exception as e:
+                playlog.error(e)
 
         def on_place(card: dict) -> None:
             nonlocal _active_uri, _soco_speaker, last_poll
@@ -106,6 +165,7 @@ class HomeScanStep(Step):
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
+            playlog.reset(uri)
             self.tag_active = True
             self.screen_off = False
             self.status = "Loading..."

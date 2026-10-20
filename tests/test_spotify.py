@@ -134,3 +134,25 @@ def test_play_pause_resumes_on_the_same_device():
     with patch("spotifactory.spotify.get_client", return_value=sp):
         assert spotify.play_pause() is False
     sp.pause_playback.assert_called_once()
+
+
+def test_playback_log_flags_tracks_off_the_tags_album(capsys):
+    """One line per track change; a track from another album is called out."""
+    from spotifactory.spotify import NowPlayingInfo
+    from spotifactory.tasks.home.steps import PlaybackLog
+    tag = "spotify:album:unplugged"
+    log = PlaybackLog()
+    log.reset(tag)
+
+    def info(track, album_uri, progress):
+        return NowPlayingInfo(track, "A", "Al", album_uri, None, context_uri=tag,
+                              device_name="Living Room", track_uri=f"spotify:track:{track}",
+                              progress_ms=progress, duration_ms=200_000)
+
+    log.update(info("one", tag, 10_000))
+    log.update(info("one", tag, 150_000))     # same track: no new line
+    log.update(info("weezer", "spotify:album:pinkerton", 5_000))
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 2
+    assert "off-album" not in lines[0]
+    assert "off-album" in lines[1] and "prev last seen 2:30/3:20" in lines[1]

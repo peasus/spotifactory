@@ -26,6 +26,12 @@ class NowPlayingInfo:
     artwork_url: str | None
     shuffle_active: bool = False
     context_uri: str | None = None  # playlist/album/artist the track is playing from
+    is_playing: bool = True
+    device_name: str | None = None
+    track_uri: str | None = None
+    track_number: int | None = None
+    progress_ms: int = 0
+    duration_ms: int = 0
 
 
 _client: spotipy.Spotify | None = None
@@ -273,12 +279,15 @@ def get_current_context() -> tuple[str | None, str | None]:
 
 
 @_with_auth_retry
-def get_now_playing() -> NowPlayingInfo | None:
+def get_now_playing(include_paused: bool = False) -> NowPlayingInfo | None:
     """What's playing, or None. Handles podcast episodes (the show stands in for
-    the album) and items with no artwork or URI, such as local files."""
+    the album) and items with no artwork or URI, such as local files.
+    include_paused also returns a paused track (is_playing False)."""
     sp = get_client()
     playback = sp.current_playback(additional_types="episode")
-    if not playback or not playback.get("is_playing") or playback.get("item") is None:
+    if not playback or playback.get("item") is None:
+        return None
+    if not playback.get("is_playing") and not include_paused:
         return None
     item = playback["item"]
     context = playback.get("context")
@@ -298,4 +307,10 @@ def get_now_playing() -> NowPlayingInfo | None:
         artwork_url=images[0]["url"] if images else None,
         shuffle_active=bool(playback.get("shuffle_state", False)),
         context_uri=context.get("uri") if context else None,
+        is_playing=bool(playback.get("is_playing")),
+        device_name=(playback.get("device") or {}).get("name"),
+        track_uri=item.get("uri"),
+        track_number=item.get("track_number"),
+        progress_ms=playback.get("progress_ms") or 0,
+        duration_ms=item.get("duration_ms") or 0,
     )
