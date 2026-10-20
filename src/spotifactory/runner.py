@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional, Type
 
+from spotifactory.display import icons
 from spotifactory.menu.definitions import MenuDef
 from spotifactory.menu.navigation import NavStack
 from spotifactory.tasks.base import (
@@ -577,41 +578,17 @@ class Runner:
         if artist:
             self.display.draw_text(2, 14, artist)
 
-        # Bottom legend:  <<  [shuffle]  >>
-        # cy=52 keeps the icon and its dot (at cy+hh+5=61) within the 64px display.
-        self.display.draw_text(2, 50, "<<")
-        self._draw_shuffle_icon(64, 52, active=shuffle)
-        self.display.draw_text(114, 50, ">>")
+        # Bottom row: skip back, shuffle (shown inverted when on), skip forward.
+        prev_w, prev_h = icons.size(icons.PREV)
+        shuf_w, shuf_h = icons.size(icons.SHUFFLE)
+        icons.draw(self.display, 2, 61 - prev_h, icons.PREV)
+        icons.draw(self.display, 125 - prev_w, 61 - prev_h, icons.NEXT)
+        left, top = 64 - shuf_w // 2, 61 - shuf_h
+        if shuffle:
+            icons.draw_badge(self.display, left, top, icons.SHUFFLE)
+        else:
+            icons.draw(self.display, left, top, icons.SHUFFLE)
         self.display.update()
-
-    def _draw_shuffle_icon(self, cx: int, cy: int, active: bool = False) -> None:
-        """Spotify-style shuffle icon: two crossing arrows with an active dot.
-
-        A small filled dot is drawn below the icon when shuffle is on.
-        """
-        hw, hh = 8, 4   # half-width / half-height of the X cross
-
-        # Incoming horizontal stubs (left side)
-        self.display.draw_line(cx - hw - 4, cy - hh, cx - hw, cy - hh, width=1.05)
-        self.display.draw_line(cx - hw - 4, cy + hh, cx - hw, cy + hh, width=1.05)
-
-        # Crossing diagonals
-        self.display.draw_line(cx - hw, cy - hh, cx + hw, cy + hh, width=1.05)
-        self.display.draw_line(cx - hw, cy + hh, cx + hw, cy - hh, width=1.05)
-
-        # Outgoing horizontal stubs (right side)
-        self.display.draw_line(cx + hw, cy - hh, cx + hw + 4, cy - hh, width=1.05)
-        self.display.draw_line(cx + hw, cy + hh, cx + hw + 4, cy + hh, width=1.05)
-
-        # Arrowheads at right exits (> shape on each)
-        self.display.draw_line(cx + hw + 2, cy - hh - 2, cx + hw + 4, cy - hh, width=1.05)
-        self.display.draw_line(cx + hw + 2, cy - hh + 2, cx + hw + 4, cy - hh, width=1.05)
-        self.display.draw_line(cx + hw + 2, cy + hh - 2, cx + hw + 4, cy + hh, width=1.05)
-        self.display.draw_line(cx + hw + 2, cy + hh + 2, cx + hw + 4, cy + hh, width=1.05)
-
-        # Active indicator: filled dot centred below the icon
-        if active:
-            self.display.draw_circle(cx, cy + hh + 5, 2)
 
     def _render_status(self, step) -> None:
         text = step.status
