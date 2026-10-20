@@ -406,6 +406,7 @@ class TestUpdates:
 
     def test_heartbeat_says_idle_or_busy_under_systemd_only(self, tmp_path, monkeypatch):
         monkeypatch.setenv("SPOTIFACTORY_STATE", str(tmp_path))
+        monkeypatch.delenv("INVOCATION_ID", raising=False)  # CI runners are systemd services too
         r = _runner()
         r._last_input = time.monotonic() - 600
         r.tick()
