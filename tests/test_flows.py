@@ -423,3 +423,80 @@ class TestUpdates:
         (tmp_path / "update-status").write_text("updated def5678\n")
         r = _runner()
         assert r._message[:2] == ("Updated", "def5678")
+
+
+# ---------------------------------------------------------------------------
+# Volume and play/pause buttons (K1-K3)
+# ---------------------------------------------------------------------------
+
+def test_volume_buttons_repeat_when_held_but_play_pause_does_not():
+    from spotifactory.input import seengreat
+    pins, clock = {}, [100.0]
+    gpio = MagicMock()
+    gpio.input.side_effect = lambda pin: pins.get(pin, 1)
+    with patch.object(seengreat, "GPIO", gpio), \
+         patch.object(seengreat.time, "monotonic", lambda: clock[0]):
+        buttons = seengreat.SeenGreatInput()
+        pins[seengreat._K1] = 0
+        assert buttons.read() == "VolUp"
+        clock[0] += 0.3
+        assert buttons.read() is None          # not held long enough yet
+        clock[0] += 0.3
+        assert buttons.read() == "VolUp"       # repeating
+        clock[0] += 0.05
+        assert buttons.read() is None          # not again so soon
+        clock[0] += 0.15
+        assert buttons.read() == "VolUp"
+        pins[seengreat._K1] = 1
+        assert buttons.read() is None
+        pins[seengreat._K3] = 0
+        assert buttons.read() == "PlayPause"
+        clock[0] += 2.0
+        assert buttons.read() is None          # play/pause never repeats
+
+
+class TestVolumeAndPlayPause:
+    def _runner(self):
+        r = _runner()
+        r._task = None
+        return r
+
+    def test_presses_step_by_five_and_show_a_bar(self):
+        r = self._runner()
+        sent = []
+        with patch("spotifactory.spotify.get_volume", return_value=40), \
+             patch("spotifactory.spotify.set_volume", side_effect=sent.append):
+            r.handle_volume(+1)
+            assert _wait_for(lambda: sent and not r._volume_sending)
+            r.handle_volume(+1)
+            r.handle_volume(-1)
+            r.handle_volume(+1)
+            assert _wait_for(lambda: not r._volume_sending and r._volume_pending == 0)
+        assert sent[0] == 45 and sent[-1] == 50
+        assert r._volume == 50 and r._volume_shown_until > time.monotonic()
+
+    def test_volume_stops_at_the_ends(self):
+        r = self._runner()
+        sent = []
+        with patch("spotifactory.spotify.get_volume", return_value=98), \
+             patch("spotifactory.spotify.set_volume", side_effect=sent.append):
+            r.handle_volume(+1)
+            assert _wait_for(lambda: sent and not r._volume_sending)
+        assert sent == [100]
+
+    def test_speaker_without_volume_control_says_so(self):
+        r = self._runner()
+        with patch("spotifactory.spotify.get_volume", return_value=None), \
+             patch("spotifactory.spotify.set_volume") as set_volume:
+            r.handle_volume(+1)
+            assert _wait_for(lambda: r._message is not None)
+        set_volume.assert_not_called()
+        assert r._message[:2] == ("Volume:", "use the speaker")
+
+    @pytest.mark.parametrize("result,note", [(True, "Playing"), (False, "Paused"), (None, "Nothing to play")])
+    def test_play_pause_says_what_happened(self, result, note):
+        r = self._runner()
+        with patch("spotifactory.spotify.play_pause", return_value=result):
+            r.handle_play_pause()
+            assert _wait_for(lambda: r._message is not None)
+        assert r._message[0] == note

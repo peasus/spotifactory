@@ -127,6 +127,37 @@ def toggle_shuffle() -> bool | None:
 
 
 @_with_auth_retry
+def get_volume() -> int | None:
+    """The playing device's volume (0-100), or None if there's no device or
+    Spotify can't set its volume (some speakers, e.g. Sonos, don't allow it)."""
+    state = get_client().current_playback()
+    dev = (state or {}).get("device") or {}
+    if dev.get("is_restricted") or dev.get("supports_volume") is False or dev.get("volume_percent") is None:
+        return None
+    return int(dev["volume_percent"])
+
+
+@_with_auth_retry
+def set_volume(percent: int) -> None:
+    get_client().volume(max(0, min(100, int(percent))))
+
+
+@_with_auth_retry
+def play_pause() -> bool | None:
+    """Pause if playing, else resume on the same device. Returns whether it's
+    now playing, or None if there's nothing to resume."""
+    sp = get_client()
+    state = sp.current_playback()
+    if not state or not state.get("device"):
+        return None
+    if state.get("is_playing"):
+        sp.pause_playback()
+        return False
+    sp.start_playback(device_id=state["device"]["id"])
+    return True
+
+
+@_with_auth_retry
 def get_devices() -> list[dict]:
     result = get_client().devices()
     return result.get("devices", [])

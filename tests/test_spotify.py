@@ -103,3 +103,34 @@ def test_nfc_port_override_kept_when_present():
          patch.object(rfid.sys, "platform", "linux"), \
          patch("os.path.exists", return_value=True):
         assert rfid.current_port() == "tty:USB0"
+
+
+# ---------------------------------------------------------------------------
+# Volume and play/pause
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("device,expected", [
+    ({"id": "d", "volume_percent": 37, "supports_volume": True}, 37),
+    ({"id": "d", "volume_percent": 37, "supports_volume": False}, None),
+    ({"id": "d", "volume_percent": 37, "is_restricted": True}, None),     # Sonos
+    ({"id": "d", "volume_percent": None}, None),
+])
+def test_volume_only_where_spotify_can_set_it(device, expected):
+    from spotifactory import spotify
+    sp = MagicMock()
+    sp.current_playback.return_value = {"device": device, "is_playing": True}
+    with patch("spotifactory.spotify.get_client", return_value=sp):
+        assert spotify.get_volume() == expected
+
+
+def test_play_pause_resumes_on_the_same_device():
+    from spotifactory import spotify
+    sp = MagicMock()
+    sp.current_playback.return_value = {"device": {"id": "echo"}, "is_playing": False}
+    with patch("spotifactory.spotify.get_client", return_value=sp):
+        assert spotify.play_pause() is True
+    sp.start_playback.assert_called_once_with(device_id="echo")
+    sp.current_playback.return_value = {"device": {"id": "echo"}, "is_playing": True}
+    with patch("spotifactory.spotify.get_client", return_value=sp):
+        assert spotify.play_pause() is False
+    sp.pause_playback.assert_called_once()

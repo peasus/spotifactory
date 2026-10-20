@@ -28,6 +28,12 @@ def main(display=None) -> None:
                 runner.handle_select()
             elif action == "Back":
                 runner.handle_back()
+            elif action == "VolUp":
+                runner.handle_volume(+1)
+            elif action == "VolDown":
+                runner.handle_volume(-1)
+            elif action == "PlayPause":
+                runner.handle_play_pause()
 
             runner.tick()
             runner.render()

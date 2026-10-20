@@ -32,6 +32,10 @@ _POWER = {"reboot": ("reboot", "Rebooting..."), "shutdown": ("poweroff", "Shutti
 # The auto-updater (deploy/update.sh) and the app talk through files here: the
 # app's heartbeat (is it up, and is someone using it), a request for an
 # update now, and the result of the last update.
+_VOLUME_STEP = 5                    # percent per press of a volume button
+_VOLUME_SHOW_SECS = 1.5             # how long the volume bar stays up
+_VOLUME_FRESH_SECS = 3.0            # trust our own idea of the volume this long after setting it
+
 _HEARTBEAT_SECS = 10.0
 _BUSY_AFTER_INPUT_SECS = 120.0      # menus touched this recently: someone's using it
 _UPDATED_NOTE_SECS = 15 * 60        # show "Updated" if the app restarted this soon after
@@ -69,6 +73,12 @@ class Runner:
         self._shuffle_busy: bool = False
         self._message: tuple[str, str, float | None] | None = None   # (line 1, line 2, until)
         self._last_beat: float = 0.0
+        self._volume: int | None = None              # last volume we set or read
+        self._volume_at: float = 0.0
+        self._volume_shown_until: float = 0.0
+        self._volume_pending = 0                     # presses not yet sent to Spotify
+        self._volume_lock = threading.Lock()
+        self._volume_sending = False
         self._note_recent_update()
 
         if home_task_class is not None:
@@ -156,6 +166,68 @@ class Runner:
         elif item.action == "update":
             self._check_for_updates()
 
+    def handle_volume(self, direction: int) -> None:
+        """Volume up (+1) or down (-1) by _VOLUME_STEP on the playing device.
+        Presses that come in while Spotify is still answering are added up and
+        sent together, so holding the button doesn't queue a backlog."""
+        self._last_input = time.monotonic()
+        if self._wake_if_sleeping():
+            return
+        with self._volume_lock:
+            self._volume_pending += direction
+            if self._volume_sending:
+                return
+            self._volume_sending = True
+        threading.Thread(target=self._send_volume, daemon=True).start()
+
+    def _send_volume(self) -> None:
+        try:
+            from spotifactory.spotify import get_volume, set_volume
+            volume = self._volume
+            if volume is None or time.monotonic() - self._volume_at > _VOLUME_FRESH_SECS:
+                volume = get_volume()
+            if volume is None:
+                with self._volume_lock:
+                    self._volume_pending = 0
+                self._message = ("Volume:", "use the speaker", time.monotonic() + 2.0)
+                return
+            while True:
+                with self._volume_lock:
+                    presses, self._volume_pending = self._volume_pending, 0
+                if not presses:
+                    return
+                volume = max(0, min(100, volume + presses * _VOLUME_STEP))
+                self._volume, self._volume_at = volume, time.monotonic()
+                self._volume_shown_until = time.monotonic() + _VOLUME_SHOW_SECS
+                set_volume(volume)
+        except Exception as e:
+            print(f"[runner] volume: {e}", flush=True)
+            with self._volume_lock:
+                self._volume_pending = 0
+            self._message = ("Couldn't change", "the volume", time.monotonic() + 2.0)
+        finally:
+            with self._volume_lock:
+                self._volume_sending = False
+            if self._volume_pending:          # a press came in as we finished
+                self.handle_volume(0)
+
+    def handle_play_pause(self) -> None:
+        self._last_input = time.monotonic()
+        if self._wake_if_sleeping():
+            return
+
+        def work() -> None:
+            try:
+                from spotifactory.spotify import play_pause
+                playing = play_pause()
+            except Exception as e:
+                print(f"[runner] play/pause: {e}", flush=True)
+                playing = "error"
+            note = {True: "Playing", False: "Paused", None: "Nothing to play"}.get(playing, "Couldn't do that")
+            self._message = (note, "", time.monotonic() + 1.2)
+
+        threading.Thread(target=work, daemon=True).start()
+
     def handle_tag_scan_sim(self, uri: str = "spotify:album:5Z9iiGl2FcIfa3BMiv6OIw") -> None:
         """Simulate an RFID tag scan (sim / dry_run mode). Press T in the sim."""
         from spotifactory.tasks.home.steps import HomeScanStep
@@ -198,6 +270,9 @@ class Runner:
     # ------------------------------------------------------------------
 
     def render(self) -> None:
+        if self._volume is not None and time.monotonic() < self._volume_shown_until:
+            self._render_volume(self._volume)
+            return
         if self._message is not None:
             line1, line2, until = self._message
             if until is None or time.monotonic() < until:
@@ -571,6 +646,19 @@ class Runner:
             y += 12
         self._draw_scrollbar(state, list_top, y - 2)
         self.display.update()
+
+    def _render_volume(self, volume: int) -> None:
+        """A volume bar, shown for a moment after each volume press."""
+        d = self.display
+        d.clear()
+        d.draw_text(2, 6, f"Volume {volume}%")
+        left, right, top, bottom = 4, 123, 30, 44
+        d.draw_rect(left, top, right, bottom)                            # frame...
+        d.draw_rect(left + 1, top + 1, right - 1, bottom - 1, on=False)  # ...hollow
+        fill = round((right - left - 3) * volume / 100)
+        if fill:
+            d.draw_rect(left + 2, top + 2, left + 1 + fill, bottom - 2)
+        d.update()
 
     def _draw_scrollbar(self, state, top: int, bottom: int) -> None:
         """Slim bar on the right edge when the menu has more items than fit."""

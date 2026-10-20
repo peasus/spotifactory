@@ -24,6 +24,12 @@ def main() -> None:
             runner.handle_back()
         elif key in ("t", "T"):
             runner.handle_tag_scan_sim()
+        elif key in ("plus", "equal", "KP_Add"):
+            runner.handle_volume(+1)
+        elif key in ("minus", "KP_Subtract"):
+            runner.handle_volume(-1)
+        elif key == "space":
+            runner.handle_play_pause()
         runner.tick()
         runner.render()
 
