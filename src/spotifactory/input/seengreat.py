@@ -22,7 +22,7 @@ _MAPPING = [
     (_SELECT, "Select"),
     (_K1,     "VolUp"),
     (_K2,     "VolDown"),
-    (_K3,     "PlayPause"),
+    (_K3,     "Menu"),
 ]
 
 # Held down, these repeat: after _REPEAT_DELAY, every _REPEAT_EVERY.

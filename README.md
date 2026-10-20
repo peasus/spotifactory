@@ -30,6 +30,11 @@ off pauses.
 | Menus | move | move | back / select | select |
 | Running tasks | — | — | Left cancels where possible | — |
 
+The three buttons beside the screen, top to bottom: volume up, volume down
+(both repeat when held), and menu, which opens the menu from home and goes
+straight back to home from anywhere in it (over a prompt it's Back). There's
+no pause button: lift the album off to pause, put it back to carry on.
+
 Menus return to the home screen after a minute idle (tags only work there),
 and the screen sleeps after ten minutes with nothing playing.
 

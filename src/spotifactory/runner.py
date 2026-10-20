@@ -212,7 +212,27 @@ class Runner:
             if self._volume_pending:          # a press came in as we finished
                 self.handle_volume(0)
 
+    def handle_menu(self) -> None:
+        """The menu button (K3): opens the menu from home and closes it again,
+        straight back to home from any depth. Over a prompt or a running step
+        it's Back."""
+        self._last_input = time.monotonic()
+        if self._in_home_mode():
+            if self._in_home_scan():
+                self.handle_up()          # home → menu, as joystick up does
+            return
+        if self._pushed_menu is not None or self._task is not None:
+            self.handle_back()
+            return
+        if self._wake_if_sleeping():
+            return
+        while self.nav.pop():
+            pass
+        if self._home_task_class is not None:
+            self._start_task(self._home_task_class)
+
     def handle_play_pause(self) -> None:
+        """Not on a button (lifting the album pauses); the sim keeps it on space."""
         self._last_input = time.monotonic()
         if self._wake_if_sleeping():
             return

@@ -483,7 +483,7 @@ class TestUpdates:
 # Volume and play/pause buttons (K1-K3)
 # ---------------------------------------------------------------------------
 
-def test_volume_buttons_repeat_when_held_but_play_pause_does_not():
+def test_volume_buttons_repeat_when_held_but_menu_does_not():
     from spotifactory.input import seengreat
     pins, clock = {}, [100.0]
     gpio = MagicMock()
@@ -504,9 +504,38 @@ def test_volume_buttons_repeat_when_held_but_play_pause_does_not():
         pins[seengreat._K1] = 1
         assert buttons.read() is None
         pins[seengreat._K3] = 0
-        assert buttons.read() == "PlayPause"
+        assert buttons.read() == "Menu"
         clock[0] += 2.0
-        assert buttons.read() is None          # play/pause never repeats
+        assert buttons.read() is None          # the menu button never repeats
+
+
+class TestMenuButton:
+    """K3 opens the menu from home and closes it from any depth."""
+
+    def test_opens_the_menu_from_home(self):
+        r = _runner(home=_FakeHome)
+        with patch.object(r, "_in_home_mode", return_value=True), \
+             patch.object(r, "_in_home_scan", return_value=True), \
+             patch.object(r, "handle_up") as up:
+            r.handle_menu()
+        up.assert_called_once()                 # home → menu, as joystick up does
+
+    def test_closes_the_menu_straight_to_home(self):
+        r = _runner(home=_FakeHome)
+        r._task = None
+        r.nav.push(r.menus[next(iter(r.menus))])
+        r.nav.push(r.menus[next(iter(r.menus))])
+        r.handle_menu()
+        assert isinstance(r._task, _FakeHome)
+        assert not r.nav.pop()                  # back at the top level
+        r._cancel_running_step()
+
+    def test_is_back_over_a_prompt(self):
+        r = _runner(home=_FakeHome)
+        r._start_task(_BlockingTask)
+        step = r._task.current_step
+        r.handle_menu()
+        assert _wait_for(lambda: step.is_done)
 
 
 class TestVolumeAndPlayPause:

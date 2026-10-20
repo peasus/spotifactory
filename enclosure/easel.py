@@ -93,7 +93,7 @@ HOLE_DX, HOLE_DY = 58.0, 23.5       # same pattern on the Pi Zero
 WINDOW = (31.0, 16.0, 0.2, -1.5)    # w, h, cx, cy  (active area 29.4 x 14.7)
 GLASS = (35.2, 22.6, 0.3, 0.3)
 JOY = (-25.3, 0.2)
-BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3, top to bottom: volume up, down, play/pause
+BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3, top to bottom: volume up, down, menu
 BUTTON_FOOT = (6.2, 3.6)
 GLASS_H = 1.3             # measured: OLED glass top above HAT board top
 JOY_HOUSING = 10.0        # joystick's square base
@@ -122,7 +122,7 @@ CAP_FLANGE = (6.4, 4.8, 0.6)
 CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
 CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
 CAP_LIFT = 0.15           # flange to the pocket's ceiling: how far a cap can rattle up
-CAP_ICONS = ("plus", "minus", "playpause")      # in BUTTONS order
+CAP_ICONS = ("plus", "minus", "menu")           # in BUTTONS order
 STACK = 11.5              # measured: HAT board top to Pi board bottom
 BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
 PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
@@ -653,6 +653,9 @@ def _cap_icon(kind: str, z: float):
         return bar(-1.0, 1.0, -0.3, 0.3) + bar(-0.3, 0.3, -1.0, 1.0)
     if kind == "minus":
         return bar(-1.0, 1.0, -0.3, 0.3)
+    if kind == "menu":            # three bars, like the menu icon on screen
+        return sum((bar(-1.2, 1.2, y - 0.225, y + 0.225) for y in (-0.9, 0.9)),
+                   bar(-1.2, 1.2, -0.225, 0.225))
     # play/pause: a triangle pointing right, then two bars
     return poly((-1.6, -0.8), (-0.3, 0), (-1.6, 0.8)) + bar(0.2, 0.6, -0.8, 0.8) + bar(1.0, 1.4, -0.8, 0.8)
 

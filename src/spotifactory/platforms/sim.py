@@ -28,6 +28,8 @@ def main() -> None:
             runner.handle_volume(+1)
         elif key in ("minus", "KP_Subtract"):
             runner.handle_volume(-1)
+        elif key in ("m", "M"):
+            runner.handle_menu()
         elif key == "space":
             runner.handle_play_pause()
         runner.tick()

@@ -32,8 +32,8 @@ def main(display=None) -> None:
                 runner.handle_volume(+1)
             elif action == "VolDown":
                 runner.handle_volume(-1)
-            elif action == "PlayPause":
-                runner.handle_play_pause()
+            elif action == "Menu":
+                runner.handle_menu()
 
             runner.tick()
             runner.render()
