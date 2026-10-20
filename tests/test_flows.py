@@ -243,8 +243,11 @@ class TestPlaylistNameChoice:
             steps = [("label", PlaylistLabelStep), ("block", _BlockingStep)]
 
         r = _runner()
-        r._start_task(_LabelThenBlock)
-        r._task.ctx.data["playlist"] = {"name": "Derpy derp", "labelled": labelled}
+        # Data in place before the step starts: it runs on its own thread.
+        ctx = TaskContext(display=r.display, dry_run=True,
+                          data={"playlist": {"name": "Derpy derp", "labelled": labelled}})
+        r._task = _LabelThenBlock(ctx)
+        r._task.start_current_step()
         r.tick()
         return r
 
