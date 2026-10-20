@@ -8,6 +8,7 @@ from spotifactory.tasks.capture.steps import (
     FetchPlaylistInfoStep,
     PlaylistConfirmStep,
     PlaylistDoneStep,
+    PlaylistLabelStep,
     PlaylistScanStep,
     PrintStep,
     ScanStep,
@@ -31,6 +32,7 @@ class CapturePlaylistTask(Task):
     steps = [
         ("fetch_info", FetchPlaylistInfoStep),
         ("confirm",    PlaylistConfirmStep),
+        ("label",      PlaylistLabelStep),
         ("fetch_art",  FetchPlaylistArtStep),
         ("print",      PrintStep),
         ("scan",       PlaylistScanStep),

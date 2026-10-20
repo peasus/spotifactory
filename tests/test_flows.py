@@ -233,6 +233,59 @@ class TestPauseWhilePrinting:
         sp.start_playback.assert_not_called()
 
 
+class TestPlaylistNameChoice:
+    """Playlist prints ask whether to add the name; either answer prints."""
+
+    def _runner_at_label_step(self, labelled=True):
+        from spotifactory.tasks.capture.steps import PlaylistLabelStep
+
+        class _LabelThenBlock(Task):
+            steps = [("label", PlaylistLabelStep), ("block", _BlockingStep)]
+
+        r = _runner()
+        r._start_task(_LabelThenBlock)
+        r._task.ctx.data["playlist"] = {"name": "Derpy derp", "labelled": labelled}
+        r.tick()
+        return r
+
+    @pytest.mark.parametrize("presses, choice", [(0, "label"), (1, "plain")])
+    def test_yes_or_no_both_carry_on_to_printing(self, presses, choice):
+        r = self._runner_at_label_step()
+        assert _wait_for(lambda: (r.tick(), r._pushed_menu)[1] is not None)
+        assert r.nav.current.menu.title == "Add name?"
+        for _ in range(presses):
+            r.handle_down()
+        r.handle_select()
+        assert r._pushed_menu is None and r._task.current_step_name == "block"
+        assert r._task.ctx.data["selected"] == choice
+        r._cancel_running_step()
+
+    def test_back_cancels_the_print(self):
+        r = self._runner_at_label_step()
+        assert _wait_for(lambda: (r.tick(), r._pushed_menu)[1] is not None)
+        r.handle_back()
+        assert r._task is None
+
+    def test_auto_playlists_skip_the_question(self):
+        r = self._runner_at_label_step(labelled=False)
+        assert _wait_for(lambda: (r.tick(), r._task.current_step_name)[1] == "block")
+        assert r._pushed_menu is None
+        r._cancel_running_step()
+
+    @pytest.mark.parametrize("choice, labelled", [("label", True), ("plain", False)])
+    def test_art_gets_the_name_only_when_asked(self, choice, labelled):
+        from spotifactory.tasks.capture.steps import FetchPlaylistArtStep
+        ctx = TaskContext(data={"playlist": {"name": "P", "image_url": "u", "labelled": True},
+                                "selected": choice})
+        resp = MagicMock(content=b"img")
+        with patch("spotifactory.tasks.capture.steps.requests.get", return_value=resp), \
+             patch("spotifactory.tasks.capture.label.add_playlist_label",
+                   return_value="labelled") as add:
+            assert isinstance(FetchPlaylistArtStep().run(ctx), Continue)
+        assert add.called is labelled
+        assert (ctx.data["image"] == "labelled") is labelled
+
+
 # ---------------------------------------------------------------------------
 # Bluetooth pairing
 # ---------------------------------------------------------------------------

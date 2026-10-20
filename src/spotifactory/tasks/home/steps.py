@@ -78,7 +78,7 @@ class HomeScanStep(Step):
     Behaviour:
       tag placed (new)  → start_playback for that album
       tag still present → no-op (PN532 supervises; on_place is not re-fired)
-      tag removed       → pause if Spotify is still on the album we started
+      tag removed       → pause, whatever is playing (Autoplay after the album too)
     """
 
     def __init__(self) -> None:

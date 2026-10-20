@@ -292,6 +292,30 @@ class PlaylistConfirmStep(Step):
         )
 
 
+def _label_menu(playlist_name: str):
+    from spotifactory.menu.definitions import ItemDef, MenuDef
+    return MenuDef("Add name?", [
+        ItemDef("Yes", action="confirm", data="label"),
+        ItemDef("No",  action="confirm", data="plain"),
+    ], visible_rows=2, subtitle=playlist_name)
+
+
+class PlaylistLabelStep(Step):
+    """Ask whether to print the playlist's name on it: auto-made covers need
+    it, custom ones often don't, and some custom ones still do. Back cancels
+    the print, as on the confirm screen."""
+
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        pl = ctx.data["playlist"]
+        if not pl.get("labelled", True):
+            return Continue()    # auto playlist: no name to print
+        return PushMenu(
+            menu=_label_menu(pl["name"]),
+            on_confirm=Continue(),
+            on_cancel=Cancel(),
+        )
+
+
 class FetchPlaylistArtStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Fetching artwork..."
@@ -303,9 +327,9 @@ class FetchPlaylistArtStep(Step):
         except Exception as e:
             self.show_for(f"Art error: {str(e)[:20]}", 3.0)
             return Done()
-        # The playlist's name across the bottom (album prints stay plain). Auto
-        # playlists have no name we can read, so they print without one.
-        if pl.get("labelled", True):
+        # The playlist's name across the bottom, if asked for (album prints
+        # stay plain). Auto playlists have no name we can read.
+        if pl.get("labelled", True) and ctx.data.get("selected") == "label":
             try:
                 from spotifactory.tasks.capture.label import add_playlist_label
                 ctx.data["image"] = add_playlist_label(ctx.data["image"], pl["name"])
