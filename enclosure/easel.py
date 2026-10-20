@@ -93,13 +93,36 @@ HOLE_DX, HOLE_DY = 58.0, 23.5       # same pattern on the Pi Zero
 WINDOW = (31.0, 16.0, 0.2, -1.5)    # w, h, cx, cy  (active area 29.4 x 14.7)
 GLASS = (35.2, 22.6, 0.3, 0.3)
 JOY = (-25.3, 0.2)
-BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3 (unused, covered)
+BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3, top to bottom: volume up, down, play/pause
 BUTTON_FOOT = (6.2, 3.6)
 GLASS_H = 1.3             # measured: OLED glass top above HAT board top
-JOY_HOUSING_H = 2.1       # measured
-JOY_TOP = 9.9             # measured: joystick top above HAT board top
-JOY_KNOB_D = 7.3
+JOY_HOUSING = 10.0        # joystick's square base
+JOY_HOUSING_H = 2.5       # measured
+# Joystick stem, heights above the housing's top (measured, the clear knob off):
+JOY_STEM_TOP = 6.61       # top of the stem
+JOY_SQ = 2.5              # the two square sections the nub grips (a 1.65 neck between)
+JOY_COLLAR_TOP = 2.7      # top of the 3.8 mm round section the nub rests on
+JOY_COLLAR_D = 3.8
+JOY_TILT = 9.0            # degrees: the top moves ~1 mm sideways
+# Faceplate over the joystick: a pocket the housing tucks up into, and a round
+# hole for the stem to tilt in.
+JOY_POCKET_CLEAR = (0.3, 0.2)   # round the housing; over it
+JOY_HOLE_D = 5.0
+# Printed nub (like Adafruit's 4697): a tapered post with arrows on top, a
+# square socket on the stem, and a short sleeve hiding the round section.
+NUB_D = (6.5, 6.0)        # bottom, top
+NUB_ABOVE_STEM = 2.0
+NUB_SLEEVE = 1.0          # how far it hangs below the round section's top
+NUB_SOCKET = 2.6          # square socket; nub_test.py prints a range to pick from
 BUTTON_H = 2.0            # measured
+# Printed caps for K1-K3: a flange trapped under the faceplate rests on the
+# switch, and a body comes up through the faceplate with a raised icon.
+CAP_BODY = (5.0, 3.4)     # x by y, through the faceplate
+CAP_FLANGE = (6.4, 4.8, 0.6)
+CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
+CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
+CAP_LIFT = 0.15           # flange to the pocket's ceiling: how far a cap can rattle up
+CAP_ICONS = ("plus", "minus", "playpause")      # in BUTTONS order
 STACK = 11.5              # measured: HAT board top to Pi board bottom
 BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
 PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
@@ -591,16 +614,112 @@ def faceplate():
     plate = _faceplate_outline(0, FP_FACE - FP_T, FP_FACE)
     ww, wh, wx, wy = WINDOW
     plate -= Pos(wx, wy, FP_FACE - FP_T - 1) * _rounded(Box(ww, wh, FP_T + 2, align=C), 1.0, Axis.Z)
-    plate -= Pos(*JOY, FP_FACE - FP_T - 1) * _rounded(Box(11, 11, FP_T + 2, align=C), 1.5, Axis.Z)
+    # Joystick: its housing tucks up into a pocket underneath; just a round
+    # hole for the stem shows on the face.
+    side, over = JOY_POCKET_CLEAR
+    pw = JOY_HOUSING + 2 * side
+    plate -= Pos(*JOY, FP_FACE - FP_T - 1) * _rounded(
+        Box(pw, pw, HAT_TOP + JOY_HOUSING_H + over - (FP_FACE - FP_T) + 1, align=C), 1.0, Axis.Z)
+    plate -= Pos(*JOY, FP_FACE - FP_T - 1) * Cylinder(JOY_HOLE_D / 2, FP_T + 2, align=C)
+    # Buttons: a pocket underneath for the caps' flanges (and the switches),
+    # and a hole for each cap's body.
     ys = [by for _, by in BUTTONS]
-    pocket = BUTTON_H - GLASS_H + 0.4
-    plate -= Pos(BUTTONS[0][0], (max(ys) + min(ys)) / 2, FP_FACE - FP_T) * Box(
-        BUTTON_FOOT[0] + 1.5, max(ys) - min(ys) + BUTTON_FOOT[1] + 1.5, pocket, align=C)
+    fw, fh, ft = CAP_FLANGE
+    pocket_top = HAT_TOP + BUTTON_H + ft + CAP_LIFT
+    plate -= Pos(BUTTONS[0][0], (max(ys) + min(ys)) / 2, FP_FACE - FP_T - 1) * _rounded(Box(
+        max(fw, BUTTON_FOOT[0]) + 0.8, max(ys) - min(ys) + max(fh, BUTTON_FOOT[1]) + 0.8,
+        pocket_top - (FP_FACE - FP_T) + 1, align=C), 1.0, Axis.Z)
+    cw, ch = CAP_BODY
+    for bx, by in BUTTONS:
+        plate -= Pos(bx, by, FP_FACE - FP_T - 1) * _rounded(
+            Box(cw + 2 * CAP_CLEAR, ch + 2 * CAP_CLEAR, FP_T + 2, align=C), 1.0, Axis.Z)
     blind = PILOT_DEPTH
     for hx, hy in _hole_positions(HOLE_DX, HOLE_DY):
         plate += Pos(hx, hy, HAT_TOP) * Cylinder(2.75, GLASS_H, align=C)
         plate -= Pos(hx, hy, HAT_TOP) * Cylinder(PILOT_M25 / 2, blind, align=C)
     return hat_frame() * plate
+
+
+def _cap_icon(kind: str, z: float):
+    """Raised icon on a button cap's top, 0.3 mm proud."""
+    def poly(*pts):
+        with BuildSketch(Plane.XY.offset(z - 0.05)) as sk:
+            with BuildLine():
+                Polyline(*pts, close=True)
+            make_face()
+        return extrude(sk.sketch, amount=0.35)
+    bar = lambda x0, x1, y0, y1: Pos(0, 0, z - 0.05) * _box(x0, x1, y0, y1, 0, 0.35)
+    if kind == "plus":
+        return bar(-1.0, 1.0, -0.3, 0.3) + bar(-0.3, 0.3, -1.0, 1.0)
+    if kind == "minus":
+        return bar(-1.0, 1.0, -0.3, 0.3)
+    # play/pause: a triangle pointing right, then two bars
+    return poly((-1.6, -0.8), (-0.3, 0), (-1.6, 0.8)) + bar(0.2, 0.6, -0.8, 0.8) + bar(1.0, 1.4, -0.8, 0.8)
+
+
+def _button_cap_local(kind: str):
+    """A button cap, upright, z = 0 at the switch's top (where it rests)."""
+    fw, fh, ft = CAP_FLANGE
+    cw, ch = CAP_BODY
+    top = GLASS_H + FP_T + CAP_ABOVE - BUTTON_H
+    cap = _rounded(Box(fw, fh, ft, align=C), 1.0, Axis.Z)
+    body = _rounded(Box(cw, ch, top, align=C), 0.9, Axis.Z)
+    body = fillet(body.edges().group_by(Axis.Z)[-1], radius=0.4)
+    return cap + body + _cap_icon(kind, top)
+
+
+def button_caps():
+    """The three caps, in place on K1-K3."""
+    f = hat_frame()
+    return [f * Pos(bx, by, HAT_TOP + BUTTON_H) * _button_cap_local(k)
+            for (bx, by), k in zip(BUTTONS, CAP_ICONS)]
+
+
+def button_caps_flat():
+    """The three caps standing on their flanges, side by side, top to bottom left to right."""
+    out = None
+    for i, k in enumerate(CAP_ICONS):
+        c = Pos((i - 1) * 9.0, 0, 0) * _button_cap_local(k)
+        out = c if out is None else out + c
+    return out
+
+
+def joy_stem():
+    """The joystick's stem above its housing (z = 0 at the housing's top)."""
+    stem = Cylinder(JOY_COLLAR_D / 2, JOY_COLLAR_TOP, align=C)
+    stem += Pos(0, 0, JOY_COLLAR_TOP) * Box(JOY_SQ, JOY_SQ, JOY_STEM_TOP - JOY_COLLAR_TOP, align=C)
+    return stem
+
+
+def _nub_local(socket: float = NUB_SOCKET):
+    """Printed joystick nub, upright, z = 0 at the housing's top."""
+    z0 = JOY_COLLAR_TOP - NUB_SLEEVE
+    h = JOY_STEM_TOP + NUB_ABOVE_STEM - z0
+    nub = Pos(0, 0, z0) * Cone(NUB_D[0] / 2, NUB_D[1] / 2, h, align=C)
+    nub = fillet(nub.edges().group_by(Axis.Z)[-1], radius=0.6)
+    # Socket: the square sections, then the sleeve round the round section.
+    nub -= Pos(0, 0, JOY_COLLAR_TOP - 0.01) * Box(socket, socket, JOY_STEM_TOP - JOY_COLLAR_TOP + 0.2, align=C)
+    nub -= Pos(0, 0, z0 - 1) * Cylinder(JOY_COLLAR_D / 2 + 0.3, NUB_SLEEVE + 1, align=C)
+    # Four raised arrows on top, pointing the way the stick goes.
+    top = z0 + h
+    for a in (0, 90, 180, 270):
+        with BuildSketch(Plane.XY.offset(top - 0.05)) as sk:
+            with BuildLine():
+                Polyline((0.9, -0.6), (2.05, 0), (0.9, 0.6), close=True)
+            make_face()
+        nub += Rot(0, 0, a) * extrude(sk.sketch, amount=0.35)
+    return nub
+
+
+def nub(socket: float = NUB_SOCKET):
+    """The nub on the stem, in place."""
+    return hat_frame() * Pos(*JOY, HAT_TOP + JOY_HOUSING_H) * _nub_local(socket)
+
+
+def nub_tilted(sign: int, axis: str = "x"):
+    """The nub pushed fully over (about the housing's top, centre), for the check."""
+    r = Rot(JOY_TILT * sign, 0, 0) if axis == "x" else Rot(0, JOY_TILT * sign, 0)
+    return hat_frame() * Pos(*JOY, HAT_TOP + JOY_HOUSING_H) * r * _nub_local()
 
 
 def spacers():
@@ -683,8 +802,7 @@ def internals():
     hat = f * Pos(0, 0, HAT_TOP - HAT_T) * hat
     glass = f * Pos(gx, gy, HAT_TOP) * Box(gw, gh, GLASS_H, align=C)
     joy = f * Pos(*JOY, HAT_TOP) * Box(10, 10, JOY_HOUSING_H, align=C)
-    knob = f * Pos(*JOY, HAT_TOP + JOY_HOUSING_H) * Cylinder(
-        JOY_KNOB_D / 2, JOY_TOP - JOY_HOUSING_H, align=C)
+    knob = f * Pos(*JOY, HAT_TOP + JOY_HOUSING_H) * joy_stem()
     buttons = [f * Pos(bx, by, HAT_TOP) * Box(*BUTTON_FOOT, BUTTON_H, align=C) for bx, by in BUTTONS]
     pi = f * Pos(0, 0, PI_BOTTOM) * pi_pcb
     pi_under = f * Pos(0, 0, PI_BOTTOM - PI_UNDER) * Box(HOLE_DX - 8, HAT_D - 4, PI_UNDER, align=C)
@@ -750,6 +868,8 @@ def print_orientation():
         "faceplate": fp_flat,
         "spacers": spacers(),
         "keepers": keepers_flat(),
+        "nub": Pos(0, 0, -(JOY_COLLAR_TOP - NUB_SLEEVE)) * _nub_local(),
+        "buttoncaps": button_caps_flat(),
         "baseplate": Pos(0, 0, PLATE_T) * baseplate(),
     }
 

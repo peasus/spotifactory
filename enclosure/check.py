@@ -10,7 +10,7 @@ import sys
 
 import numpy as np
 import trimesh
-from build123d import Pos, export_stl
+from build123d import Pos, Rot, export_stl
 
 import easel
 
@@ -181,6 +181,21 @@ def main() -> int:
                 check(False, f"{key} vs {name}: {v:.2f} mm³")
     if not clashes:
         check(True, "boards, spacers, reader, sockets, plugs and the print all clear the parts")
+    tilts = [easel.nub_tilted(s, ax) for s in (-1, 1) for ax in ("x", "y")]
+    hits = sum(overlap(p, [easel.nub(), *tilts]) for p in (body, fp))
+    check(hits < TOUCH, f"joystick nub clears the faceplate and body, upright and pushed over ({hits:.2f} mm³)")
+    caps = easel.button_caps()
+    f = easel.hat_frame()
+    down = (f * Pos(0, 0, -0.25)).position - f.position             # pressed: a switch's travel
+    up = (f * Pos(0, 0, easel.CAP_LIFT - 0.02)).position - f.position
+    cap_hits = sum(overlap(p, [Pos(v.X, v.Y, v.Z) * cp for cp in caps for v in (down, up)] + caps)
+                   for p in (body, fp))
+    check(cap_hits < TOUCH, f"button caps move freely in the faceplate, pressed or lifted ({cap_hits:.2f} mm³)")
+    lifted = sum(overlap(fp, Pos(u.X, u.Y, u.Z) * cp) for cp in caps
+                 for u in [(f * Pos(0, 0, easel.CAP_LIFT + 0.1)).position - f.position])
+    check(lifted > 0.1, "button caps can't come out the front (flange catches)")
+    stem_hit = overlap(fp, inside["buttons"]) + sum(overlap(fp, easel.hat_frame() * Pos(*easel.JOY, easel.HAT_TOP + easel.JOY_HOUSING_H) * (Rot(easel.JOY_TILT * s, 0, 0) if ax == "x" else Rot(0, easel.JOY_TILT * s, 0)) * easel.joy_stem()) for s in (-1, 1) for ax in ("x", "y"))
+    check(stem_hit < TOUCH, f"joystick stem tilts freely in the faceplate's hole ({stem_hit:.2f} mm³)")
     shell_end = inside["port"][0].bounding_box().max.Y
     wall_in = easel.back_in_y(easel.PWR_Z + easel.PWR_SHELL[1] / 2)
     check(wall_in - easel.SOCKET_INSET - 0.3 < shell_end <= wall_in,
@@ -245,7 +260,7 @@ def main() -> int:
 
     print("Printability (as oriented in out/print)")
     parts = easel.print_orientation()
-    for name in ("body", "faceplate", "baseplate", "spacers", "keepers"):
+    for name in ("body", "faceplate", "baseplate", "spacers", "keepers", "nub", "buttoncaps"):
         manifold(parts[name], name)
         overhangs(parts[name], name)
         unsupported(parts[name], name, easel.supported_bridges() if name == "body" else ())
