@@ -156,3 +156,18 @@ def test_playback_log_flags_tracks_off_the_tags_album(capsys):
     assert len(lines) == 2
     assert "off-album" not in lines[0]
     assert "off-album" in lines[1] and "prev last seen 2:30/3:20" in lines[1]
+
+
+def test_playlist_label_keeps_print_square_and_marks_the_bottom():
+    """The labelled print is 800x800; the name darkens/whitens only the bottom."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    from spotifactory.tasks.capture.label import add_playlist_label
+    src = BytesIO()
+    Image.new("RGB", (640, 480), (120, 160, 200)).save(src, "PNG")
+    out = Image.open(add_playlist_label(src, "A Very Long Playlist Name That Needs Wrapping Or Cutting Short"))
+    assert out.size == (800, 800)
+    assert out.getpixel((400, 50)) == pytest.approx((120, 160, 200), abs=3)
+    assert out.getpixel((400, 790)) != out.getpixel((400, 50))

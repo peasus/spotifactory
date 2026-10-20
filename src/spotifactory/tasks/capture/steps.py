@@ -277,6 +277,7 @@ class FetchPlaylistInfoStep(Step):
             "uri": playlist_uri,
             "image_url": image_url,
             "owner": owner,
+            "labelled": pl is not None,
         }
         return Continue()
 
@@ -295,13 +296,21 @@ class FetchPlaylistArtStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Fetching artwork..."
         try:
-            url = ctx.data["playlist"]["image_url"]
-            resp = requests.get(url, timeout=10)
+            pl = ctx.data["playlist"]
+            resp = requests.get(pl["image_url"], timeout=10)
             resp.raise_for_status()
             ctx.data["image"] = BytesIO(resp.content)
         except Exception as e:
             self.show_for(f"Art error: {str(e)[:20]}", 3.0)
             return Done()
+        # The playlist's name across the bottom (album prints stay plain). Auto
+        # playlists have no name we can read, so they print without one.
+        if pl.get("labelled", True):
+            try:
+                from spotifactory.tasks.capture.label import add_playlist_label
+                ctx.data["image"] = add_playlist_label(ctx.data["image"], pl["name"])
+            except Exception as e:
+                print(f"[print] couldn't add playlist name: {e}", flush=True)
         return Continue()
 
 
