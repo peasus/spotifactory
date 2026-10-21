@@ -131,6 +131,7 @@ CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
 CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
 CAP_LIFT = 0.3            # flange to the pocket's ceiling: room for the board to bow when screwed tight (0.15 pressed a button)
 CAP_ICONS = ("plus", "minus", "menu")           # in BUTTONS order
+ICON_PROUD = 0.48         # raised symbols on the caps and nub: 4 layers at 0.12, solid in an accent colour
 STACK = 11.5              # measured: HAT board top to Pi board bottom
 BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
 PI_T = STACK - HAT_T - BOARD_GAP    # Pi board thickness, from the measurements
@@ -649,14 +650,14 @@ def faceplate():
 
 
 def _cap_icon(kind: str, z: float):
-    """Raised icon on a button cap's top, 0.3 mm proud."""
+    """Raised icon on a button cap's top, ICON_PROUD high."""
     def poly(*pts):
         with BuildSketch(Plane.XY.offset(z - 0.05)) as sk:
             with BuildLine():
                 Polyline(*pts, close=True)
             make_face()
-        return extrude(sk.sketch, amount=0.35)
-    bar = lambda x0, x1, y0, y1: Pos(0, 0, z - 0.05) * _box(x0, x1, y0, y1, 0, 0.35)
+        return extrude(sk.sketch, amount=ICON_PROUD + 0.05)
+    bar = lambda x0, x1, y0, y1: Pos(0, 0, z - 0.05) * _box(x0, x1, y0, y1, 0, ICON_PROUD + 0.05)
     if kind == "plus":
         return bar(-1.0, 1.0, -0.3, 0.3) + bar(-0.3, 0.3, -1.0, 1.0)
     if kind == "minus":
@@ -754,7 +755,7 @@ def _nub_local(socket: float = NUB_SOCKET, label: str | None = None):
             with BuildLine():
                 Polyline((0.9, -0.6), (2.05, 0), (0.9, 0.6), close=True)
             make_face()
-        nub += Rot(0, 0, a) * extrude(sk.sketch, amount=0.35)
+        nub += Rot(0, 0, a) * extrude(sk.sketch, amount=ICON_PROUD + 0.05)
     return nub
 
 
