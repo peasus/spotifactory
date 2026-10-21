@@ -20,8 +20,10 @@ def main() -> None:
             runner.handle_down()
         elif action == "Left":
             runner.handle_left()
+            runner.handle_release(-1)     # no hold events here: a press skips
         elif action == "Right":
             runner.handle_right()
+            runner.handle_release(+1)
         elif action == "Select":
             runner.handle_select()
         elif action == "Back":

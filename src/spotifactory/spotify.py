@@ -32,6 +32,7 @@ class NowPlayingInfo:
     track_number: int | None = None
     progress_ms: int = 0
     duration_ms: int = 0
+    repeat_state: str = "off"     # "off", "context" (album/playlist) or "track"
 
 
 _client: spotipy.Spotify | None = None
@@ -118,6 +119,17 @@ def prev_track() -> None:
 @_with_auth_retry
 def next_track() -> None:
     get_client().next_track()
+
+
+@_with_auth_retry
+def set_repeat(state: str) -> None:
+    """"off", "context" (the album or playlist) or "track"."""
+    get_client().repeat(state)
+
+
+@_with_auth_retry
+def seek(position_ms: int) -> None:
+    get_client().seek_track(max(0, int(position_ms)))
 
 
 @_with_auth_retry
@@ -313,4 +325,5 @@ def get_now_playing(include_paused: bool = False) -> NowPlayingInfo | None:
         track_number=item.get("track_number"),
         progress_ms=playback.get("progress_ms") or 0,
         duration_ms=item.get("duration_ms") or 0,
+        repeat_state=playback.get("repeat_state") or "off",
     )

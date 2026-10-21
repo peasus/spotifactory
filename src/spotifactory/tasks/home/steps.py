@@ -13,7 +13,7 @@ from spotifactory.tasks.base import (
 
 _POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
 _SCREEN_OFF_SECS = 600.0    # blank display after this many idle seconds
-_SHUFFLE_SETTLE_SECS = 3.0  # Spotify can report the old shuffle state briefly after a change
+_SHUFFLE_SETTLE_SECS = 3.0  # Spotify can report the old shuffle/repeat state briefly after a change
 _POLL_ERROR_LOG_SECS = 60.0  # log failed polls at most this often
 
 
@@ -91,11 +91,35 @@ class HomeScanStep(Step):
         self.tag_active: bool = False        # a tag is on the reader (the box is in use)
         self._idle_since: float = time.monotonic()
         self._shuffle_set_at: float = 0.0
+        self.repeat_state: str = "off"       # "off", "context" or "track"
+        self._repeat_set_at: float = 0.0
+        # Where the track was at the last poll (seeking starts from here).
+        self.is_playing: bool = False
+        self.progress_ms: int = 0
+        self.duration_ms: int = 0
+        self.progress_at: float = 0.0
 
     def set_shuffle(self, active: bool) -> None:
         """Show a shuffle state we just set; polls won't override it while Spotify settles."""
         self.shuffle_active = active
         self._shuffle_set_at = time.monotonic()
+
+    def set_repeat(self, state: str) -> None:
+        """Show a repeat state we just set; polls won't override it while Spotify settles."""
+        self.repeat_state = state
+        self._repeat_set_at = time.monotonic()
+
+    def set_position(self, progress_ms: int) -> None:
+        """Where we just sought to, until the next poll says otherwise."""
+        self.progress_ms = progress_ms
+        self.progress_at = time.monotonic()
+
+    def position_ms(self) -> int:
+        """The track position now, counting on from the last poll while playing."""
+        pos = self.progress_ms
+        if self.is_playing:
+            pos += int((time.monotonic() - self.progress_at) * 1000)
+        return min(pos, self.duration_ms) if self.duration_ms else pos
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -140,8 +164,14 @@ class HomeScanStep(Step):
                 info = get_now_playing(include_paused=True)
                 if info:
                     playlog.update(info)
+                    self.is_playing = info.is_playing
+                    self.duration_ms = info.duration_ms
+                    self.set_position(info.progress_ms)
+                    if time.monotonic() - self._repeat_set_at >= _SHUFFLE_SETTLE_SECS:
+                        self.repeat_state = info.repeat_state
                 else:
                     playlog.nothing()
+                    self.is_playing = False
                 if info and not info.is_playing:
                     info = None
                 if info:
@@ -290,6 +320,8 @@ class HomeScanStep(Step):
             self.status = "Place tag..."
             self.artist = ""
             self.shuffle_active = False
+            self.repeat_state = "off"
+            self.is_playing = False
             self._idle_since = time.monotonic()
 
         def check_idle() -> None:

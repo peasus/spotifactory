@@ -400,6 +400,111 @@ class TestShuffleIcon:
         assert step.shuffle_active is False
 
 
+class TestJoystickHome:
+    """Home screen: up cycles repeat; left/right tap to skip, hold to scrub."""
+
+    def _runner(self, duration=200_000, position=60_000, playing=False):
+        from spotifactory.tasks.home.steps import HomeScanStep
+        r = _runner()
+        step = HomeScanStep()
+        step.tag_active = True
+        step.duration_ms = duration
+        step.is_playing = playing
+        step.set_position(position)
+        r._task = MagicMock(current_step=step)
+        patch.object(r, "_in_home_scan", return_value=True).start()
+        patch.object(r, "_in_home_mode", return_value=True).start()
+        return r, step
+
+    def teardown_method(self):
+        patch.stopall()
+
+    def test_tap_skips_when_let_go(self):
+        r, _ = self._runner()
+        with patch("spotifactory.spotify.next_track") as nxt, \
+             patch("spotifactory.spotify.prev_track") as prv:
+            r.handle_right()
+            nxt.assert_not_called()             # not on the press...
+            r.handle_release(+1)
+            nxt.assert_called_once()            # ...on letting go
+            r.handle_left()
+            r.handle_release(-1)
+            prv.assert_called_once()
+
+    def test_hold_scrubs_instead_of_skipping(self):
+        r, step = self._runner()
+        sent = []
+        with patch("spotifactory.spotify.seek", side_effect=sent.append), \
+             patch("spotifactory.spotify.next_track") as nxt:
+            r.handle_right()
+            for _ in range(3):
+                r.handle_seek_hold(+1)
+            r.handle_release(+1)
+            assert _wait_for(lambda: r._seek_target is None and not r._seek_sending)
+        nxt.assert_not_called()
+        assert sent[-1] == 75_000               # 60 s + 3 × 5 s, sent on letting go
+        assert step.position_ms() == 75_000
+
+    def test_scrub_stops_at_the_ends(self):
+        r, _ = self._runner(position=3_000)
+        sent = []
+        with patch("spotifactory.spotify.seek", side_effect=sent.append):
+            r.handle_left()
+            r.handle_seek_hold(-1)
+            r.handle_release(-1)
+            assert _wait_for(lambda: r._seek_target is None and not r._seek_sending)
+        assert sent[-1] == 0
+
+    def test_nothing_to_scrub_without_a_tag(self):
+        r, step = self._runner()
+        step.tag_active = False
+        with patch("spotifactory.spotify.seek") as seek:
+            r.handle_seek_hold(+1)
+        assert r._seek_target is None
+        seek.assert_not_called()
+
+    def test_press_that_wakes_the_screen_does_nothing_else(self):
+        r, step = self._runner()
+        step.screen_off = True
+        with patch("spotifactory.spotify.next_track") as nxt, \
+             patch("spotifactory.spotify.seek") as seek:
+            r.handle_right()
+            r.handle_seek_hold(+1)
+            r.handle_release(+1)
+        assert not step.screen_off
+        nxt.assert_not_called()
+        seek.assert_not_called()
+
+    def test_up_cycles_repeat_like_a_cd_player(self):
+        r, step = self._runner()
+        sent = []
+        with patch("spotifactory.spotify.set_repeat", side_effect=sent.append):
+            for _ in range(3):
+                r.handle_up()
+                assert _wait_for(lambda: not r._repeat_busy)
+        assert sent == ["context", "track", "off"]
+        assert step.repeat_state == "off"
+
+    def test_repeat_reverts_if_the_speaker_refuses(self):
+        r, step = self._runner()
+        with patch("spotifactory.spotify.set_repeat", side_effect=Exception("403 restricted")):
+            r.handle_up()
+            assert _wait_for(lambda: not r._repeat_busy)
+        assert step.repeat_state == "off"
+        assert r._message[:2] == ("Couldn't change", "repeat")
+
+    @pytest.mark.parametrize("repeat, shuffle", [("off", False), ("context", True), ("track", False)])
+    def test_home_screen_draws_the_cross(self, repeat, shuffle):
+        r, step = self._runner()
+        step.status, step.artist = "Song", "Artist"
+        step.repeat_state, step.shuffle_active = repeat, shuffle
+        r._render_home()
+        r._seek_target = 90_000
+        r._render_home()                        # scrubbing: position in place of the artist
+        texts = [c.args[2] for c in r.display.draw_text.call_args_list]
+        assert "Artist" in texts and "1:30 / 3:20" in texts
+
+
 # ---------------------------------------------------------------------------
 # Menu scrollbar
 # ---------------------------------------------------------------------------
@@ -512,6 +617,32 @@ def test_volume_buttons_repeat_when_held_but_menu_does_not():
         assert buttons.read() is None          # the menu button never repeats
 
 
+def test_left_right_report_holds_and_release():
+    from spotifactory.input import seengreat
+    pins, clock = {}, [100.0]
+    gpio = MagicMock()
+    gpio.input.side_effect = lambda pin: pins.get(pin, 1)
+    with patch.object(seengreat, "GPIO", gpio), \
+         patch.object(seengreat.time, "monotonic", lambda: clock[0]):
+        buttons = seengreat.SeenGreatInput()
+        pins[seengreat._RIGHT] = 0
+        assert buttons.read() == "Right"
+        clock[0] += 0.3
+        assert buttons.read() is None           # a tap so far
+        clock[0] += 0.3
+        assert buttons.read() == "RightHold"
+        clock[0] += 0.2
+        assert buttons.read() == "RightHold"
+        pins[seengreat._RIGHT] = 1
+        assert buttons.read() == "RightRelease"
+        assert buttons.read() is None
+        pins[seengreat._RIGHT] = 0              # straight from left to right: both reported
+        buttons.read()
+        pins[seengreat._RIGHT], pins[seengreat._LEFT] = 1, 0
+        assert buttons.read() == "RightRelease"
+        assert buttons.read() == "Left"
+
+
 class TestMenuButton:
     """K3 opens the menu from home and closes it from any depth."""
 
@@ -519,9 +650,9 @@ class TestMenuButton:
         r = _runner(home=_FakeHome)
         with patch.object(r, "_in_home_mode", return_value=True), \
              patch.object(r, "_in_home_scan", return_value=True), \
-             patch.object(r, "handle_up") as up:
+             patch.object(r, "_open_menu_from_home") as open_menu:
             r.handle_menu()
-        up.assert_called_once()                 # home → menu, as joystick up does
+        open_menu.assert_called_once()
 
     def test_closes_the_menu_straight_to_home(self):
         r = _runner(home=_FakeHome)

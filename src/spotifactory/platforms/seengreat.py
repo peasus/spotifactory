@@ -24,6 +24,10 @@ def main(display=None) -> None:
                 runner.handle_left()
             elif action == "Right":
                 runner.handle_right()
+            elif action in ("LeftHold", "RightHold"):
+                runner.handle_seek_hold(-1 if action == "LeftHold" else +1)
+            elif action in ("LeftRelease", "RightRelease"):
+                runner.handle_release(-1 if action == "LeftRelease" else +1)
             elif action == "Select":
                 runner.handle_select()
             elif action == "Back":

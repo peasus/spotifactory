@@ -7,6 +7,7 @@ from spotifactory.tasks.home import HomeTask
 def main() -> None:
     display = DisplaySim()
     runner = Runner(display, MENUS, dry_run=False, printer_dry_run=True, home_task_class=HomeTask)
+    release_timers = {}
 
     def on_key(event):
         key = event.keysym
@@ -16,8 +17,18 @@ def main() -> None:
             runner.handle_down()
         elif key == "Left":
             runner.handle_left()
+            runner.handle_release(-1)     # a key press skips; [ and ] scrub
         elif key == "Right":
             runner.handle_right()
+            runner.handle_release(+1)
+        elif key in ("bracketleft", "bracketright"):
+            direction = -1 if key == "bracketleft" else +1
+            runner.handle_seek_hold(direction)
+            # Let go once the key stops repeating.
+            if release_timers.get(direction):
+                display.root.after_cancel(release_timers[direction])
+            release_timers[direction] = display.root.after(
+                400, lambda: runner.handle_release(direction))
         elif key == "Return":
             runner.handle_select()
         elif key in ("BackSpace", "Escape"):

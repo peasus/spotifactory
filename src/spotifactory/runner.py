@@ -37,6 +37,16 @@ _VOLUME_STEP = 5                    # percent per press of a volume button
 _VOLUME_SHOW_SECS = 1.5             # how long the volume bar stays up
 _VOLUME_FRESH_SECS = 3.0            # trust our own idea of the volume this long after setting it
 
+# Holding left/right on the home screen scrubs through the track, like a CD
+# player's search: each hold tick moves the target, faster the longer it's held.
+_SEEK_STEP_MS = 5_000
+_SEEK_FAST_STEP_MS = 15_000
+_SEEK_FAST_AFTER = 2.0              # seconds held before the bigger steps
+_SEEK_SEND_EVERY = 0.8              # seconds between seeks sent while held (plus one on release)
+_SEEK_SHOW_SECS = 1.5               # how long the position stays up after letting go
+
+_REPEAT_NEXT = {"off": "context", "context": "track", "track": "off"}
+
 _HEARTBEAT_SECS = 10.0
 _BUSY_AFTER_INPUT_SECS = 120.0      # menus touched this recently: someone's using it
 _UPDATED_NOTE_SECS = 15 * 60        # show "Updated" if the app restarted this soon after
@@ -44,6 +54,11 @@ _UPDATED_NOTE_SECS = 15 * 60        # show "Updated" if the app restarted this s
 
 def state_dir() -> Path:
     return Path(os.environ.get("SPOTIFACTORY_STATE", "~/.cache/spotifactory")).expanduser()
+
+
+def _clock(ms: int) -> str:
+    s = max(0, ms) // 1000
+    return f"{s // 60}:{s % 60:02d}"
 
 
 class Runner:
@@ -80,6 +95,15 @@ class Runner:
         self._volume_pending = 0                     # presses not yet sent to Spotify
         self._volume_lock = threading.Lock()
         self._volume_sending = False
+        self._repeat_busy: bool = False
+        self._skip_on_release = 0                    # -1/+1: a left/right tap waiting to be let go
+        self._swallow_release = False                # that press woke the screen; ignore its hold
+        self._seek_target: int | None = None         # ms; set while scrubbing
+        self._seek_started = 0.0
+        self._seek_released = False
+        self._seek_shown_until = 0.0
+        self._seek_lock = threading.Lock()
+        self._seek_sending = False
         self._note_recent_update()
 
         if home_task_class is not None:
@@ -96,10 +120,15 @@ class Runner:
         if self._in_home_scan():
             if self._wake_if_sleeping():
                 return
-            self._task.current_step.cancel()
+            self._cycle_repeat()
             return
         if self._accepting_nav_input:
             self.nav.current.move_up()
+
+    def _open_menu_from_home(self) -> None:
+        if self._wake_if_sleeping():
+            return
+        self._task.current_step.cancel()     # the home task ends; the menu shows
 
     def handle_down(self) -> None:
         self._last_input = time.monotonic()
@@ -117,9 +146,7 @@ class Runner:
     def handle_left(self) -> None:
         self._last_input = time.monotonic()
         if self._in_home_mode():
-            if self._wake_if_sleeping():
-                return
-            self._prev_track()
+            self._home_skip_pressed(-1)
             return
         # In a menu or a running task: treat left as Back
         self.handle_back()
@@ -130,11 +157,97 @@ class Runner:
             self._task.current_step.toggle_url()
             return
         if self._in_home_mode():
-            if self._wake_if_sleeping():
-                return
-            self._next_track()
+            self._home_skip_pressed(+1)
         else:
             self.handle_select()
+
+    # Left/right on the home screen: a tap skips when it's let go, a hold
+    # scrubs through the track. Platforms without hold/release events call
+    # handle_release right after handle_left/right, so a press just skips.
+
+    def _home_skip_pressed(self, direction: int) -> None:
+        if self._wake_if_sleeping():
+            self._swallow_release = True
+            return
+        self._skip_on_release = direction
+
+    def handle_release(self, direction: int) -> None:
+        """Left (-1) or right (+1) let go."""
+        self._last_input = time.monotonic()
+        skip, self._skip_on_release = self._skip_on_release, 0
+        if self._swallow_release:
+            self._swallow_release = False
+            return
+        with self._seek_lock:
+            seeking = self._seek_target is not None
+            if seeking:
+                self._seek_released = True
+                start = not self._seek_sending
+                self._seek_sending = True
+        if seeking:
+            if start:
+                threading.Thread(target=self._send_seek, daemon=True).start()
+            return
+        if skip == direction and self._in_home_scan():
+            self._next_track() if direction > 0 else self._prev_track()
+
+    def handle_seek_hold(self, direction: int) -> None:
+        """Left (-1) or right (+1) still held: move the scrub target on."""
+        self._last_input = time.monotonic()
+        if self._swallow_release or not self._in_home_scan():
+            return
+        step = self._task.current_step
+        now = time.monotonic()
+        with self._seek_lock:
+            if self._seek_target is None:
+                if not step.tag_active or not step.duration_ms:
+                    return                      # nothing to scrub through
+                self._seek_target = step.position_ms()
+                self._seek_started = now
+            self._skip_on_release = 0
+            self._seek_released = False
+            fast = now - self._seek_started >= _SEEK_FAST_AFTER
+            jump = _SEEK_FAST_STEP_MS if fast else _SEEK_STEP_MS
+            self._seek_target = max(0, min(step.duration_ms - 1000, self._seek_target + direction * jump))
+            self._seek_shown_until = now + _SEEK_SHOW_SECS
+            start = not self._seek_sending
+            self._seek_sending = True
+        if start:
+            threading.Thread(target=self._send_seek, daemon=True).start()
+
+    def _send_seek(self) -> None:
+        """Send the scrub target to Spotify about once a second while held, and
+        once more when let go; then stop scrubbing."""
+        step = self._task.current_step if self._in_home_scan() else None
+        sent, sent_at = None, 0.0
+        try:
+            from spotifactory.spotify import seek
+            while True:
+                with self._seek_lock:
+                    target, released = self._seek_target, self._seek_released
+                    if target is None:
+                        return
+                    if released and target == sent:
+                        self._seek_target = None
+                        return
+                if target != sent and (released or time.monotonic() - sent_at >= _SEEK_SEND_EVERY):
+                    seek(target)
+                    sent, sent_at = target, time.monotonic()
+                    if step is not None:
+                        step.set_position(target)
+                else:
+                    time.sleep(0.05)
+        except Exception as e:
+            print(f"[runner] seek: {e}", flush=True)
+            with self._seek_lock:
+                self._seek_target = None
+            self._message = ("Couldn't skip", "through the track", time.monotonic() + 2.0)
+        finally:
+            with self._seek_lock:
+                again = self._seek_target is not None     # held again as we finished
+                self._seek_sending = again
+            if again:
+                threading.Thread(target=self._send_seek, daemon=True).start()
 
     def handle_select(self) -> None:
         self._last_input = time.monotonic()
@@ -219,7 +332,7 @@ class Runner:
         self._last_input = time.monotonic()
         if self._in_home_mode():
             if self._in_home_scan():
-                self.handle_up()          # home → menu, as joystick up does
+                self._open_menu_from_home()
             return
         if self._pushed_menu is not None or self._task is not None:
             self.handle_back()
@@ -264,6 +377,8 @@ class Runner:
             return
         if self._pushed_menu is not None:
             self._resolve(self._pushed_menu.on_cancel)
+        elif self._in_home_scan():
+            self._open_menu_from_home()     # boards without a menu button, and the sim
         elif self._task is None:
             if not self.nav.pop() and self._home_task_class is not None:
                 self._start_task(self._home_task_class)
@@ -509,6 +624,30 @@ class Runner:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _cycle_repeat(self) -> None:
+        """Repeat off → album/playlist → track → off, like a CD player's REPEAT.
+        The icon changes now; Spotify confirms (or it reverts) off the UI thread."""
+        if self._repeat_busy:
+            return
+        step = self._task.current_step
+        previous = step.repeat_state
+        state = _REPEAT_NEXT.get(previous, "off")
+        step.set_repeat(state)
+        self._repeat_busy = True
+
+        def work() -> None:
+            try:
+                from spotifactory.spotify import set_repeat
+                set_repeat(state)
+            except Exception as e:
+                print(f"[runner] repeat: {e}", flush=True)
+                step.set_repeat(previous)
+                self._message = ("Couldn't change", "repeat", time.monotonic() + 2.0)
+            finally:
+                self._repeat_busy = False
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _wake_if_sleeping(self) -> bool:
         """Blank the display and eat the button press if the home screen is sleeping."""
         if not self._in_home_scan():
@@ -592,23 +731,43 @@ class Runner:
         song = step.status
         artist = getattr(step, "artist", "")
         shuffle = getattr(step, "shuffle_active", False)
+        repeat = getattr(step, "repeat_state", "off")
 
-        self.display.clear()
-        self.display.draw_text(2, 0, song)
-        if artist:
-            self.display.draw_text(2, 14, artist)
+        d = self.display
+        d.clear()
+        d.draw_text(2, 0, song)
+        scrub = self._seek_target is not None or time.monotonic() < self._seek_shown_until
+        if scrub:
+            self._draw_scrub(step)
+        elif artist:
+            d.draw_text(2, 14, artist)
 
-        # Bottom row: skip back, shuffle (shown inverted when on), skip forward.
-        prev_w, prev_h = icons.size(icons.PREV)
-        shuf_w, shuf_h = icons.size(icons.SHUFFLE)
-        icons.draw(self.display, 2, 61 - prev_h, icons.PREV)
-        icons.draw(self.display, 125 - prev_w, 61 - prev_h, icons.NEXT)
-        left, top = 64 - shuf_w // 2, 61 - shuf_h
-        if shuffle:
-            icons.draw_badge(self.display, left, top, icons.SHUFFLE)
-        else:
-            icons.draw(self.display, left, top, icons.SHUFFLE)
-        self.display.update()
+        # A cross laid out like the joystick: repeat (up) over shuffle (down),
+        # skips (left/right) halfway between. A setting that's on is inverted.
+        sw, sh = icons.size(icons.SHUFFLE)
+        rw, rh = icons.size(icons.REPEAT)
+        pw, ph = icons.size(icons.PREV)
+        shuf_top = 61 - sh
+        rep_top = shuf_top - 6 - rh
+        skip_top = (rep_top + shuf_top + sh) // 2 - ph // 2
+        sx = 64 - sw // 2
+        rep_icon = icons.REPEAT_ONE if repeat == "track" else icons.REPEAT
+        (icons.draw_badge if repeat != "off" else icons.draw)(d, 64 - rw // 2, rep_top, rep_icon)
+        (icons.draw_badge if shuffle else icons.draw)(d, sx, shuf_top, icons.SHUFFLE)
+        icons.draw(d, sx - 8 - pw, skip_top, icons.PREV)
+        icons.draw(d, sx + sw + 8, skip_top, icons.NEXT)
+        d.update()
+
+    def _draw_scrub(self, step) -> None:
+        """While scrubbing: where we'll land, in place of the artist line."""
+        pos = self._seek_target if self._seek_target is not None else step.position_ms()
+        dur = step.duration_ms
+        self.display.draw_text(2, 14, f"{_clock(pos)} / {_clock(dur)}")
+        left, right, y = 2, 125, 27
+        self.display.draw_rect(left, y + 1, right, y + 1)                  # track line
+        if dur:
+            x = left + round((right - left) * min(pos, dur) / dur)
+            self.display.draw_rect(max(left, x - 1), y, min(right, x + 1), y + 2)   # where
 
     def _render_status(self, step) -> None:
         text = step.status
