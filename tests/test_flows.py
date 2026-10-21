@@ -599,7 +599,7 @@ def test_volume_buttons_repeat_when_held_but_menu_does_not():
     with patch.object(seengreat, "GPIO", gpio), \
          patch.object(seengreat.time, "monotonic", lambda: clock[0]):
         buttons = seengreat.SeenGreatInput()
-        pins[seengreat._K1] = 0
+        pins[seengreat._K3] = 0
         assert buttons.read() == "VolUp"
         clock[0] += 0.3
         assert buttons.read() is None          # not held long enough yet
@@ -609,9 +609,9 @@ def test_volume_buttons_repeat_when_held_but_menu_does_not():
         assert buttons.read() is None          # not again so soon
         clock[0] += 0.15
         assert buttons.read() == "VolUp"
-        pins[seengreat._K1] = 1
+        pins[seengreat._K3] = 1
         assert buttons.read() is None
-        pins[seengreat._K3] = 0
+        pins[seengreat._K1] = 0
         assert buttons.read() == "Menu"
         clock[0] += 2.0
         assert buttons.read() is None          # the menu button never repeats

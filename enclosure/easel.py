@@ -93,7 +93,7 @@ HOLE_DX, HOLE_DY = 58.0, 23.5       # same pattern on the Pi Zero
 WINDOW = (31.0, 16.0, 0.2, -1.5)    # w, h, cx, cy  (active area 29.4 x 14.7)
 GLASS = (35.2, 22.6, 0.3, 0.3)
 JOY = (-25.3, 0.2)
-BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3, top to bottom: volume up, down, menu
+BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # top to bottom: volume up, down, menu
 BUTTON_FOOT = (6.2, 3.6)
 # The switches, measured from the HAT board's top: a 1.4 mm body, a thin metal
 # lip round the plunger up to 1.7, and the plunger itself up to 2.46.

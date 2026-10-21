@@ -333,7 +333,7 @@ class Runner:
                 self.handle_volume(0)
 
     def handle_menu(self) -> None:
-        """The menu button (K3): opens the menu from home and closes it again,
+        """The menu button (the bottom one): opens the menu from home and closes it again,
         straight back to home from any depth. Over a prompt or a running step
         it's Back."""
         self._last_input = time.monotonic()

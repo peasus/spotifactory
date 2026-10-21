@@ -9,7 +9,8 @@ _DOWN   = 13
 _LEFT   = 26
 _RIGHT  = 6
 _SELECT = 5
-# Buttons beside the screen, top to bottom
+# Buttons beside the screen. With the box upright, K3's pin is the top button
+# and K1's the bottom (checked on the hardware).
 _K1 = 21
 _K2 = 20
 _K3 = 16
@@ -20,9 +21,9 @@ _MAPPING = [
     (_LEFT,   "Left"),
     (_RIGHT,  "Right"),
     (_SELECT, "Select"),
-    (_K1,     "VolUp"),
+    (_K3,     "VolUp"),       # top
     (_K2,     "VolDown"),
-    (_K3,     "Menu"),
+    (_K1,     "Menu"),        # bottom
 ]
 
 # Held down, these repeat: after _REPEAT_DELAY, every _REPEAT_EVERY.
