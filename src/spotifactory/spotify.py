@@ -33,6 +33,7 @@ class NowPlayingInfo:
     progress_ms: int = 0
     duration_ms: int = 0
     repeat_state: str = "off"     # "off", "context" (album/playlist) or "track"
+    total_tracks: int | None = None   # on the track's album
 
 
 _client: spotipy.Spotify | None = None
@@ -326,4 +327,22 @@ def get_now_playing(include_paused: bool = False) -> NowPlayingInfo | None:
         progress_ms=playback.get("progress_ms") or 0,
         duration_ms=item.get("duration_ms") or 0,
         repeat_state=playback.get("repeat_state") or "off",
+        total_tracks=collection.get("total_tracks"),
     )
+
+
+_album_lengths: dict[str, int] = {}
+
+
+@_with_auth_retry
+def album_length_ms(album_uri: str) -> int:
+    """Total running time of an album (remembered: albums don't change)."""
+    if album_uri not in _album_lengths:
+        sp = get_client()
+        page = sp.album_tracks(album_uri, limit=50)
+        total = 0
+        while page:
+            total += sum(t.get("duration_ms") or 0 for t in page["items"])
+            page = sp.next(page) if page.get("next") else None
+        _album_lengths[album_uri] = total
+    return _album_lengths[album_uri]

@@ -98,6 +98,12 @@ class HomeScanStep(Step):
         self.progress_ms: int = 0
         self.duration_ms: int = 0
         self.progress_at: float = 0.0
+        # For the time and album displays.
+        self.track_number: int | None = None
+        self.total_tracks: int | None = None
+        self.album_name: str = ""
+        self.album_uri: str | None = None
+        self.album_length_ms: int | None = None
 
     def set_shuffle(self, active: bool) -> None:
         """Show a shuffle state we just set; polls won't override it while Spotify settles."""
@@ -169,6 +175,16 @@ class HomeScanStep(Step):
                     self.set_position(info.progress_ms)
                     if time.monotonic() - self._repeat_set_at >= _SHUFFLE_SETTLE_SECS:
                         self.repeat_state = info.repeat_state
+                    self.track_number, self.total_tracks = info.track_number, info.total_tracks
+                    self.album_name = info.album_name
+                    if info.album_uri != self.album_uri:
+                        self.album_uri, self.album_length_ms = info.album_uri, None
+                        if info.album_uri and info.album_uri.startswith("spotify:album:"):
+                            try:
+                                from spotifactory.spotify import album_length_ms
+                                self.album_length_ms = album_length_ms(info.album_uri)
+                            except Exception as e:
+                                print(f"[home] album length: {e}", flush=True)
                 else:
                     playlog.nothing()
                     self.is_playing = False

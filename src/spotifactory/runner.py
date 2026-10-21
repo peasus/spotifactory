@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional, Type
 
-from spotifactory.display import icons
+from spotifactory.display import icons, lcd
 from spotifactory.menu.definitions import MenuDef
 from spotifactory.menu.navigation import NavStack
 from spotifactory.tasks.base import (
@@ -46,6 +46,9 @@ _SEEK_SEND_EVERY = 0.8              # seconds between seeks sent while held (plu
 _SEEK_SHOW_SECS = 1.5               # how long the position stays up after letting go
 
 _REPEAT_NEXT = {"off": "context", "context": "track", "track": "off"}
+
+# Pressing the joystick on the home screen cycles these, like a CD player's DISP.
+_DISPLAY_MODES = ("now", "time", "album")
 
 _HEARTBEAT_SECS = 10.0
 _BUSY_AFTER_INPUT_SECS = 120.0      # menus touched this recently: someone's using it
@@ -96,6 +99,7 @@ class Runner:
         self._volume_lock = threading.Lock()
         self._volume_sending = False
         self._repeat_busy: bool = False
+        self._display_mode = _DISPLAY_MODES[0]
         self._skip_on_release = 0                    # -1/+1: a left/right tap waiting to be let go
         self._swallow_release = False                # that press woke the screen; ignore its hold
         self._seek_target: int | None = None         # ms; set while scrubbing
@@ -251,7 +255,10 @@ class Runner:
 
     def handle_select(self) -> None:
         self._last_input = time.monotonic()
-        if self._in_home_scan() and self._wake_if_sleeping():
+        if self._in_home_scan():
+            if not self._wake_if_sleeping():
+                i = _DISPLAY_MODES.index(self._display_mode)
+                self._display_mode = _DISPLAY_MODES[(i + 1) % len(_DISPLAY_MODES)]
             return
         item = self.nav.current.selected_item
 
@@ -735,8 +742,21 @@ class Runner:
 
         d = self.display
         d.clear()
-        d.draw_text(2, 0, song)
         scrub = self._seek_target is not None or time.monotonic() < self._seek_shown_until
+        # The time and album screens need something playing; scrubbing shows the time.
+        mode = self._display_mode if getattr(step, "tag_active", False) else "now"
+        if mode == "album" and scrub:
+            mode = "time"
+        if mode == "time":
+            self._render_time(step, shuffle, repeat)
+            d.update()
+            return
+        if mode == "album":
+            self._render_album(step, artist)
+            d.update()
+            return
+
+        d.draw_text(2, 0, song)
         if scrub:
             self._draw_scrub(step)
         elif artist:
@@ -757,6 +777,41 @@ class Runner:
         icons.draw(d, sx - 8 - pw, skip_top, icons.PREV)
         icons.draw(d, sx + sw + 8, skip_top, icons.NEXT)
         d.update()
+
+    def _render_time(self, step, shuffle: bool, repeat: str) -> None:
+        """CD-player time display: track number, the repeat and shuffle flags,
+        big elapsed time (where we'll land, while scrubbing) and a bar."""
+        d = self.display
+        pos = self._seek_target if self._seek_target is not None else step.position_ms()
+        dur = step.duration_ms
+        track = step.track_number
+        lcd.tiny_text(d, 2, 19, "TRACK")
+        lcd.seg_text(d, 2, 27, f"{track:02d}" if track else "--", w=9, h=17, gap=3)
+        flags = ("RPT 1" if repeat == "track" else "RPT", "RND")
+        x = 127 - lcd.flags_width(flags)
+        x = lcd.flag(d, x, 0, flags[0], repeat != "off") + 3
+        lcd.flag(d, x, 0, flags[1], shuffle)
+        t = _clock(pos)
+        lcd.seg_text(d, 127 - lcd.seg_width(t, 13, 4), 19, t)
+        d.draw_rect(0, 62, 127, 62)                                   # progress
+        if dur:
+            d.draw_rect(0, 61, round(127 * min(pos, dur) / dur), 63)
+
+    def _render_album(self, step, artist: str) -> None:
+        """Album, artist, which track of how many, and the album's length."""
+        d = self.display
+        d.draw_text(2, 0, step.album_name or step.status)
+        d.draw_text(2, 14, artist)
+        track, total = step.track_number, step.total_tracks
+        lcd.tiny_text(d, 2, 33, "TRACK")
+        x = lcd.seg_text(d, 2, 41, f"{track:02d}" if track else "--", w=8, h=17, gap=3)
+        if total:
+            lcd.tiny_text(d, x + 3, 53, f"/{total}")
+        if step.album_length_ms:
+            t = _clock(step.album_length_ms)
+            tx = 127 - lcd.seg_width(t, 8, 3)
+            lcd.tiny_text(d, 127 - lcd.tiny_width("TOTAL"), 33, "TOTAL")
+            lcd.seg_text(d, tx, 41, t, w=8, h=17, gap=3)
 
     def _draw_scrub(self, step) -> None:
         """While scrubbing: where we'll land, in place of the artist line."""

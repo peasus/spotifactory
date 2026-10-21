@@ -26,7 +26,7 @@ off pauses.
 
 | Screen | Up | Down | Left / Right | Press |
 |---|---|---|---|---|
-| Home (now playing) | repeat: off → album → track | shuffle on/off | tap: previous / next track; hold: scrub through the track | — |
+| Home (now playing) | repeat: off → album → track | shuffle on/off | tap: previous / next track; hold: scrub through the track | display: now playing → time → album |
 | Menus | move | move | back / select | select |
 | Running tasks | — | — | Left cancels where possible | — |
 

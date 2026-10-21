@@ -717,3 +717,68 @@ class TestVolumeAndPlayPause:
             r.handle_play_pause()
             assert _wait_for(lambda: r._message is not None)
         assert r._message[0] == note
+
+
+class TestDisplayModes:
+    """Pressing the joystick on the home screen cycles now playing → time → album."""
+
+    def _runner(self):
+        from spotifactory.tasks.home.steps import HomeScanStep
+        r = _runner()
+        step = HomeScanStep()
+        step.tag_active, step.status, step.artist = True, "Song", "Artist"
+        step.duration_ms, step.track_number, step.total_tracks = 200_000, 3, 14
+        step.album_name, step.album_length_ms = "Album", 31 * 60_000 + 20_000
+        step.set_position(41_000)
+        r._task = MagicMock(current_step=step)
+        patch.object(r, "_in_home_scan", return_value=True).start()
+        return r, step
+
+    def teardown_method(self):
+        patch.stopall()
+
+    def _texts(self, r):
+        return [c.args[2] for c in r.display.draw_text.call_args_list]
+
+    def test_press_cycles_the_screens(self):
+        r, _ = self._runner()
+        seen = []
+        for _ in range(4):
+            seen.append(r._display_mode)
+            r.handle_select()
+        assert seen == ["now", "time", "album", "now"]
+
+    def test_time_and_album_screens(self):
+        r, _ = self._runner()
+        r._display_mode = "time"
+        r._render_home()
+        assert self._texts(r) == []             # all seven-segment and pixel font
+        r._display_mode = "album"
+        r._render_home()
+        assert self._texts(r)[:2] == ["Album", "Artist"]
+
+    def test_without_a_tag_it_shows_place_tag(self):
+        r, step = self._runner()
+        step.tag_active, step.status, step.artist = False, "Place tag...", ""
+        r._display_mode = "time"
+        r._render_home()
+        assert self._texts(r) == ["Place tag..."]
+
+    def test_press_that_wakes_the_screen_keeps_the_mode(self):
+        r, step = self._runner()
+        step.screen_off = True
+        r.handle_select()
+        assert r._display_mode == "now" and not step.screen_off
+
+
+def test_album_length_adds_up_every_page_and_is_remembered():
+    from spotifactory import spotify
+    sp = MagicMock()
+    page2 = {"items": [{"duration_ms": 3}], "next": None}
+    sp.album_tracks.return_value = {"items": [{"duration_ms": 1}, {"duration_ms": 2}], "next": "p2"}
+    sp.next.return_value = page2
+    spotify._album_lengths.clear()
+    with patch("spotifactory.spotify.get_client", return_value=sp):
+        assert spotify.album_length_ms("spotify:album:x") == 6
+        assert spotify.album_length_ms("spotify:album:x") == 6
+    sp.album_tracks.assert_called_once()
