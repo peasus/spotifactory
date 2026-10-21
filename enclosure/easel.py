@@ -95,6 +95,11 @@ GLASS = (35.2, 22.6, 0.3, 0.3)
 JOY = (-25.3, 0.2)
 BUTTONS = [(24.9, 6.7), (24.9, 0.6), (24.9, -5.4)]  # K1-K3, top to bottom: volume up, down, menu
 BUTTON_FOOT = (6.2, 3.6)
+# The switches, measured from the HAT board's top: a 1.4 mm body, a thin metal
+# lip round the plunger up to 1.7, and the plunger itself up to 2.46.
+BUTTON_BODY_H = 1.4
+BUTTON_LIP = (3.1, 1.7, 1.7)    # x, y, top
+BUTTON_PLUNGER = (2.7, 1.3)
 GLASS_H = 1.3             # measured: OLED glass top above HAT board top
 JOY_HOUSING = 10.0        # joystick's square base
 JOY_HOUSING_H = 2.5       # measured
@@ -114,11 +119,14 @@ NUB_D = (6.5, 6.0)        # bottom, top
 NUB_ABOVE_STEM = 2.0
 NUB_SLEEVE = 1.0          # how far it hangs below the round section's top
 NUB_SOCKET = 2.50         # square socket: 2.45 wouldn't go on, 2.55 was loose (fit test)
-BUTTON_H = 2.0            # measured
-# Printed caps for K1-K3: a flange trapped under the faceplate rests on the
-# switch, and a body comes up through the faceplate with a raised icon.
+BUTTON_H = 2.46           # measured: plunger top (2.0 was the case, and pressed the buttons)
+# Printed caps for K1-K3: the plunger comes up through an opening in the
+# flange and pushes on the cap's body, so the flange sits beside the plunger
+# (trapped under the faceplate) rather than on top of it; the body comes up
+# through the faceplate with a raised icon.
 CAP_BODY = (5.0, 3.4)     # x by y, through the faceplate
 CAP_FLANGE = (6.4, 4.8, 0.5)
+CAP_OPENING = 3.3         # square, round the plunger and its lip, whichever way it's turned
 CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
 CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
 CAP_LIFT = 0.3            # flange to the pocket's ceiling: room for the board to bow when screwed tight (0.15 pressed a button)
@@ -625,7 +633,7 @@ def faceplate():
     # and a hole for each cap's body.
     ys = [by for _, by in BUTTONS]
     fw, fh, ft = CAP_FLANGE
-    pocket_top = HAT_TOP + BUTTON_H + ft + CAP_LIFT
+    pocket_top = HAT_TOP + BUTTON_H + CAP_LIFT        # the flange's top is level with the plunger
     plate -= Pos(BUTTONS[0][0], (max(ys) + min(ys)) / 2, FP_FACE - FP_T - 1) * _rounded(Box(
         max(fw, BUTTON_FOOT[0]) + 0.8, max(ys) - min(ys) + max(fh, BUTTON_FOOT[1]) + 0.8,
         pocket_top - (FP_FACE - FP_T) + 1, align=C), 1.0, Axis.Z)
@@ -660,12 +668,23 @@ def _cap_icon(kind: str, z: float):
     return poly((-1.6, -0.8), (-0.3, 0), (-1.6, 0.8)) + bar(0.2, 0.6, -0.8, 0.8) + bar(1.0, 1.4, -0.8, 0.8)
 
 
+def switch():
+    """A K1-K3 switch on the board (z = 0 at the board's top): body, lip, plunger."""
+    lx, ly, ltop = BUTTON_LIP
+    px, py = BUTTON_PLUNGER
+    return (Box(*BUTTON_FOOT, BUTTON_BODY_H, align=C)
+            + Box(lx, ly, ltop, align=C)
+            + Box(px, py, BUTTON_H, align=C))
+
+
 def _button_cap_local(kind: str):
-    """A button cap, upright, z = 0 at the switch's top (where it rests)."""
+    """A button cap, upright, z = 0 at the plunger's top (where it rests). The
+    flange hangs below that, the plunger up through its opening."""
     fw, fh, ft = CAP_FLANGE
     cw, ch = CAP_BODY
     top = GLASS_H + FP_T + CAP_ABOVE - BUTTON_H
-    cap = _rounded(Box(fw, fh, ft, align=C), 1.0, Axis.Z)
+    cap = Pos(0, 0, -ft) * _rounded(Box(fw, fh, ft, align=C), 1.0, Axis.Z)
+    cap -= Pos(0, 0, -ft - 0.01) * _rounded(Box(CAP_OPENING, CAP_OPENING, ft + 0.01, align=C), 0.5, Axis.Z)
     body = _rounded(Box(cw, ch, top, align=C), 0.9, Axis.Z)
     body = fillet(body.edges().group_by(Axis.Z)[-1], radius=0.4)
     return cap + body + _cap_icon(kind, top)
@@ -682,7 +701,7 @@ def button_caps_flat():
     """The three caps standing on their flanges, side by side, top to bottom left to right."""
     out = None
     for i, k in enumerate(CAP_ICONS):
-        c = Pos((i - 1) * 9.0, 0, 0) * _button_cap_local(k)
+        c = Pos((i - 1) * 9.0, 0, CAP_FLANGE[2]) * _button_cap_local(k)
         out = c if out is None else out + c
     return out
 
@@ -831,7 +850,7 @@ def internals():
     glass = f * Pos(gx, gy, HAT_TOP) * Box(gw, gh, GLASS_H, align=C)
     joy = f * Pos(*JOY, HAT_TOP) * Box(10, 10, JOY_HOUSING_H, align=C)
     knob = f * Pos(*JOY, HAT_TOP + JOY_HOUSING_H) * joy_stem()
-    buttons = [f * Pos(bx, by, HAT_TOP) * Box(*BUTTON_FOOT, BUTTON_H, align=C) for bx, by in BUTTONS]
+    buttons = [f * Pos(bx, by, HAT_TOP) * switch() for bx, by in BUTTONS]
     pi = f * Pos(0, 0, PI_BOTTOM) * pi_pcb
     pi_under = f * Pos(0, 0, PI_BOTTOM - PI_UNDER) * Box(HOLE_DX - 8, HAT_D - 4, PI_UNDER, align=C)
     stack_spacers = [f * Pos(hx, hy, PI_BOTTOM + PI_T) * (
