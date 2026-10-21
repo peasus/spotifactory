@@ -184,6 +184,14 @@ def main() -> int:
     tilts = [easel.nub_tilted(s, ax) for s in (-1, 1) for ax in ("x", "y")]
     hits = sum(overlap(p, [easel.nub(), *tilts]) for p in (body, fp))
     check(hits < TOUCH, f"joystick nub clears the faceplate and body, upright and pushed over ({hits:.2f} mm³)")
+    # Pressing the stick in (its centre click) while it leans a little: the
+    # nub mustn't bottom out on the faceplate first.
+    press = 0.6
+    fdir = easel.hat_frame()
+    dz = (fdir * Pos(0, 0, -press)).position - fdir.position
+    pressed_nubs = [Pos(dz.X, dz.Y, dz.Z) * n for n in (easel.nub(), easel.nub_tilted(1, "x"), easel.nub_tilted(-1, "y"))]
+    press_hits = overlap(fp, pressed_nubs)
+    check(press_hits < TOUCH, f"joystick nub can be pressed in {press} mm, upright or leaning ({press_hits:.2f} mm³)")
     caps = easel.button_caps()
     f = easel.hat_frame()
     down = (f * Pos(0, 0, -0.25)).position - f.position             # pressed: a switch's travel
