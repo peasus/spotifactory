@@ -118,10 +118,10 @@ BUTTON_H = 2.0            # measured
 # Printed caps for K1-K3: a flange trapped under the faceplate rests on the
 # switch, and a body comes up through the faceplate with a raised icon.
 CAP_BODY = (5.0, 3.4)     # x by y, through the faceplate
-CAP_FLANGE = (6.4, 4.8, 0.6)
+CAP_FLANGE = (6.4, 4.8, 0.5)
 CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
 CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
-CAP_LIFT = 0.15           # flange to the pocket's ceiling: how far a cap can rattle up
+CAP_LIFT = 0.3            # flange to the pocket's ceiling: room for the board to bow when screwed tight (0.15 pressed a button)
 CAP_ICONS = ("plus", "minus", "menu")           # in BUTTONS order
 STACK = 11.5              # measured: HAT board top to Pi board bottom
 BOARD_GAP = 8.5           # measured: HAT underside to Pi top = spacer length
