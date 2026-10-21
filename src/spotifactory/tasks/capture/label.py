@@ -1,5 +1,6 @@
-"""The playlist name printed across the bottom of a playlist's artwork, so a
-print of a generic or auto-made cover still says which playlist it is."""
+"""A name printed across the bottom of the artwork, if asked for: a playlist's
+name, or an album's name and artist, so a print whose cover has no text (or a
+generic or auto-made one) still says what it is."""
 from __future__ import annotations
 
 from io import BytesIO
@@ -7,11 +8,14 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
 SIZE = 800            # Instax Square print, pixels
-SHADE_FRAC = 0.32     # bottom part of the art darkened behind the name
-SHADE_ALPHA = 200     # darkness at the very bottom (0-255)
+SHADE_FRAC = 0.32     # bottom part of the art darkened behind the name, at least
+SHADE_RAMP = 90       # px of soft fade above the text
+SHADE_TEXT = 170      # darkness where the text starts (0-255)...
+SHADE_ALPHA = 215     # ...and at the very bottom
 MARGIN = 44           # side and bottom margin for the text
 MAX_FONT, MIN_FONT = 64, 36
 MAX_LINES = 2
+SUB_FONT = 34         # the subtitle (an album's artist) under the name
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont:
@@ -50,30 +54,56 @@ def _fit(draw: ImageDraw.ImageDraw, text: str, width: int) -> tuple[int, list[st
     return MIN_FONT, [ln for ln in out if ln]
 
 
-def add_playlist_label(image: BytesIO, name: str) -> BytesIO:
-    """`image` cropped square and sized for the print, with `name` across the bottom."""
+def _one_line(draw: ImageDraw.ImageDraw, text: str, font, width: int) -> str:
+    """`text` cut with an ellipsis to fit on one line."""
+    if draw.textlength(text, font=font) <= width:
+        return text
+    while text and draw.textlength(text + "…", font=font) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
+def add_label(image: BytesIO, name: str, subtitle: str | None = None) -> BytesIO:
+    """`image` cropped square and sized for the print, with `name` across the
+    bottom and, if given, a smaller `subtitle` (an album's artist) under it."""
     image.seek(0)
     art = Image.open(image).convert("RGB")
     side = min(art.size)
     left, top = (art.width - side) // 2, (art.height - side) // 2
     art = art.crop((left, top, left + side, top + side)).resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
-    # Fade to dark toward the bottom so white text reads on any cover.
-    shade_h = int(SIZE * SHADE_FRAC)
-    shade = Image.new("L", (1, shade_h))
-    shade.putdata([int(SHADE_ALPHA * (i / (shade_h - 1)) ** 1.5) for i in range(shade_h)])
-    black = Image.new("RGB", (SIZE, shade_h))
-    art.paste(black, (0, SIZE - shade_h), shade.resize((SIZE, shade_h)))
-
     draw = ImageDraw.Draw(art)
-    size, lines = _fit(draw, " ".join(name.split()), SIZE - 2 * MARGIN)
+    width = SIZE - 2 * MARGIN
+    size, lines = _fit(draw, " ".join(name.split()), width)
     font = _font(size)
     line_h = int(size * 1.15)
-    y = SIZE - MARGIN - line_h * len(lines)
+    sub_font = _font(SUB_FONT)
+    sub = _one_line(draw, " ".join(subtitle.split()), sub_font, width) if subtitle else ""
+    sub_h = int(SUB_FONT * 1.4) if sub else 0
+    text_top = SIZE - MARGIN - line_h * len(lines) - sub_h
+
+    # Fade to dark toward the bottom so white text reads on any cover: a soft
+    # ramp above the text, then dark enough behind it, however many lines.
+    shade_top = min(SIZE - int(SIZE * SHADE_FRAC), text_top - SHADE_RAMP)
+    shade_h = SIZE - shade_top
+    ramp = text_top - shade_top
+    shade = Image.new("L", (1, shade_h))
+    shade.putdata([int(SHADE_TEXT * (i / ramp) ** 1.5) if i < ramp
+                   else int(SHADE_TEXT + (SHADE_ALPHA - SHADE_TEXT) * (i - ramp) / max(1, shade_h - ramp))
+                   for i in range(shade_h)])
+    art.paste(Image.new("RGB", (SIZE, shade_h)), (0, shade_top), shade.resize((SIZE, shade_h)))
+
+    def text(xy, s, f, fill, bold=0):
+        x, y = xy
+        draw.text((x + 2, y + 3), s, font=f, fill=(0, 0, 0), stroke_width=bold, stroke_fill=(0, 0, 0))  # shadow
+        draw.text((x, y), s, font=f, fill=fill, stroke_width=bold, stroke_fill=fill)
+
+    y = text_top
     for line in lines:
-        draw.text((MARGIN, y), line, font=font, fill="white",
-                  stroke_width=max(1, size // 32), stroke_fill="white")   # a touch bolder
+        text((MARGIN, y), line, font, (255, 255, 255), bold=max(1, size // 32))   # a touch bolder
         y += line_h
+    if sub:
+        text((MARGIN, y + int(SUB_FONT * 0.25)), sub, sub_font, (225, 225, 225))
 
     out = BytesIO()
     art.save(out, "JPEG", quality=95)

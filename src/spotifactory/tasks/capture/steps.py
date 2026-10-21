@@ -66,17 +66,35 @@ class ConfirmStep(Step):
         )
 
 
+class AlbumLabelStep(Step):
+    """Ask whether to print the album's name and artist on it. Most album
+    covers say what they are, so No comes first; Back cancels the print."""
+
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        return PushMenu(
+            menu=_label_menu(ctx.data["info"].album_name, yes_first=False),
+            on_confirm=Continue(),
+            on_cancel=Cancel(),
+        )
+
+
 class FetchArtStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Fetching artwork..."
+        info = ctx.data["info"]
         try:
-            url = ctx.data["info"].artwork_url
-            resp = requests.get(url, timeout=10)
+            resp = requests.get(info.artwork_url, timeout=10)
             resp.raise_for_status()
             ctx.data["image"] = BytesIO(resp.content)
         except Exception as e:
             self.show_for(f"Art error: {str(e)[:20]}", 3.0)
             return Done()
+        if ctx.data.get("selected") == "label":
+            try:
+                from spotifactory.tasks.capture.label import add_label
+                ctx.data["image"] = add_label(ctx.data["image"], info.album_name, info.artist_name)
+            except Exception as e:
+                print(f"[print] couldn't add album name: {e}", flush=True)
         return Continue()
 
 
@@ -292,12 +310,13 @@ class PlaylistConfirmStep(Step):
         )
 
 
-def _label_menu(playlist_name: str):
+def _label_menu(name: str, yes_first: bool):
+    """Whether to print the name on it. The first item is the one selected."""
     from spotifactory.menu.definitions import ItemDef, MenuDef
-    return MenuDef("Add name?", [
-        ItemDef("Yes", action="confirm", data="label"),
-        ItemDef("No",  action="confirm", data="plain"),
-    ], visible_rows=2, subtitle=playlist_name)
+    yes = ItemDef("Yes", action="confirm", data="label")
+    no = ItemDef("No", action="confirm", data="plain")
+    return MenuDef("Add name?", [yes, no] if yes_first else [no, yes],
+                   visible_rows=2, subtitle=name)
 
 
 class PlaylistLabelStep(Step):
@@ -310,7 +329,7 @@ class PlaylistLabelStep(Step):
         if not pl.get("labelled", True):
             return Continue()    # auto playlist: no name to print
         return PushMenu(
-            menu=_label_menu(pl["name"]),
+            menu=_label_menu(pl["name"], yes_first=True),
             on_confirm=Continue(),
             on_cancel=Cancel(),
         )
@@ -331,8 +350,8 @@ class FetchPlaylistArtStep(Step):
         # stay plain). Auto playlists have no name we can read.
         if pl.get("labelled", True) and ctx.data.get("selected") == "label":
             try:
-                from spotifactory.tasks.capture.label import add_playlist_label
-                ctx.data["image"] = add_playlist_label(ctx.data["image"], pl["name"])
+                from spotifactory.tasks.capture.label import add_label
+                ctx.data["image"] = add_label(ctx.data["image"], pl["name"])
             except Exception as e:
                 print(f"[print] couldn't add playlist name: {e}", flush=True)
         return Continue()

@@ -282,11 +282,42 @@ class TestPlaylistNameChoice:
                                 "selected": choice})
         resp = MagicMock(content=b"img")
         with patch("spotifactory.tasks.capture.steps.requests.get", return_value=resp), \
-             patch("spotifactory.tasks.capture.label.add_playlist_label",
+             patch("spotifactory.tasks.capture.label.add_label",
                    return_value="labelled") as add:
             assert isinstance(FetchPlaylistArtStep().run(ctx), Continue)
         assert add.called is labelled
         assert (ctx.data["image"] == "labelled") is labelled
+
+
+class TestAlbumNameChoice:
+    """Album prints ask too, with No first: most covers already say what they are."""
+
+    def _info(self):
+        from spotifactory.spotify import NowPlayingInfo
+        return NowPlayingInfo("Track", "Nirvana", "MTV Unplugged In New York",
+                              "spotify:album:x", "https://art")
+
+    def test_no_is_selected_first(self):
+        from spotifactory.tasks.capture.steps import AlbumLabelStep
+        out = AlbumLabelStep().run(TaskContext(data={"info": self._info()}))
+        assert out.menu.title == "Add name?"
+        assert [(i.label, i.data) for i in out.menu.items] == [("No", "plain"), ("Yes", "label")]
+        assert out.menu.subtitle == "MTV Unplugged In New York"
+        assert isinstance(out.on_cancel, Cancel)
+
+    @pytest.mark.parametrize("choice, labelled", [("label", True), ("plain", False), (None, False)])
+    def test_album_art_gets_name_and_artist_only_when_asked(self, choice, labelled):
+        from spotifactory.tasks.capture.steps import FetchArtStep
+        data = {"info": self._info()}
+        if choice:
+            data["selected"] = choice
+        ctx = TaskContext(data=data)
+        with patch("spotifactory.tasks.capture.steps.requests.get", return_value=MagicMock(content=b"img")), \
+             patch("spotifactory.tasks.capture.label.add_label", return_value="labelled") as add:
+            assert isinstance(FetchArtStep().run(ctx), Continue)
+        assert add.called is labelled
+        if labelled:
+            assert add.call_args.args[1:] == ("MTV Unplugged In New York", "Nirvana")
 
 
 # ---------------------------------------------------------------------------

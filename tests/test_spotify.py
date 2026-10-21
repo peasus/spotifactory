@@ -164,10 +164,22 @@ def test_playlist_label_keeps_print_square_and_marks_the_bottom():
 
     from PIL import Image
 
-    from spotifactory.tasks.capture.label import add_playlist_label
+    from spotifactory.tasks.capture.label import add_label
     src = BytesIO()
     Image.new("RGB", (640, 480), (120, 160, 200)).save(src, "PNG")
-    out = Image.open(add_playlist_label(src, "A Very Long Playlist Name That Needs Wrapping Or Cutting Short"))
+    out = Image.open(add_label(src, "A Very Long Playlist Name That Needs Wrapping Or Cutting Short"))
     assert out.size == (800, 800)
     assert out.getpixel((400, 50)) == pytest.approx((120, 160, 200), abs=3)
     assert out.getpixel((400, 790)) != out.getpixel((400, 50))
+
+
+def test_label_with_an_artist_line_stays_square():
+    from io import BytesIO
+
+    from PIL import Image
+
+    from spotifactory.tasks.capture.label import add_label
+    src = BytesIO()
+    Image.new("RGB", (640, 640), (200, 180, 160)).save(src, "PNG")
+    out = Image.open(add_label(src, "MTV Unplugged In New York", "Nirvana and Some Very Long Featured Artist Names"))
+    assert out.size == (800, 800)

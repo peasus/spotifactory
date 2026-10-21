@@ -1,5 +1,6 @@
 from spotifactory.tasks.base import Task
 from spotifactory.tasks.capture.steps import (
+    AlbumLabelStep,
     ConfirmStep,
     DoneStep,
     FetchArtStep,
@@ -20,6 +21,7 @@ class CaptureTask(Task):
     steps = [
         ("fetch_info", FetchInfoStep),
         ("confirm",    ConfirmStep),
+        ("label",      AlbumLabelStep),
         ("fetch_art",  FetchArtStep),
         ("print",      PrintStep),
         ("scan",       ScanStep),
