@@ -155,7 +155,7 @@ Assembly order, with the body upside down or on its back:
 Spotifactory, the app and the enclosure, is © 2025–2026 Joe Pease, under the
 [PolyForm Noncommercial License 1.0.0](LICENSE.md): free to use, change and
 share for personal and other noncommercial purposes. Selling it, or using it
-commercially, needs permission.
+commercially, needs permission: ask at hello@spotifactory.com.
 
 `src/spotifactory/vendor/instax/` is from
 [InstaxBLE](https://github.com/javl/InstaxBLE) by Jasper van Loenen, under its
