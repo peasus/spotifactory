@@ -118,7 +118,7 @@ JOY_HOLE_D = 5.0
 NUB_D = (6.5, 6.0)        # bottom, top
 NUB_ABOVE_STEM = 2.0
 NUB_SLEEVE = 1.0          # how far it hangs below the round section's top
-NUB_SOCKET = 2.50         # square socket: 2.45 wouldn't go on, 2.55 was loose (fit test)
+NUB_SOCKET = 2.53         # square socket, from fit tests: 2.45 wouldn't go on, 2.53 just right, 2.55 loose
 BUTTON_H = 2.46           # measured: plunger top (2.0 was the case, and pressed the buttons)
 # Printed caps for K1-K3: the plunger comes up through an opening in the
 # flange and pushes on the cap's body, so the flange sits beside the plunger
