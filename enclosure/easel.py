@@ -694,8 +694,31 @@ def joy_stem():
     return stem
 
 
-def _nub_local(socket: float = NUB_SOCKET):
-    """Printed joystick nub, upright, z = 0 at the housing's top."""
+_NUB_LETTERS = {          # 4 x 5 blocks, for telling fit-test nubs apart
+    "A": (".##.", "#..#", "####", "#..#", "#..#"),
+    "B": ("###.", "#..#", "###.", "#..#", "###."),
+    "C": (".###", "#...", "#...", "#...", ".###"),
+    "D": ("###.", "#..#", "#..#", "#..#", "###."),
+}
+
+
+def _nub_letter(letter: str, top: float, cell: float = 0.6):
+    """A raised blocky letter centred on the nub's top, 0.3 mm proud."""
+    rows = _NUB_LETTERS[letter]
+    w, h = len(rows[0]) * cell, len(rows) * cell
+    out = None
+    for r, line in enumerate(rows):
+        for c, px in enumerate(line):
+            if px == "#":
+                x, y = -w / 2 + (c + 0.5) * cell, h / 2 - (r + 0.5) * cell
+                b = Pos(x, y, top - 0.05) * Box(cell + 0.02, cell + 0.02, 0.35, align=C)
+                out = b if out is None else out + b
+    return out
+
+
+def _nub_local(socket: float = NUB_SOCKET, label: str | None = None):
+    """Printed joystick nub, upright, z = 0 at the housing's top. A `label`
+    (fit tests) replaces the arrows on top with that letter."""
     z0 = JOY_COLLAR_TOP - NUB_SLEEVE
     h = JOY_STEM_TOP + NUB_ABOVE_STEM - z0
     nub = Pos(0, 0, z0) * Cone(NUB_D[0] / 2, NUB_D[1] / 2, h, align=C)
@@ -705,6 +728,8 @@ def _nub_local(socket: float = NUB_SOCKET):
     nub -= Pos(0, 0, z0 - 1) * Cylinder(JOY_COLLAR_D / 2 + 0.3, NUB_SLEEVE + 1, align=C)
     # Four raised arrows on top, pointing the way the stick goes.
     top = z0 + h
+    if label:
+        return nub + _nub_letter(label, top)
     for a in (0, 90, 180, 270):
         with BuildSketch(Plane.XY.offset(top - 0.05)) as sk:
             with BuildLine():
