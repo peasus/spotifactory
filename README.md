@@ -149,3 +149,14 @@ Assembly order, with the body upside down or on its back:
 | `deploy/` | Pi setup script, systemd unit, auth relay Worker |
 | `enclosure/` | Case model, checks and parts list |
 | `docs/sonos.md` | What does and doesn't work with Sonos speakers |
+
+## License
+
+Spotifactory, the app and the enclosure, is © 2025–2026 Joe Pease, under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md): free to use, change and
+share for personal and other noncommercial purposes. Selling it, or using it
+commercially, needs permission.
+
+`src/spotifactory/vendor/instax/` is from
+[InstaxBLE](https://github.com/javl/InstaxBLE) by Jasper van Loenen, under its
+own [MIT license](src/spotifactory/vendor/instax/LICENSE.md).
