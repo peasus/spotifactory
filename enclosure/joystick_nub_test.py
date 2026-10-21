@@ -12,7 +12,7 @@ from build123d import Pos, export_stl
 
 import easel
 
-SOCKETS = (2.45, 2.55, 2.65, 2.75)    # square socket, mm; left to right
+SOCKETS = (2.47, 2.50, 2.53)          # square socket, mm; left to right (round 2: 2.55 loose, 2.45 too tight)
 PITCH = 10.0
 
 if __name__ == "__main__":

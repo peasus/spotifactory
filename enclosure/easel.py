@@ -113,7 +113,7 @@ JOY_HOLE_D = 5.0
 NUB_D = (6.5, 6.0)        # bottom, top
 NUB_ABOVE_STEM = 2.0
 NUB_SLEEVE = 1.0          # how far it hangs below the round section's top
-NUB_SOCKET = 2.6          # square socket; nub_test.py prints a range to pick from
+NUB_SOCKET = 2.50         # square socket: 2.45 wouldn't go on, 2.55 was loose (fit test)
 BUTTON_H = 2.0            # measured
 # Printed caps for K1-K3: a flange trapped under the faceplate rests on the
 # switch, and a body comes up through the faceplate with a raised icon.
