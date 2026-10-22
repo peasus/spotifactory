@@ -90,12 +90,13 @@ def _reset_uart(dev_path: str) -> None:
 
 
 def _parse_tag(tag) -> dict:
+    """uid, plus "uri" (the first link: what plays) and "uris" (every link,
+    e.g. an album's Spotify link then its Apple Music one) if it has any."""
     entry = {"uid": tag.identifier.hex().upper()}
     if tag.ndef and tag.ndef.records:
-        for record in tag.ndef.records:
-            if isinstance(record, ndef.UriRecord):
-                entry["uri"] = record.uri
-                break
+        uris = [r.uri for r in tag.ndef.records if isinstance(r, ndef.UriRecord)]
+        if uris:
+            entry["uri"], entry["uris"] = uris[0], uris
     return entry
 
 
@@ -229,9 +230,11 @@ def write_uri(
     port: str | None = None,
     terminate: "Callable[[], bool] | None" = None,
     uid: str | None = None,
+    extra: "list[str] | tuple[str, ...]" = (),
 ) -> str | None:
     """Write a URI to a tag on the reader: the one with `uid` if given (other
-    tags are left alone), otherwise the next one.
+    tags are left alone), otherwise the next one. `extra` links follow it on
+    the tag (the first link is the one boxes play by default).
 
     Returns the tag UID on success, or None if terminate() returned True first.
     Raises TagWriteError if a tag was found but couldn't be written
@@ -252,7 +255,7 @@ def write_uri(
             errors.append("Tag is read-only")
             return False
         try:
-            tag.ndef.records = [ndef.UriRecord(uri)]
+            tag.ndef.records = [ndef.UriRecord(u) for u in (uri, *extra)]
         except Exception as e:
             errors.append(str(e) or type(e).__name__)
             return False
