@@ -166,39 +166,141 @@ def test_seengreat_input_fires_once_per_press():
 # Tag write step
 # ---------------------------------------------------------------------------
 
+class _FakeReader:
+    """Stands in for the RFID calls: `present` is the tag on the reader now,
+    `placed` the tags put on it after, in turn. Lifting happens when asked."""
+
+    def __init__(self, present=None, placed=(), on_read=None):
+        self.present, self.placed, self.writes = present, list(placed), []
+        self.lift_asked = False
+        self.on_read = on_read
+
+    def wait_until_clear(self, terminate=None, on_seen=None, settle=1.0):
+        if self.present:
+            on_seen(self.present)
+            self.lift_asked = True
+            self.present = None                 # they lift it off
+        return not (terminate and terminate())
+
+    def read_next(self, terminate=None):
+        if self.on_read:
+            self.on_read()
+        if terminate and terminate():
+            return None
+        if self.present is None and self.placed:
+            self.present = self.placed.pop(0)
+        return self.present
+
+    def write_uri(self, uri, terminate=None, uid=None):
+        self.writes.append((uri, uid))
+        return uid
+
+    def patch(self):
+        from contextlib import ExitStack
+        stack = ExitStack()
+        for name in ("wait_until_clear", "read_next", "write_uri"):
+            stack.enter_context(patch(f"spotifactory.hardware.rfid.{name}", getattr(self, name)))
+        stack.enter_context(patch("spotifactory.spotify.uri_name", return_value="Other Album"))
+        stack.enter_context(patch("spotifactory.tasks.base.time.sleep"))
+        return stack
+
+
 class TestWriteTagStep:
+    """The print's tag step: never writes a tag it hasn't read first."""
+
     def _step(self):
         from spotifactory.tasks.capture.steps import ScanStep
         step = ScanStep()
         ctx = TaskContext(data={"info": MagicMock(album_uri="spotify:album:x")})
         return step, ctx
 
-    def test_success_continues(self):
+    def test_album_on_the_reader_is_lifted_off_not_overwritten(self):
         step, ctx = self._step()
-        with patch("spotifactory.hardware.rfid.write_uri", return_value="UID1"):
+        reader = _FakeReader(present={"uid": "OLD", "uri": "spotify:album:old"}, placed=[{"uid": "NEW"}])
+        with reader.patch():
             assert isinstance(step.run(ctx), Continue)
+        assert reader.lift_asked
+        assert reader.writes == [("spotify:album:x", "NEW")]   # only the new tag
+
+    def test_a_tag_with_something_else_asks_first_no_by_default(self):
+        step, ctx = self._step()
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:other"}])
+        with reader.patch():
+            out = step.run(ctx)
+            assert out.menu.title == "Overwrite tag?" and out.menu.subtitle == "Has Other Album"
+            assert [i.label for i in out.menu.items] == ["No", "Yes"]
+            assert reader.writes == []
+            ctx.data["selected"] = "overwrite"              # Yes
+            assert isinstance(step.run(ctx), Continue)
+        assert reader.writes == [("spotify:album:x", "T")]
+
+    def test_saying_no_to_overwrite_wants_it_lifted_off(self):
+        step, ctx = self._step()
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:other"}])
+        with reader.patch():
+            step.run(ctx)                                     # asks; No
+            step._cancel = MagicMock(is_set=MagicMock(return_value=False))
+            with patch.object(type(step), "_stopped", return_value=Done()):
+                step.run(ctx)
+        assert reader.lift_asked and reader.writes == []
+
+    def test_tag_already_right_is_left_alone(self):
+        step, ctx = self._step()
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x"}])
+        with reader.patch():
+            assert isinstance(step.run(ctx), Continue)
+        assert reader.writes == [] and step.status == "Tag already set"
+
+    def test_back_asks_before_skipping_no_by_default(self):
+        step, ctx = self._step()
+        reader = _FakeReader(on_read=step.cancel)
+        with reader.patch():
+            out = step.run(ctx)
+        assert out.menu.title == "Skip the tag?"
+        assert [i.label for i in out.menu.items] == ["No", "Yes"]
+        assert isinstance(out.on_confirm, Done)
+        assert out.on_cancel == Continue(next_step="scan")     # No: keep waiting
+        assert reader.writes == []
 
     def test_unwritable_tag_shows_reason_then_waits_for_another(self):
         from spotifactory.hardware.rfid import TagWriteError
         step, ctx = self._step()
         step._cancel = MagicMock(is_set=MagicMock(return_value=False))
-        with patch("spotifactory.hardware.rfid.write_uri",
-                   side_effect=[TagWriteError("Not NDEF formatted"), "UID1"]) as write:
+        reader = _FakeReader(placed=[{"uid": "T"}])
+        with reader.patch(), patch("spotifactory.hardware.rfid.write_uri",
+                                   side_effect=TagWriteError("Not NDEF formatted")):
+            out = step.run(ctx)
+        assert out == Continue(next_step="scan")
+        assert step.artist == "Not NDEF formatted"
+
+
+class TestWriteTagFromMenu:
+    """Menu > Write Tag: the tag to fix can stay on the reader."""
+
+    def test_offers_the_album_and_the_playlist_playing(self):
+        from spotifactory.tasks.capture.steps import ChooseTagTargetStep
+        sp = MagicMock()
+        sp.current_playback.return_value = {
+            "item": {"album": {"uri": "spotify:album:a", "name": "Wildflowers"}},
+            "context": {"type": "playlist", "uri": "spotify:playlist:p"}}
+        with patch("spotifactory.spotify.get_client", return_value=sp), \
+             patch("spotifactory.spotify.uri_name", return_value="Road Trip"):
+            out = ChooseTagTargetStep().run(TaskContext())
+        assert [i.label for i in out.menu.items] == ["Wildflowers", "Playlist: Road Trip", "Cancel"]
+        assert out.menu.items[1].data["uri"] == "spotify:playlist:p"
+
+    def test_fixes_the_tag_on_the_reader_after_asking(self):
+        from spotifactory.tasks.capture.steps import WriteChosenTagStep
+        step = WriteChosenTagStep()
+        ctx = TaskContext(data={"selected": {"uri": "spotify:album:a", "label": "Wildflowers"}})
+        reader = _FakeReader(present={"uid": "T", "uri": "spotify:album:wrong"})
+        with reader.patch():
+            out = step.run(ctx)
+            assert not reader.lift_asked                      # no need to lift it off
+            assert out.menu.title == "Overwrite tag?"
+            ctx.data["selected"] = "overwrite"                # the answer replaces the choice...
             assert isinstance(step.run(ctx), Continue)
-        assert write.call_count == 2
-
-    def test_cancel_skips_without_claiming_success(self):
-        step, ctx = self._step()
-
-        def write(uri, terminate):
-            step.cancel()
-            assert terminate()
-            return None
-
-        with patch("spotifactory.hardware.rfid.write_uri", side_effect=write), \
-             patch("spotifactory.tasks.base.time.sleep"):
-            assert isinstance(step.run(ctx), Done)
-        assert step.status == "Tag not written"
+        assert reader.writes == [("spotify:album:a", "T")]   # ...but the target was kept
 
 
 # ---------------------------------------------------------------------------

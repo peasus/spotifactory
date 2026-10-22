@@ -331,6 +331,18 @@ def get_now_playing(include_paused: bool = False) -> NowPlayingInfo | None:
     )
 
 
+@_with_auth_retry
+def uri_name(uri: str) -> str:
+    """The name of an album or playlist from its URI."""
+    _, kind, ident = uri.split(":", 2)
+    sp = get_client()
+    if kind == "album":
+        return sp.album(ident)["name"]
+    if kind == "playlist":
+        return sp._get(f"playlists/{ident}", fields="name")["name"]   # see FetchPlaylistInfoStep
+    return kind
+
+
 _album_lengths: dict[str, int] = {}
 
 

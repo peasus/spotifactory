@@ -1,6 +1,9 @@
 from spotifactory.tasks.base import Task
 from spotifactory.tasks.capture.steps import (
     AlbumLabelStep,
+    ChooseTagTargetStep,
+    TagWrittenStep,
+    WriteChosenTagStep,
     ConfirmStep,
     DoneStep,
     FetchArtStep,
@@ -39,4 +42,14 @@ class CapturePlaylistTask(Task):
         ("print",      PrintStep),
         ("scan",       PlaylistScanStep),
         ("done",       PlaylistDoneStep),
+    ]
+
+
+class WriteTagTask(Task):
+    """Menu > Write Tag: put what's playing on a tag, without printing."""
+    name = "write_tag"
+    steps = [
+        ("choose", ChooseTagTargetStep),
+        ("write",  WriteChosenTagStep),
+        ("done",   TagWrittenStep),
     ]

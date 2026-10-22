@@ -168,12 +168,34 @@ class PrintStep(Step):
 _TAG_WRITE_TIMEOUT_SECS = 120.0
 
 
-class _WriteTagStep(Step):
-    """Writes the just-printed album/playlist URI to a tag.
+def _skip_tag_menu():
+    from spotifactory.menu.definitions import ItemDef, MenuDef
+    return MenuDef("Skip the tag?", [
+        ItemDef("No",  action="cancel"),
+        ItemDef("Yes", action="confirm"),
+    ], visible_rows=2, subtitle="Menu > Write Tag later")
 
-    Back skips; gives up after a timeout so the device can't get stuck here.
-    A tag that can't be written shows why and waits for another one.
+
+def _overwrite_menu(has: str):
+    from spotifactory.menu.definitions import ItemDef, MenuDef
+    return MenuDef("Overwrite tag?", [
+        ItemDef("No",  action="cancel"),
+        ItemDef("Yes", action="confirm", data="overwrite"),
+    ], visible_rows=2, subtitle=f"Has {has}")
+
+
+class _WriteTagStep(Step):
+    """Writes an album/playlist URI to a tag.
+
+    Never writes to a tag it hasn't read first: a tag already on the reader
+    (the album that was playing) must be lifted off before a print's tag is
+    written, and a tag that already holds something else is only overwritten
+    if asked. Back asks before skipping; gives up after a timeout so the
+    device can't get stuck here. A tag that can't be written shows why.
     """
+
+    step_name = "scan"     # its name in the task: the prompts come back to it
+    fresh_tag = True       # a tag already on the reader must be lifted off first
 
     def __init__(self) -> None:
         super().__init__()
@@ -187,7 +209,7 @@ class _WriteTagStep(Step):
         raise NotImplementedError
 
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.hardware.rfid import TagWriteError, write_uri
+        from spotifactory.hardware.rfid import read_next, wait_until_clear
 
         self._cancel.clear()
         deadline = time.monotonic() + _TAG_WRITE_TIMEOUT_SECS
@@ -195,27 +217,74 @@ class _WriteTagStep(Step):
         def stop() -> bool:
             return self._cancel.is_set() or time.monotonic() >= deadline
 
-        while not stop():
-            self.status = "Place tag to write"
-            self.artist = "< to skip"
-            try:
-                if write_uri(self._uri(ctx), terminate=stop):
-                    self.artist = ""
-                    return Continue()
-            except TagWriteError as e:
-                print(f"[capture] tag write failed: {e}", flush=True)
-                self.status = "Can't write this tag"
-                self.artist = str(e)
-                self._cancel.wait(3.0)
-            except Exception as e:
-                print(f"[capture] RFID error: {e}", flush=True)
-                self.artist = ""
-                self.show_for(f"RFID error: {e}", 3.0)
-                return Done()
+        uri = self._uri(ctx)
+        again = Continue(next_step=self.step_name)
+        try:
+            offered = ctx.data.pop("tag_offered", None)
+            if offered and ctx.data.pop("selected", None) == "overwrite":
+                return self._write(uri, offered["uid"], stop)
+            # A print's tag goes on a tag placed now, not the one already
+            # there; and a tag we were told not to overwrite has to go.
+            if self.fresh_tag or offered:
+                self.status, self.artist = "Checking reader...", ""
 
+                def seen(card: dict) -> None:
+                    self.status, self.artist = "Lift the tag off", "the reader"
+
+                if not wait_until_clear(terminate=stop, on_seen=seen):
+                    return self._stopped()
+            self.status, self.artist = "Place tag to write", "< to skip"
+            card = read_next(terminate=stop)
+            if card is None:
+                return self._stopped()
+            has = card.get("uri")
+            if has == uri:
+                self.artist = ""
+                self.show_for("Tag already set", 1.5)
+                return Continue()
+            if has:
+                ctx.data["tag_offered"] = card
+                return PushMenu(menu=_overwrite_menu(_describe(has)), on_confirm=again, on_cancel=again)
+            return self._write(uri, card["uid"], stop)
+        except Exception as e:
+            print(f"[capture] RFID error: {e}", flush=True)
+            self.artist = ""
+            self.show_for(f"RFID error: {e}", 3.0)
+            return Done()
+
+    def _write(self, uri: str, uid: str, stop) -> StepOutcome:
+        """Write to the tag we just read, and no other."""
+        from spotifactory.hardware.rfid import TagWriteError, write_uri
+        self.status, self.artist = "Writing tag...", ""
+        try:
+            if write_uri(uri, terminate=stop, uid=uid):
+                print(f"[capture] wrote {uri} to tag {uid}", flush=True)
+                return Continue()
+        except TagWriteError as e:
+            print(f"[capture] tag write failed: {e}", flush=True)
+            self.status, self.artist = "Can't write this tag", str(e)
+            self._cancel.wait(3.0)
+            return Continue(next_step=self.step_name)     # lift it off, try another
+        return self._stopped()
+
+    def _stopped(self) -> StepOutcome:
+        if self._cancel.is_set():                         # Back: check first
+            return PushMenu(menu=_skip_tag_menu(), on_confirm=Done(),
+                            on_cancel=Continue(next_step=self.step_name))
         self.artist = ""
         self.show_for("Tag not written", 2.0)
         return Done()
+
+
+def _describe(uri: str) -> str:
+    """What a tag holds, for the overwrite question."""
+    if not uri.startswith("spotify:"):
+        return "something else"
+    try:
+        from spotifactory.spotify import uri_name
+        return uri_name(uri)
+    except Exception:
+        return "another " + uri.split(":")[1]
 
 
 class ScanStep(_WriteTagStep):
@@ -369,4 +438,65 @@ class PlaylistDoneStep(Step):
         self.artist = f"{result.photos_left} photos left" if result else ""
         self.detail = f"Battery: {result.battery_pct}%" if (result and result.battery_pct is not None) else ""
         time.sleep(3.0)
+        return Done()
+
+
+# ---------------------------------------------------------------------------
+# Write Tag (from the menu): write what's playing to a tag, no print. For
+# fixing a tag that got messed up, or one that was skipped after printing.
+# ---------------------------------------------------------------------------
+
+def _target_menu(targets: list[dict]):
+    from spotifactory.menu.definitions import ItemDef, MenuDef
+    items = [ItemDef(t["label"], action="confirm", data=t) for t in targets]
+    return MenuDef("Write tag for", items + [ItemDef("Cancel", action="cancel")],
+                   visible_rows=min(3, len(items) + 1))
+
+
+class ChooseTagTargetStep(Step):
+    """What's playing: its album, and its playlist if it's playing from one."""
+
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        self.status = "Checking Spotify..."
+        try:
+            from spotifactory.spotify import get_client, uri_name
+            playback = get_client().current_playback()
+        except Exception as e:
+            self.show_for(f"Spotify error: {str(e)[:20]}", 3.0)
+            return Done()
+        item = (playback or {}).get("item") or {}
+        album = item.get("album") or {}
+        targets = []
+        if album.get("uri"):
+            targets.append({"uri": album["uri"], "label": album.get("name") or "This album"})
+        context = (playback or {}).get("context") or {}
+        if context.get("type") == "playlist":
+            try:
+                name = uri_name(context["uri"])
+            except Exception:
+                name = "This playlist"
+            targets.append({"uri": context["uri"], "label": f"Playlist: {name}"})
+        if not targets:
+            self.show_for("Nothing playing", 2.0)
+            return Done()
+        return PushMenu(menu=_target_menu(targets), on_confirm=Continue(), on_cancel=Cancel())
+
+
+class WriteChosenTagStep(_WriteTagStep):
+    """Like the print's tag step, but the tag to fix may already be on the
+    reader: no need to lift it off, the overwrite question covers it."""
+
+    step_name = "write"
+    fresh_tag = False
+
+    def _uri(self, ctx: TaskContext) -> str:
+        # Kept apart: the overwrite question replaces ctx.data["selected"].
+        if "tag_target" not in ctx.data:
+            ctx.data["tag_target"] = ctx.data["selected"]["uri"]
+        return ctx.data["tag_target"]
+
+
+class TagWrittenStep(Step):
+    def run(self, ctx: TaskContext) -> StepOutcome:
+        self.show_for("Tag written!", 2.0)
         return Done()

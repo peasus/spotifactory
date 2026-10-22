@@ -173,22 +173,78 @@ class TagWriteError(Exception):
     """A tag was found but the URI could not be written to it."""
 
 
+def wait_until_clear(
+    terminate: "Callable[[], bool] | None" = None,
+    on_seen: "Callable[[dict], None] | None" = None,
+    settle: float = 1.0,
+    port: str | None = None,
+) -> bool:
+    """Block until no tag is on the reader: True once it's clear, False if
+    terminate() returned True first. on_seen(card) fires if a tag is there
+    (so the screen can ask for it to be lifted off). With nothing on the
+    reader this returns after `settle` seconds."""
+    port = port or current_port()
+    stop = terminate or (lambda: False)
+    state = {"seen": False, "released": False}
+    start = time.monotonic()
+
+    def on_connect(tag) -> bool:
+        state["seen"] = True
+        if on_seen:
+            on_seen(_parse_tag(tag))
+        return True                     # supervise it until it's lifted off
+
+    def on_release(tag) -> None:
+        state["released"] = True
+
+    def done() -> bool:
+        return (stop() or state["released"]
+                or (not state["seen"] and time.monotonic() - start >= settle))
+
+    with nfc.ContactlessFrontend(port) as clf:
+        clf.connect(rdwr={"on-connect": on_connect, "on-release": on_release}, terminate=done)
+    return not stop()
+
+
+def read_next(
+    terminate: "Callable[[], bool] | None" = None,
+    port: str | None = None,
+) -> dict | None:
+    """The next tag on the reader (uid, and uri if it has one), or None if
+    terminate() returned True first. The tag is left where it is."""
+    port = port or current_port()
+    result: list[dict] = []
+
+    def on_connect(tag) -> bool:
+        result.append(_parse_tag(tag))
+        return False
+
+    with nfc.ContactlessFrontend(port) as clf:
+        clf.connect(rdwr={"on-connect": on_connect}, terminate=terminate or (lambda: False))
+    return result[0] if result else None
+
+
 def write_uri(
     uri: str,
     port: str | None = None,
     terminate: "Callable[[], bool] | None" = None,
+    uid: str | None = None,
 ) -> str | None:
-    """Write a URI to the next tag placed on the reader.
+    """Write a URI to a tag on the reader: the one with `uid` if given (other
+    tags are left alone), otherwise the next one.
 
     Returns the tag UID on success, or None if terminate() returned True first.
     Raises TagWriteError if a tag was found but couldn't be written
     (not NDEF-formatted, read-only, or too small for the URI).
     """
     port = port or current_port()
+    stop = terminate or (lambda: False)
     result: list[str] = []
     errors: list[str] = []
 
     def on_connect(tag):
+        if uid and tag.identifier.hex().upper() != uid:
+            return False                # not the tag we checked: leave it be
         if not tag.ndef:
             errors.append("Not NDEF formatted")
             return False
@@ -204,7 +260,10 @@ def write_uri(
         return False
 
     with nfc.ContactlessFrontend(port) as clf:
-        clf.connect(rdwr={"on-connect": on_connect}, terminate=terminate or (lambda: False))
+        while not stop() and not result and not errors:
+            clf.connect(rdwr={"on-connect": on_connect}, terminate=stop)
+            if not result and not errors:
+                time.sleep(0.2)         # a different tag is there: look again shortly
 
     if errors:
         raise TagWriteError(errors[0])
