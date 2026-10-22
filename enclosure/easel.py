@@ -113,11 +113,12 @@ JOY_TILT = 9.0            # degrees: the top moves ~1 mm sideways
 # hole for the stem to tilt in.
 JOY_POCKET_CLEAR = (0.3, 0.2)   # round the housing; over it
 JOY_HOLE_D = 5.0
-# Printed nub (like Adafruit's 4697): a tapered post with arrows on top, a
-# square socket on the stem, and a short sleeve hiding the round section.
+# Printed nub (like Adafruit's 4697): a tapered post with arrows on top and a
+# square socket on the stem; its flat bottom sits on the round section's top
+# (prints flat on the bed, and leaves room to press the stick in).
 NUB_D = (6.5, 6.0)        # bottom, top
 NUB_ABOVE_STEM = 2.0
-NUB_SLEEVE = 0.5          # how far it hangs below the round section's top (1.0 left too little press travel)
+NUB_ENTRY = 0.5           # flared socket entrance: cancels first-layer squish, eases it on
 NUB_SOCKET = 2.53         # square socket, from fit tests: 2.45 wouldn't go on, 2.53 just right, 2.55 loose
 BUTTON_H = 2.46           # measured: plunger top (2.0 was the case, and pressed the buttons)
 # Printed caps for K1-K3: the plunger comes up through an opening in the
@@ -739,13 +740,14 @@ def _nub_letter(letter: str, top: float, cell: float = 0.6):
 def _nub_local(socket: float = NUB_SOCKET, label: str | None = None):
     """Printed joystick nub, upright, z = 0 at the housing's top. A `label`
     (fit tests) replaces the arrows on top with that letter."""
-    z0 = JOY_COLLAR_TOP - NUB_SLEEVE
+    z0 = JOY_COLLAR_TOP
     h = JOY_STEM_TOP + NUB_ABOVE_STEM - z0
     nub = Pos(0, 0, z0) * Cone(NUB_D[0] / 2, NUB_D[1] / 2, h, align=C)
     nub = fillet(nub.edges().group_by(Axis.Z)[-1], radius=0.6)
-    # Socket: the square sections, then the sleeve round the round section.
-    nub -= Pos(0, 0, JOY_COLLAR_TOP - 0.01) * Box(socket, socket, JOY_STEM_TOP - JOY_COLLAR_TOP + 0.2, align=C)
-    nub -= Pos(0, 0, z0 - 1) * Cylinder(JOY_COLLAR_D / 2 + 0.3, NUB_SLEEVE + 1, align=C)
+    # Socket: the square sections, with a flared entrance at the bottom.
+    nub -= Pos(0, 0, z0 - 0.01) * Box(socket, socket, JOY_STEM_TOP - z0 + 0.2, align=C)
+    corner = socket / 2 * 2 ** 0.5
+    nub -= Pos(0, 0, z0 - 0.01) * Cone(corner + 0.15, socket / 2, NUB_ENTRY + 0.01, align=C)
     # Four raised arrows on top, pointing the way the stick goes.
     top = z0 + h
     if label:
@@ -916,7 +918,7 @@ def print_orientation():
         "faceplate": fp_flat,
         "spacers": spacers(),
         "keepers": keepers_flat(),
-        "nub": Pos(0, 0, -(JOY_COLLAR_TOP - NUB_SLEEVE)) * _nub_local(),
+        "nub": Pos(0, 0, -JOY_COLLAR_TOP) * _nub_local(),
         "buttoncaps": button_caps_flat(),
         "baseplate": Pos(0, 0, PLATE_T) * baseplate(),
     }
