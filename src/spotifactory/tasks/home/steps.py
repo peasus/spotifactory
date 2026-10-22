@@ -13,6 +13,7 @@ from spotifactory.tasks.base import (
 
 _POLL_INTERVAL_SECS = 5.0   # how often to refresh now-playing display from Spotify (only while playing)
 _SCREEN_OFF_SECS = 600.0    # blank display after this many idle seconds
+_CARRY_SECS = 2.0           # after the menu: trust the remembered screen this long for the tag to be seen again
 _SHUFFLE_SETTLE_SECS = 3.0  # Spotify can report the old shuffle/repeat state briefly after a change
 _POLL_ERROR_LOG_SECS = 60.0  # log failed polls at most this often
 
@@ -68,7 +69,16 @@ def _secs(ms: int) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
+# What the home screen showed, kept across a trip to the menu so it comes back
+# as it was instead of blank until the reader sees the tag again.
+_CARRY_FIELDS = ("status", "artist", "shuffle_active", "repeat_state", "is_playing",
+                 "progress_ms", "duration_ms", "progress_at", "track_number",
+                 "total_tracks", "album_name", "album_uri", "album_length_ms",
+                 "tag_active", "tag_uri")
+
+
 class HomeScanStep(Step):
+    _carried: dict | None = None
     """Event-driven RFID home screen.
 
     Uses nfcpy supervision mode so the PN532 fires on_place/on_remove natively —
@@ -89,6 +99,7 @@ class HomeScanStep(Step):
         self.shuffle_active: bool = False
         self.screen_off: bool = False
         self.tag_active: bool = False        # a tag is on the reader (the box is in use)
+        self.tag_uri: str | None = None
         self._idle_since: float = time.monotonic()
         self._shuffle_set_at: float = 0.0
         self.repeat_state: str = "off"       # "off", "context" or "track"
@@ -104,6 +115,11 @@ class HomeScanStep(Step):
         self.album_name: str = ""
         self.album_uri: str | None = None
         self.album_length_ms: int | None = None
+
+    @classmethod
+    def remember(cls, step: "HomeScanStep") -> None:
+        """Keep `step`'s screen for the next home screen (leaving for the menu)."""
+        cls._carried = {k: getattr(step, k) for k in _CARRY_FIELDS} if step.tag_active else None
 
     def set_shuffle(self, active: bool) -> None:
         """Show a shuffle state we just set; polls won't override it while Spotify settles."""
@@ -149,7 +165,14 @@ class HomeScanStep(Step):
         self.shuffle_active = False
         self.screen_off = False
         self.tag_active = False
+        self.tag_uri = None
         self._idle_since = time.monotonic()
+        carried, HomeScanStep._carried = HomeScanStep._carried, None
+        carry_until = 0.0
+        if carried:
+            for k, v in carried.items():
+                setattr(self, k, v)
+            carry_until = float("inf")         # the wait starts once the reader is watching
 
         _active_uri: str | None = None
         _soco_speaker: str | None = None  # set when active device is Sonos (restricted)
@@ -205,17 +228,21 @@ class HomeScanStep(Step):
                 playlog.error(e)
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri, _soco_speaker, last_poll
+            nonlocal _active_uri, _soco_speaker, last_poll, carry_until
             uri = card.get("uri")
             if not uri:
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
             playlog.reset(uri)
+            same = carry_until and uri == self.tag_uri    # back from the menu, same album
+            carry_until = 0.0
             self.tag_active = True
+            self.tag_uri = uri
             self.screen_off = False
-            self.status = "Loading..."
-            self.artist = ""
+            if not same:
+                self.status = "Loading..."
+                self.artist = ""
             # Poll as soon as possible — on_poll now guards against resetting "Loading..."
             # to "Place tag..." if Spotify hasn't reflected the new state yet.
             last_poll = time.monotonic() - _POLL_INTERVAL_SECS
@@ -333,6 +360,7 @@ class HomeScanStep(Step):
             _active_uri = None
             _soco_speaker = None
             self.tag_active = False
+            self.tag_uri = None
             self.status = "Place tag..."
             self.artist = ""
             self.shuffle_active = False
@@ -351,8 +379,21 @@ class HomeScanStep(Step):
                 self._sim_tag = None
                 on_place({"uid": f"sim:{sim}", "uri": sim})
 
+        def check_carry() -> None:
+            nonlocal carry_until
+            # The remembered screen, but its tag hasn't turned up: it was lifted
+            # while in the menu.
+            if carry_until == float("inf"):
+                carry_until = time.monotonic() + _CARRY_SECS
+            if carry_until and _active_uri is None and time.monotonic() >= carry_until:
+                carry_until = 0.0
+                self.tag_active, self.tag_uri, self.is_playing = False, None, False
+                self.status, self.artist = "Place tag...", ""
+                self.shuffle_active, self.repeat_state = False, "off"
+
         def terminate() -> bool:
             check_sim()
+            check_carry()
             on_poll()
             check_idle()
             return self._cancel.is_set()

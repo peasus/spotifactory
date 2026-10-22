@@ -132,7 +132,11 @@ class Runner:
     def _open_menu_from_home(self) -> None:
         if self._wake_if_sleeping():
             return
-        self._task.current_step.cancel()     # the home task ends; the menu shows
+        from spotifactory.tasks.home.steps import HomeScanStep
+        step = self._task.current_step
+        if isinstance(step, HomeScanStep):
+            HomeScanStep.remember(step)      # so it comes back as it was
+        step.cancel()                        # the home task ends; the menu shows
 
     def handle_down(self) -> None:
         self._last_input = time.monotonic()
@@ -743,8 +747,8 @@ class Runner:
         d = self.display
         d.clear()
         scrub = self._seek_target is not None or time.monotonic() < self._seek_shown_until
-        # The time and album screens need something playing; scrubbing shows the time.
-        mode = self._display_mode if getattr(step, "tag_active", False) else "now"
+        # Scrubbing from the album screen shows the time.
+        mode = self._display_mode
         if mode == "album" and scrub:
             mode = "time"
         if mode == "time":
@@ -782,16 +786,17 @@ class Runner:
         """CD-player time display: track number, the repeat and shuffle flags,
         big elapsed time (where we'll land, while scrubbing) and a bar."""
         d = self.display
+        playing = getattr(step, "tag_active", False)
         pos = self._seek_target if self._seek_target is not None else step.position_ms()
-        dur = step.duration_ms
-        track = step.track_number
+        dur = step.duration_ms if playing else 0
+        track = step.track_number if playing else None
         lcd.tiny_text(d, 2, 19, "TRACK")
         lcd.seg_text(d, 2, 27, f"{track:02d}" if track else "--", w=9, h=17, gap=3)
         flags = ("RPT 1" if repeat == "track" else "RPT", "RND")
         x = 127 - lcd.flags_width(flags)
         x = lcd.flag(d, x, 0, flags[0], repeat != "off") + 3
         lcd.flag(d, x, 0, flags[1], shuffle)
-        t = _clock(pos)
+        t = _clock(pos) if playing else "-:--"
         lcd.seg_text(d, 127 - lcd.seg_width(t, 13, 4), 19, t)
         d.draw_rect(0, 62, 127, 62)                                   # progress
         if dur:
@@ -800,6 +805,11 @@ class Runner:
     def _render_album(self, step, artist: str) -> None:
         """Album, artist, which track of how many, and the album's length."""
         d = self.display
+        if not getattr(step, "tag_active", False):
+            d.draw_text(2, 0, step.status)            # "Place tag..."
+            lcd.tiny_text(d, 2, 33, "TRACK")
+            lcd.seg_text(d, 2, 41, "--", w=8, h=17, gap=3)
+            return
         d.draw_text(2, 0, step.album_name or step.status)
         d.draw_text(2, 14, artist)
         track, total = step.track_number, step.total_tracks

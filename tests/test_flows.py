@@ -788,10 +788,14 @@ class TestDisplayModes:
         r._render_home()
         assert self._texts(r)[:2] == ["Album", "Artist"]
 
-    def test_without_a_tag_it_shows_place_tag(self):
+    def test_screens_cycle_with_nothing_playing(self):
         r, step = self._runner()
         step.tag_active, step.status, step.artist = False, "Place tag...", ""
-        r._display_mode = "time"
+        r.handle_select()
+        assert r._display_mode == "time"
+        r._render_home()
+        assert self._texts(r) == []             # dashes, in seven-segment
+        r.handle_select()
         r._render_home()
         assert self._texts(r) == ["Place tag..."]
 
@@ -813,3 +817,53 @@ def test_album_length_adds_up_every_page_and_is_remembered():
         assert spotify.album_length_ms("spotify:album:x") == 6
         assert spotify.album_length_ms("spotify:album:x") == 6
     sp.album_tracks.assert_called_once()
+
+
+class TestHomeComesBackFromTheMenu:
+    """Leaving for the menu and back: the home screen returns as it was, not
+    blank until the reader sees the tag again."""
+
+    def _start(self, monkeypatch):
+        from spotifactory.hardware import rfid
+        from spotifactory.tasks.home.steps import HomeScanStep
+        reader = {}
+
+        def fake_watch(on_place, on_remove, terminate):
+            reader["place"] = on_place
+            while not terminate():
+                time.sleep(0.01)
+
+        monkeypatch.setattr(rfid, "watch_tags", fake_watch)
+        monkeypatch.setattr("spotifactory.spotify.get_now_playing", lambda include_paused=False: None)
+        step = HomeScanStep()
+        threading.Thread(target=step.run, args=(TaskContext(dry_run=True),), daemon=True).start()
+        assert _wait_for(lambda: "place" in reader)
+        return step, reader
+
+    def _leave_with_a_tag_down(self):
+        from spotifactory.tasks.home.steps import HomeScanStep
+        old = HomeScanStep()
+        old.tag_active, old.tag_uri = True, "spotify:album:x"
+        old.status, old.artist, old.track_number = "Song", "Artist", 3
+        HomeScanStep.remember(old)
+
+    def test_comes_back_as_it_was_and_stays_when_the_tag_is_seen(self, monkeypatch):
+        self._leave_with_a_tag_down()
+        step, reader = self._start(monkeypatch)
+        assert (step.status, step.artist, step.track_number, step.tag_active) == ("Song", "Artist", 3, True)
+        reader["place"]({"uid": "u", "uri": "spotify:album:x"})
+        assert step.status == "Song"            # no "Loading..." flash for the same album
+        step.cancel()
+
+    def test_falls_back_to_place_tag_if_the_tag_was_lifted(self, monkeypatch):
+        monkeypatch.setattr("spotifactory.tasks.home.steps._CARRY_SECS", 0.1)
+        self._leave_with_a_tag_down()
+        step, _ = self._start(monkeypatch)
+        assert _wait_for(lambda: not step.tag_active)
+        assert step.status == "Place tag..."
+        step.cancel()
+
+    def test_nothing_carried_without_a_tag(self):
+        from spotifactory.tasks.home.steps import HomeScanStep
+        HomeScanStep.remember(HomeScanStep())
+        assert HomeScanStep._carried is None
