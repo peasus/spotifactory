@@ -8,12 +8,12 @@ MENUS: dict[str, MenuDef] = {
     "main": MenuDef("Main Menu", [
         ItemDef("Print Album",    task=CaptureTask),
         ItemDef("Print Playlist", task=CapturePlaylistTask),
-        ItemDef("Write Tag",      task=WriteTagTask),
         ItemDef("Choose Speaker", task=SpeakerTask),
         ItemDef("Pair Device",    task=BluetoothTask),
         ItemDef("Connect Spotify", task=ReAuthTask),
         ItemDef("Scan Tag",       action="home"),
         ItemDef("Check for Updates", action="update"),
+        ItemDef("Write Tag",      task=WriteTagTask),     # fixing a tag: rarely needed
         ItemDef("Reboot",         submenu="confirm_reboot"),
         ItemDef("Shutdown",       submenu="confirm_shutdown"),
     ]),
