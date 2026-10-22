@@ -192,6 +192,12 @@ def main() -> int:
     pressed_nubs = [Pos(dz.X, dz.Y, dz.Z) * n for n in (easel.nub(), easel.nub_tilted(1, "x"), easel.nub_tilted(-1, "y"))]
     press_hits = overlap(fp, pressed_nubs)
     check(press_hits < TOUCH, f"joystick nub can be pressed in {press} mm, upright or leaning ({press_hits:.2f} mm³)")
+    # The centre click moves the stem down through its round section, which
+    # stays put: the nub must clear that, pressed, or it pushes on the wrong part.
+    jp = (fdir * Pos(0, 0, -easel.JOY_PRESS)).position - fdir.position
+    collar = fdir * Pos(*easel.JOY, easel.HAT_TOP + easel.JOY_HOUSING_H) * easel.joy_collar()
+    collar_hit = overlap(collar, Pos(jp.X, jp.Y, jp.Z) * easel.nub())
+    check(collar_hit < TOUCH, f"pressed nub clears the stem's round section ({collar_hit:.2f} mm³)")
     caps = easel.button_caps()
     f = easel.hat_frame()
     down = (f * Pos(0, 0, -0.25)).position - f.position             # pressed: a switch's travel

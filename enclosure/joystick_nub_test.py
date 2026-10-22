@@ -16,7 +16,7 @@ SOCKETS = (2.47, 2.50, 2.53)          # square socket, mm; left to right (round 
 PITCH = 10.0
 
 if __name__ == "__main__":
-    lift = -easel.JOY_COLLAR_TOP                            # bottom on the bed
+    lift = -easel.NUB_BOTTOM                                # bottom on the bed
     letters = "ABCD"
     parts = [Pos((i - (len(SOCKETS) - 1) / 2) * PITCH, 0, lift) * easel._nub_local(s, label=letters[i])
              for i, s in enumerate(SOCKETS)]

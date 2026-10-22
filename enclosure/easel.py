@@ -108,17 +108,20 @@ JOY_STEM_TOP = 6.61       # top of the stem
 JOY_SQ = 2.5              # the two square sections the nub grips (a 1.65 neck between)
 JOY_COLLAR_TOP = 2.7      # top of the 3.8 mm round section the nub rests on
 JOY_COLLAR_D = 3.8
+JOY_PRESS = 0.5           # centre click: the stem slides down through the round section (which stays put)
 JOY_TILT = 9.0            # degrees: the top moves ~1 mm sideways
 # Faceplate over the joystick: a pocket the housing tucks up into, and a round
 # hole for the stem to tilt in.
 JOY_POCKET_CLEAR = (0.3, 0.2)   # round the housing; over it
 JOY_HOLE_D = 5.0
 # Printed nub (like Adafruit's 4697): a tapered post with arrows on top and a
-# square socket on the stem; its flat bottom sits on the round section's top
-# (prints flat on the bed, and leaves room to press the stick in).
+# square socket on the stem. It holds only the stem: its flat bottom stays
+# NUB_GAP above the round section, which doesn't move when the stick is pressed.
 NUB_D = (6.5, 6.0)        # bottom, top
 NUB_ABOVE_STEM = 2.0
 NUB_ENTRY = 0.5           # flared socket entrance: cancels first-layer squish, eases it on
+NUB_GAP = JOY_PRESS + 0.3                 # nub bottom above the round section: the press, and margin
+NUB_BOTTOM = JOY_COLLAR_TOP + NUB_GAP     # above the housing's top
 NUB_SOCKET = 2.53         # square socket, from fit tests: 2.45 wouldn't go on, 2.53 just right, 2.55 loose
 BUTTON_H = 2.46           # measured: plunger top (2.0 was the case, and pressed the buttons)
 # Printed caps for K1-K3: the plunger comes up through an opening in the
@@ -708,9 +711,15 @@ def button_caps_flat():
     return out
 
 
+def joy_collar():
+    """The round section round the stem's foot (z = 0 at the housing's top):
+    it tilts with the stick but doesn't go down when it's pressed."""
+    return Cylinder(JOY_COLLAR_D / 2, JOY_COLLAR_TOP, align=C)
+
+
 def joy_stem():
-    """The joystick's stem above its housing (z = 0 at the housing's top)."""
-    stem = Cylinder(JOY_COLLAR_D / 2, JOY_COLLAR_TOP, align=C)
+    """The joystick's stem above its housing, with its round section."""
+    stem = joy_collar()
     stem += Pos(0, 0, JOY_COLLAR_TOP) * Box(JOY_SQ, JOY_SQ, JOY_STEM_TOP - JOY_COLLAR_TOP, align=C)
     return stem
 
@@ -740,7 +749,7 @@ def _nub_letter(letter: str, top: float, cell: float = 0.6):
 def _nub_local(socket: float = NUB_SOCKET, label: str | None = None):
     """Printed joystick nub, upright, z = 0 at the housing's top. A `label`
     (fit tests) replaces the arrows on top with that letter."""
-    z0 = JOY_COLLAR_TOP
+    z0 = NUB_BOTTOM
     h = JOY_STEM_TOP + NUB_ABOVE_STEM - z0
     nub = Pos(0, 0, z0) * Cone(NUB_D[0] / 2, NUB_D[1] / 2, h, align=C)
     nub = fillet(nub.edges().group_by(Axis.Z)[-1], radius=0.6)
@@ -918,7 +927,7 @@ def print_orientation():
         "faceplate": fp_flat,
         "spacers": spacers(),
         "keepers": keepers_flat(),
-        "nub": Pos(0, 0, -JOY_COLLAR_TOP) * _nub_local(),
+        "nub": Pos(0, 0, -NUB_BOTTOM) * _nub_local(),
         "buttoncaps": button_caps_flat(),
         "baseplate": Pos(0, 0, PLATE_T) * baseplate(),
     }
