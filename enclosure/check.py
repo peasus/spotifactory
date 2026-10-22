@@ -218,6 +218,20 @@ def main() -> int:
     check(switch_hits < TOUCH, f"pressed caps touch only the plungers, not the switch bodies ({switch_hits:.2f} mm³)")
     rest = sum(overlap(f * Pos(bx, by, easel.HAT_TOP) * easel.switch(), caps) for bx, by in easel.BUTTONS)
     check(rest < TOUCH, f"caps rest on the plungers without pressing them ({rest:.2f} mm³)")
+    # Pressed at one end: the cap tips about its far flange end until its
+    # middle (on the plunger) has gone down the switch's travel; it mustn't
+    # catch on the faceplate on the way.
+    fw, _, ft = easel.CAP_FLANGE
+    tip = math.degrees(math.atan(0.3 / (fw / 2)))
+    tipped = []
+    for (bx, by), cp in zip(easel.BUTTONS, caps):
+        local = f.inverse() * cp
+        z = easel.HAT_TOP + easel.BUTTON_H
+        for side in (-1, 1):
+            px = bx - side * fw / 2
+            tipped.append(f * Pos(px, by, z) * Rot(0, side * tip, 0) * Pos(-px, -by, -z) * local)
+    tip_hits = overlap(fp, tipped)
+    check(tip_hits < TOUCH, f"caps pressed at either end tip down without catching ({tip_hits:.2f} mm³)")
     stem_hit = overlap(fp, inside["buttons"]) + sum(overlap(fp, easel.hat_frame() * Pos(*easel.JOY, easel.HAT_TOP + easel.JOY_HOUSING_H) * (Rot(easel.JOY_TILT * s, 0, 0) if ax == "x" else Rot(0, easel.JOY_TILT * s, 0)) * easel.joy_stem()) for s in (-1, 1) for ax in ("x", "y"))
     check(stem_hit < TOUCH, f"joystick stem tilts freely in the faceplate's hole ({stem_hit:.2f} mm³)")
     shell_end = inside["port"][0].bounding_box().max.Y

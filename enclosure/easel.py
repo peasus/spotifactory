@@ -128,8 +128,8 @@ BUTTON_H = 2.46           # measured: plunger top (2.0 was the case, and pressed
 # flange and pushes on the cap's body, so the flange sits beside the plunger
 # (trapped under the faceplate) rather than on top of it; the body comes up
 # through the faceplate with a raised icon.
-CAP_BODY = (5.0, 3.4)     # x by y, through the faceplate
-CAP_FLANGE = (6.4, 4.8, 0.5)
+CAP_BODY = (7.0, 3.8)     # x by y, through the faceplate (5.0 x 3.4 felt small)
+CAP_FLANGE = (8.4, 4.8, 0.5)
 CAP_OPENING = 3.3         # square, round the plunger and its lip, whichever way it's turned
 CAP_ABOVE = 1.2           # how far a cap stands above the faceplate
 CAP_CLEAR = 0.2           # round its body, in the faceplate's hole
