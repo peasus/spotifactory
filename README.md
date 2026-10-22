@@ -126,6 +126,10 @@ The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
 straight cable: a USB-C plug up to 12.5 mm wide and 6.5 mm thick (plug and
 strain relief up to 28 mm long), and any straight micro-USB plug at the Pi.
 
+Before assembly, set the screen HAT to I2C: both switches on its back (SW1,
+SW2) to 0. The app talks to the screen over I2C only (at 400 kHz, which setup
+configures).
+
 Assembly order, with the body upside down or on its back:
 
 1. Plug the right-angle USB-C cable into the reader. Bring the reader in from

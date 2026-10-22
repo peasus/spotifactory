@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Bring the system in line with this checkout: the systemd units and the sudo
-# rule. Idempotent; setup.sh runs it, and so does every auto-update, so a
+# Bring the system in line with this checkout: the systemd units, the sudo
+# rule and the boot config. Idempotent; setup.sh runs it, and so does every auto-update, so a
 # change here reaches boxes that are already out in the world.
 #   sudo bash deploy/upgrade.sh APP_USER
 set -euo pipefail
@@ -30,3 +30,14 @@ systemctl enable --quiet spotifactory
 systemctl enable --quiet --now spotifactory-update.timer
 
 SUDO_USER="$APP_USER" bash "$REPO_DIR/deploy/sudoers.sh"
+
+# The OLED's I2C bus at 400 kHz (the Pi's default is 100): a full screen
+# update takes 38 ms instead of 159, and the app reads the buttons in the
+# same loop. The screen is the only thing on this bus. Takes effect at the
+# next boot.
+BOOT_CONFIG=/boot/firmware/config.txt
+[ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
+if [ -f "$BOOT_CONFIG" ] && ! grep -q "^dtparam=i2c_arm_baudrate=" "$BOOT_CONFIG"; then
+  echo "dtparam=i2c_arm_baudrate=400000" >> "$BOOT_CONFIG"
+  echo "==> I2C at 400 kHz from the next reboot"
+fi
