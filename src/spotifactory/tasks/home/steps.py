@@ -252,6 +252,8 @@ class HomeScanStep(Step):
             try:
                 import spotipy
 
+                from spotifactory.connect import ConnectError
+                from spotifactory.connect import available as connect_available
                 from spotifactory.spotify import (
                     find_device_by_name,
                     get_active_device,
@@ -259,6 +261,7 @@ class HomeScanStep(Step):
                     get_current_context,
                     get_playback_device,
                     resolve_chosen_device,
+                    start_playback,
                 )
 
                 # Check if we're already in this album context (even if paused).
@@ -266,11 +269,8 @@ class HomeScanStep(Step):
                 _ctx_uri, _alb_uri = get_current_context()
                 _in_context = (_ctx_uri == uri or _alb_uri == uri)
 
-                def _play(device_id: str) -> None:
-                    if _in_context:
-                        get_client().start_playback(device_id=device_id)
-                    else:
-                        get_client().start_playback(context_uri=uri, device_id=device_id)
+                def _play(device_id: str, restricted: bool | None = None) -> None:
+                    start_playback(device_id, None if _in_context else uri, restricted=restricted)
 
                 verb = "resume" if _in_context else "start"
 
@@ -289,8 +289,9 @@ class HomeScanStep(Step):
                     print(f"[home] {verb} {uri} on chosen device {label!r} ({dev_id})", flush=True)
                     try:
                         _play(dev_id)
-                    except spotipy.SpotifyException as e:
-                        # Idle Echos stay listed but 404 until woken.
+                    except (spotipy.SpotifyException, ConnectError) as e:
+                        # Idle Echos stay listed but 404 until woken; a Sonos
+                        # can refuse the Connect route the same way.
                         print(f"[home] chosen device {label!r} didn't respond: {e}", flush=True)
                         self.status = label
                         self.artist = "not responding"
@@ -312,6 +313,13 @@ class HomeScanStep(Step):
 
                 # Tier 3: Fall back to active Spotify device (Raspotify not yet auth'd)
                 dev = get_playback_device()
+                if dev.restricted and dev.device_id and connect_available():
+                    # Sonos S2 playing already: start the tag there through the
+                    # Connect route (spotifactory/connect.py).
+                    print(f"[home] {verb} {uri} on restricted {dev.name!r} via Connect", flush=True)
+                    _play(dev.device_id, restricted=True)
+                    _soco_speaker = None
+                    return
                 if dev.restricted:
                     # Sonos S2: programmatic play not supported (see docs/sonos.md).
                     print(f"[home] device {dev.name!r} is restricted — pause only via SoCo", flush=True)
@@ -353,8 +361,8 @@ class HomeScanStep(Step):
                     pause_speaker(_soco_speaker)
                 else:
                     try:
-                        from spotifactory.spotify import get_client
-                        get_client().pause_playback()
+                        from spotifactory.spotify import pause
+                        pause()
                     except Exception as e:
                         print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None

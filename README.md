@@ -152,6 +152,7 @@ Assembly order, with the body upside down or on its back:
 | `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
 | `deploy/` | Pi setup script, systemd unit, auth relay Worker |
 | `enclosure/` | Case model, checks and parts list |
+| `connect-helper/` | Rust helper that plays Spotify on Sonos speakers (experimental) |
 | `docs/sonos.md` | What does and doesn't work with Sonos speakers |
 
 ## License
