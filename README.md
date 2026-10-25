@@ -1,5 +1,7 @@
 # Spotifactory
 
+[spotifactory.com](https://spotifactory.com) · website source in `site/` (see `docs/website.md`)
+
 A Raspberry Pi music box that plays albums from instant photos. Print an
 album's cover on an Instax Square printer, stick an NFC tag on the back, and
 from then on standing that photo on Spotifactory plays the album; lifting it

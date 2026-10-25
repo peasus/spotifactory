@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191414">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://spotifactory.com/">
+<meta property="og:title" content="Spotifactory">
+<meta property="og:description" content="A small wooden music box that plays albums from instant photos. Stand a photo on it to play the album; lift it off to pause.">
+<meta property="og:url" content="https://spotifactory.com/">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://spotifactory.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<title>Spotifactory</title>
+<meta name="description" content="A small wooden music box that plays albums from instant photos. Stand a photo on it to play the album; lift it off to pause.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
+<style>
+body { margin: 0; }
+img { max-width: 100%; }
+/* Layout: a dark listening room. The easel and its photo carry the hero; wood and photo-paper are the only warm materials; one paper band for the hands-on part. */
+:root {
+  --ink: #191414;          /* brand ink, page ground */
+  --ink-2: #221d1d;        /* raised surfaces */
+  --ink-3: #2e2727;        /* hairlines on ink */
+  --green: #1DB96E;        /* brand green, used sparingly */
+  --green-deep: #128A52;   /* green on paper */
+  --paper: #f7f4ef;        /* Instax film white, warm */
+  --paper-2: #ebe5dc;
+  --fg: #f3efe9;           /* text on ink */
+  --muted: #a89f97;        /* secondary text on ink */
+  --fg-paper: #191414;
+  --muted-paper: #625955;
+  --wood: #c8955e;
+  --wood-hi: #ddb07c;
+  --wood-lo: #9c6c3c;
+  --oled: #e9f1ff;
+
+  --f-display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
+  --f-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --f-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+
+  --step--1: 0.875rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.3rem;
+  --step-2: clamp(1.6rem, 1.2rem + 1.6vw, 2.3rem);
+  --step-3: clamp(2.6rem, 1.6rem + 4.4vw, 5rem);
+
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--ink);
+  color: var(--fg);
+  font: 400 var(--step-0)/1.6 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.05; }
+p { margin: 0; }
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 4px; }
+.wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+}
+.eyebrow {
+  font: 500 0.78rem/1 var(--f-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- header ---------- */
+.top { padding-block: 22px; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.lockup { display: block; height: 38px; width: auto; }
+.lockup .spoti { fill: var(--fg); }
+.lockup .factory { fill: var(--green); }
+.nav { display: flex; gap: 22px; flex-wrap: wrap; font-size: var(--step--1); }
+.nav a { text-decoration: none; color: var(--muted); }
+.nav a:hover { color: var(--fg); }
+
+/* ---------- hero ---------- */
+.hero { padding-block: 32px 72px; }
+.hero .wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
+}
+.hero h1 { font-size: var(--step-3); font-weight: 800; letter-spacing: -0.03em; }
+.hero h1 em { font-style: normal; color: var(--green); }
+.hero .lede { margin-top: 22px; font-size: var(--step-1); line-height: 1.5; color: var(--muted); max-width: 32ch; }
+.hero .lede strong { color: var(--fg); font-weight: 500; }
+.ctas { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 22px; border-radius: 999px;
+  font: 700 var(--step--1)/1 var(--f-body); text-decoration: none;
+  transition: transform .15s ease, background-color .15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--green); color: var(--ink); }
+.btn-ghost { border: 1px solid var(--ink-3); color: var(--fg); }
+.btn-ghost:hover { background: var(--ink-2); }
+.hero .fine { margin-top: 18px; font-size: 0.8rem; color: var(--muted); }
+
+.stage { position: relative; max-width: 100%; }
+.stage svg { display: block; width: 100%; height: auto; max-width: 520px; margin-inline: auto; }
+
+/* easel animation: one 10s loop, photo down, playing, photo up, paused */
+.photo { animation: drop 10s cubic-bezier(.5,0,.2,1) infinite; }
+.photo-shadow { animation: shadow 10s cubic-bezier(.5,0,.2,1) infinite; transform-origin: 200px 300px; }
+.scr-idle { animation: idle 10s steps(1) infinite; }
+.scr-play { animation: play 10s steps(1) infinite; }
+.scr-pause { animation: pause 10s steps(1) infinite; }
+.waves { animation: waves 10s ease-out infinite; }
+.progress { animation: progress 10s linear infinite; transform-origin: 0 0; transform-box: fill-box; }
+@keyframes drop {
+  0%, 6% { transform: translateY(-46px); }
+  16%, 70% { transform: translateY(0); }
+  80%, 100% { transform: translateY(-46px); }
+}
+@keyframes shadow {
+  0%, 6% { opacity: .25; transform: scaleX(.8); }
+  16%, 70% { opacity: .55; transform: scaleX(1); }
+  80%, 100% { opacity: .25; transform: scaleX(.8); }
+}
+@keyframes idle { 0% { opacity: 1; } 17% { opacity: 0; } 92% { opacity: 1; } }
+@keyframes play { 0% { opacity: 0; } 17% { opacity: 1; } 74% { opacity: 0; } }
+@keyframes pause { 0% { opacity: 0; } 74% { opacity: 1; } 92% { opacity: 0; } }
+@keyframes waves { 0%, 14% { opacity: 0; } 17% { opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes progress { 0%, 17% { transform: scaleX(.18); } 72%, 100% { transform: scaleX(.52); } }
+@media (prefers-reduced-motion: reduce) {
+  .photo, .photo-shadow, .waves, .progress, .scr-idle, .scr-play, .scr-pause { animation: none; }
+  .scr-idle, .scr-pause, .waves { opacity: 0; }
+  .scr-play { opacity: 1; }
+  .progress { transform: scaleX(.4); }
+}
+
+/* ---------- section scaffolding ---------- */
+section { padding-block: 88px; }
+.sec-head { display: grid; gap: 14px; max-width: 46ch; margin-bottom: 48px; }
+.sec-head h2 { font-size: var(--step-2); font-weight: 700; letter-spacing: -0.02em; }
+.sec-head p { color: var(--muted); }
+
+/* ---------- steps ---------- */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
+.step { border-top: 1px solid var(--ink-3); padding-top: 22px; display: grid; gap: 10px; align-content: start; counter-increment: step; }
+.step::before {
+  content: counter(step);
+  font: 800 2.6rem/1 var(--f-display);
+  color: var(--green);
+}
+.step h3 { font-size: var(--step-1); font-weight: 700; }
+.step p { color: var(--muted); }
+.step kbd, .step code { font-family: var(--f-mono); font-size: .88em; color: var(--fg); }
+
+/* ---------- shelf (paper band) ---------- */
+.paper { background: var(--paper); color: var(--fg-paper); }
+.paper .eyebrow { color: var(--muted-paper); }
+.paper .sec-head p { color: var(--muted-paper); }
+.shelf {
+  display: flex; gap: 22px; justify-content: center; flex-wrap: wrap;
+  padding-block: 8px 30px;
+}
+.polaroid {
+  width: 168px; max-width: 100%;
+  background: #fff;
+  padding: 12px 12px 0;
+  border-radius: 4px;
+  box-shadow: 0 1px 1px rgba(25,20,20,.08), 0 10px 24px -8px rgba(25,20,20,.35);
+  display: flex; flex-direction: column;
+  transform: rotate(var(--r, 0deg));
+  transition: transform .25s ease;
+}
+.polaroid:hover { transform: rotate(0deg) translateY(-6px); }
+.polaroid .art { flex: none; aspect-ratio: 1; width: 100%; border-radius: 1px; position: relative; overflow: hidden; }
+.polaroid figcaption {
+  height: 3.4rem; display: flex; align-items: center; justify-content: center;
+  font: 700 1.25rem/1 var(--f-hand); color: #2b2b3a;
+  padding-inline: 4px; text-align: center;
+}
+.art-1 { background:
+  radial-gradient(circle at 50% 120%, #f6c35a 0 38%, transparent 38.5%),
+  linear-gradient(#e9603b 0 58%, #23354d 58%); }
+.art-2 { background:
+  repeating-linear-gradient(90deg, #0f3b3a 0 14%, #1a6b5f 14% 28%, #f0e6d2 28% 30%); }
+.art-3 { background:
+  radial-gradient(circle at 30% 35%, #ffd8c8 0 18%, transparent 18.5%),
+  radial-gradient(circle at 68% 62%, #c33b54 0 30%, transparent 30.5%),
+  #2a2240; }
+.art-4 { background:
+  conic-gradient(from 45deg at 50% 50%, #f3e9d2 0 25%, #191414 0 50%, #f3e9d2 0 75%, #191414 0); }
+.art-5 { background:
+  linear-gradient(160deg, #7cc6e8, #3a6fb0 55%, #1d2b5c); }
+.art-5::after { content: ""; position: absolute; inset: 58% -10% -10%; background: #f5efe2; border-radius: 50% 50% 0 0 / 30% 30% 0 0; }
+
+.tag-note {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px;
+  border-top: 1px solid var(--paper-2); padding-top: 40px; margin-top: 24px;
+}
+.tag-note h3 { font-size: var(--step-1); font-weight: 700; margin-bottom: 8px; }
+.tag-note p { color: var(--muted-paper); }
+.mono-chip { font: 500 .85em var(--f-mono); background: var(--paper-2); padding: 1px 6px; border-radius: 4px; color: var(--fg-paper); white-space: nowrap; }
+
+/* ---------- controls ---------- */
+.controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; align-items: center; }
+.oled-frame {
+  background: #0b0909; border-radius: 10px; padding: 18px;
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+  max-width: 440px; width: 100%;
+}
+.oled {
+  aspect-ratio: 2 / 1; width: 100%;
+  background: #000; color: var(--oled);
+  font-family: var(--f-mono);
+  padding: 5% 6%;
+  display: grid; grid-template-rows: auto 1fr auto; gap: 4%;
+  image-rendering: pixelated;
+  text-shadow: 0 0 6px rgba(233,241,255,.35);
+}
+.oled .row { display: flex; justify-content: space-between; font-size: clamp(.6rem, 1.6vw, .78rem); opacity: .8; }
+.oled .title { font-size: clamp(1rem, 3.2vw, 1.4rem); font-weight: 500; line-height: 1.15; align-self: center; }
+.oled .title small { display: block; font-size: .62em; opacity: .75; font-weight: 400; }
+.oled .bar { height: 5px; border: 1px solid var(--oled); position: relative; }
+.oled .bar::after { content: ""; position: absolute; inset: 1px auto 1px 1px; width: 38%; background: var(--oled); }
+.oled-caption { margin-top: 12px; font: 400 .78rem/1.4 var(--f-mono); color: var(--muted); }
+.keys { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.keys li { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 16px; padding-block: 14px; border-bottom: 1px solid var(--ink-3); }
+.keys li:first-child { border-top: 1px solid var(--ink-3); }
+.keys b { font: 500 .85rem/1.6 var(--f-mono); color: var(--fg); }
+.keys span { color: var(--muted); }
+
+/* ---------- setup ---------- */
+.setup { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 56px; align-items: center; }
+.setup-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 26px; counter-reset: s; }
+.setup-list li { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 14px; counter-increment: s; }
+.setup-list li::before {
+  content: counter(s);
+  width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  border: 1px solid var(--ink-3);
+  display: grid; place-items: center;
+  font: 500 .95rem/1 var(--f-mono); color: var(--green);
+}
+.setup-list h3 { font-size: var(--step-1); font-weight: 700; margin-bottom: 4px; }
+.setup-list p { color: var(--muted); }
+.phone {
+  width: min(280px, 100%); margin-inline: auto;
+  border-radius: 34px; padding: 10px;
+  background: #0b0909; box-shadow: inset 0 0 0 1px var(--ink-3), 0 30px 60px -30px rgba(0,0,0,.8);
+}
+.phone img { display: block; width: 100%; border-radius: 26px; height: auto; aspect-ratio: 780 / 1240; object-fit: cover; object-position: top; }
+
+/* ---------- inside ---------- */
+.spec { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--ink-3); border: 1px solid var(--ink-3); border-radius: 14px; overflow: hidden; }
+.spec div { background: var(--ink); padding: 24px; display: grid; gap: 6px; align-content: start; }
+.spec dt { font: 500 .74rem/1.3 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.spec dd { margin: 0; font-weight: 500; }
+.spec dd small { display: block; color: var(--muted); font-weight: 400; font-size: var(--step--1); margin-top: 4px; }
+
+/* ---------- build ---------- */
+.build {
+  background: var(--ink-2); border-radius: 20px;
+  padding: clamp(28px, 5vw, 56px);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: end;
+}
+.build h2 { font-size: var(--step-2); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 14px; }
+.build p { color: var(--muted); max-width: 54ch; }
+.build p + p { margin-top: 10px; }
+
+/* ---------- footer ---------- */
+footer { padding-block: 40px 56px; border-top: 1px solid var(--ink-3); }
+footer .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+footer p { max-width: 62ch; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .controls, .setup, .tag-note, .build { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 8px 48px; }
+  .stage { order: -1; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .spec { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  section { padding-block: 64px; }
+}
+@media (max-width: 520px) {
+  .spec { grid-template-columns: minmax(0, 1fr); }
+  .keys li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .polaroid { width: 140px; }
+  .nav { gap: 16px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a href="#" aria-label="Spotifactory home"><svg class="lockup" role="img" aria-label="Spotifactory" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 298.46 64"><g transform="scale(0.74)"><rect width="72" height="86" rx="4" fill="#ffffff"/>
+<rect x="5" y="6" width="62" height="62" rx="1" fill="#191414"/>
+<circle cx="36" cy="37" r="24" fill="#1DB96E"/>
+<path d="M16.45,37a19.55,19.55 0 1,0 39.1,0a19.55,19.55 0 1,0 -39.1,0ZM17.55,37a18.45,18.45 0 1,0 36.9,0a18.45,18.45 0 1,0 -36.9,0ZM20.95,37a15.05,15.05 0 1,0 30.1,0a15.05,15.05 0 1,0 -30.1,0ZM22.05,37a13.95,13.95 0 1,0 27.9,0a13.95,13.95 0 1,0 -27.9,0Z" fill="#191414" fill-rule="evenodd" opacity="0.45"/>
+<circle cx="36" cy="37" r="8" fill="#191414"/><circle cx="36" cy="37" r="2.2" fill="#1DB96E"/></g><path d="M81.55 46.48Q78.52 46.48 76.13 45.43Q73.75 44.38 72.38 42.38Q71.01 40.38 70.94 37.55H76.66Q76.71 38.82 77.3 39.81Q77.88 40.8 78.96 41.38Q80.04 41.95 81.54 41.95Q82.79 41.95 83.73 41.56Q84.68 41.18 85.22 40.42Q85.76 39.66 85.76 38.57Q85.76 37.36 85.16 36.55Q84.56 35.74 83.52 35.17Q82.48 34.61 81.16 34.16Q79.84 33.71 78.4 33.22Q75.08 32.09 73.32 30.28Q71.57 28.47 71.57 25.49Q71.57 23 72.78 21.23Q73.99 19.45 76.15 18.48Q78.31 17.52 81.07 17.52Q83.92 17.52 86.06 18.51Q88.21 19.5 89.45 21.32Q90.7 23.14 90.77 25.66H84.98Q84.96 24.64 84.45 23.82Q83.95 23.01 83.07 22.52Q82.18 22.03 80.97 22.03Q79.92 22 79.07 22.34Q78.22 22.69 77.72 23.37Q77.23 24.06 77.23 25.12Q77.23 26.11 77.7 26.8Q78.18 27.49 79.05 27.98Q79.92 28.47 81.11 28.92Q82.3 29.36 83.74 29.84Q85.85 30.55 87.6 31.53Q89.35 32.51 90.4 34.07Q91.45 35.63 91.45 38.16Q91.45 40.38 90.31 42.28Q89.18 44.17 86.98 45.32Q84.78 46.48 81.55 46.48Z M94.42 54.4V26.16H99.09L99.54 29.29H99.62Q100.32 28.23 101.29 27.42Q102.27 26.6 103.58 26.14Q104.89 25.68 106.53 25.68Q109.34 25.68 111.47 27.03Q113.6 28.39 114.82 30.74Q116.04 33.08 116.04 36.1Q116.04 39.1 114.82 41.45Q113.6 43.8 111.45 45.14Q109.3 46.48 106.43 46.48Q104.17 46.48 102.5 45.63Q100.83 44.78 99.82 43.4V54.4ZM105.14 41.93Q106.75 41.93 107.98 41.18Q109.2 40.44 109.89 39.13Q110.57 37.82 110.57 36.1Q110.57 34.39 109.89 33.07Q109.2 31.76 107.98 31.01Q106.75 30.25 105.14 30.25Q103.53 30.25 102.3 31.01Q101.06 31.76 100.37 33.07Q99.69 34.38 99.69 36.09Q99.69 37.8 100.37 39.12Q101.06 40.44 102.3 41.18Q103.53 41.93 105.14 41.93Z M128.6 46.48Q125.74 46.48 123.43 45.15Q121.12 43.83 119.77 41.48Q118.42 39.13 118.42 36.09Q118.42 33.01 119.78 30.66Q121.14 28.31 123.45 27Q125.77 25.68 128.63 25.68Q131.51 25.68 133.82 27Q136.13 28.31 137.48 30.66Q138.83 33.01 138.83 36.09Q138.83 39.15 137.47 41.49Q136.12 43.83 133.8 45.15Q131.49 46.48 128.6 46.48ZM128.6 41.88Q129.91 41.88 130.97 41.23Q132.02 40.59 132.67 39.29Q133.32 38 133.32 36.08Q133.32 34.14 132.68 32.86Q132.04 31.57 130.98 30.92Q129.92 30.28 128.65 30.28Q127.38 30.28 126.31 30.92Q125.23 31.57 124.58 32.86Q123.93 34.15 123.93 36.08Q123.93 38 124.58 39.29Q125.23 40.59 126.29 41.23Q127.35 41.88 128.6 41.88Z M150.81 46Q148.7 46 147.11 45.33Q145.52 44.67 144.65 43.13Q143.77 41.59 143.77 38.94V30.57H140.38V26.16H143.77L144.37 20.77H149.17V26.16H154.45V30.57H149.17V38.98Q149.17 40.39 149.77 40.93Q150.36 41.47 151.82 41.47H154.34V46Z M157.35 46V26.16H162.75V46ZM160.06 23.47Q158.59 23.47 157.66 22.6Q156.73 21.72 156.73 20.41Q156.73 19.09 157.66 18.23Q158.59 17.36 160.06 17.36Q161.54 17.36 162.48 18.23Q163.41 19.09 163.41 20.42Q163.41 21.72 162.48 22.59Q161.54 23.47 160.06 23.47Z" class="spoti"/><path d="M167.94 46V24.43Q167.94 21.93 168.79 20.44Q169.64 18.95 171.21 18.27Q172.77 17.6 174.88 17.6H177.11V22.13H175.72Q174.44 22.13 173.89 22.65Q173.34 23.16 173.34 24.38V46ZM165.25 30.57V26.16H177.52V30.57Z M186.61 46.48Q184.16 46.48 182.57 45.68Q180.98 44.87 180.22 43.51Q179.46 42.14 179.46 40.5Q179.46 38.67 180.41 37.29Q181.35 35.9 183.27 35.11Q185.19 34.32 188.1 34.32H193.09Q193.09 32.86 192.67 31.91Q192.26 30.96 191.4 30.49Q190.54 30.02 189.21 30.02Q187.67 30.02 186.56 30.71Q185.45 31.4 185.2 32.83H179.96Q180.17 30.64 181.4 29.05Q182.63 27.45 184.66 26.57Q186.69 25.68 189.24 25.68Q192.09 25.68 194.17 26.63Q196.25 27.58 197.37 29.39Q198.49 31.2 198.49 33.8V46H193.98L193.39 42.92H193.31Q192.8 43.76 192.12 44.42Q191.44 45.08 190.6 45.54Q189.77 45.99 188.77 46.24Q187.77 46.48 186.61 46.48ZM188.15 42.3Q189.23 42.3 190.06 41.93Q190.89 41.57 191.48 40.92Q192.07 40.27 192.41 39.42Q192.76 38.58 192.88 37.63V37.62H188.71Q187.48 37.62 186.69 37.93Q185.9 38.24 185.53 38.78Q185.16 39.32 185.16 40.04Q185.16 40.77 185.53 41.28Q185.91 41.79 186.58 42.05Q187.26 42.3 188.15 42.3Z M211.65 46.48Q208.54 46.48 206.2 45.14Q203.85 43.81 202.54 41.46Q201.22 39.12 201.22 36.1Q201.22 33.03 202.55 30.7Q203.88 28.37 206.24 27.02Q208.6 25.68 211.66 25.68Q215.51 25.68 218.14 27.68Q220.76 29.69 221.47 33.21H215.76Q215.41 31.8 214.28 31.02Q213.16 30.24 211.61 30.24Q210.24 30.24 209.13 30.93Q208.03 31.62 207.38 32.93Q206.73 34.24 206.73 36.08Q206.73 37.44 207.1 38.5Q207.46 39.57 208.12 40.33Q208.79 41.09 209.67 41.49Q210.56 41.89 211.62 41.89Q212.65 41.89 213.49 41.54Q214.33 41.2 214.93 40.54Q215.53 39.88 215.76 38.95H221.47Q220.76 42.39 218.13 44.43Q215.5 46.48 211.65 46.48Z M233.45 46Q231.34 46 229.75 45.33Q228.16 44.67 227.29 43.13Q226.41 41.59 226.41 38.94V30.57H223.02V26.16H226.41L227.01 20.77H231.81V26.16H237.09V30.57H231.81V38.98Q231.81 40.39 232.41 40.93Q233 41.47 234.46 41.47H236.98V46Z M249.16 46.48Q246.3 46.48 243.99 45.15Q241.68 43.83 240.33 41.48Q238.98 39.13 238.98 36.09Q238.98 33.01 240.34 30.66Q241.7 28.31 244.01 27Q246.33 25.68 249.19 25.68Q252.07 25.68 254.38 27Q256.69 28.31 258.04 30.66Q259.39 33.01 259.39 36.09Q259.39 39.15 258.03 41.49Q256.68 43.83 254.36 45.15Q252.05 46.48 249.16 46.48ZM249.16 41.88Q250.47 41.88 251.53 41.23Q252.58 40.59 253.23 39.29Q253.88 38 253.88 36.08Q253.88 34.14 253.24 32.86Q252.6 31.57 251.54 30.92Q250.48 30.28 249.21 30.28Q247.94 30.28 246.87 30.92Q245.79 31.57 245.14 32.86Q244.49 34.15 244.49 36.08Q244.49 38 245.14 39.29Q245.79 40.59 246.85 41.23Q247.91 41.88 249.16 41.88Z M262.36 46V26.16H267.06L267.55 30.19H267.63Q268.44 28.5 269.48 27.52Q270.53 26.54 271.89 26.11Q273.25 25.68 274.92 25.68V31.38H273.45Q272.14 31.38 271.08 31.68Q270.02 31.98 269.28 32.63Q268.54 33.28 268.15 34.37Q267.76 35.46 267.76 37.04V46Z M279.87 54.4 284.61 43.76H283.45L275.34 26.16H281.21L286.98 38.96H287.06L292.22 26.16H297.97L285.6 54.4Z" class="factory"/></svg></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#photos">Photos</a>
+      <a href="#setup">Setup</a>
+      <a href="#build">Build one</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">A record player for instant photos</p>
+      <h1 id="hero-title" style="margin-top:18px">Stand up a photo. <em>Hear the album.</em></h1>
+      <p class="lede">Spotifactory is a small wooden easel that plays music from Instax prints of album covers. <strong>Stand a photo on it and the album starts. Lift it off and the music pauses.</strong></p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#build">Build your own</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="fine">Plays through Spotify Connect. Needs Spotify Premium.</p>
+    </div>
+
+    <div class="stage" aria-hidden="true">
+      <svg viewBox="0 0 400 380" role="img">
+        <defs>
+          <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wood-hi)"/>
+            <stop offset=".55" stop-color="var(--wood)"/>
+            <stop offset="1" stop-color="var(--wood-lo)"/>
+          </linearGradient>
+          <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--wood-hi)"/>
+            <stop offset="1" stop-color="var(--wood)"/>
+          </linearGradient>
+          <pattern id="grain" width="400" height="6" patternUnits="userSpaceOnUse">
+            <path d="M0 3 Q100 1 200 3 T400 3" stroke="#000" stroke-opacity=".06" fill="none"/>
+          </pattern>
+          <clipPath id="artclip"><rect x="122" y="56" width="156" height="156" rx="2"/></clipPath>
+        </defs>
+
+        <!-- floor shadow -->
+        <ellipse class="photo-shadow" cx="200" cy="352" rx="150" ry="10" fill="#000" opacity=".5"/>
+
+        <!-- back panel, holds the NFC reader -->
+        <path d="M95 92 Q95 80 107 80 H293 Q305 80 305 92 L330 350 H70 Z" fill="url(#wood)"/>
+        <path d="M95 92 Q95 80 107 80 H293 Q305 80 305 92 L330 350 H70 Z" fill="url(#grain)"/>
+
+        <!-- read waves -->
+        <g class="waves" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round" opacity="0">
+          <path d="M318 140 a40 40 0 0 1 0 60"/>
+          <path d="M334 126 a60 60 0 0 1 0 88"/>
+          <path d="M82 140 a40 40 0 0 0 0 60"/>
+          <path d="M66 126 a60 60 0 0 0 0 88"/>
+        </g>
+
+        <!-- the photo -->
+        <g class="photo">
+          <rect x="106" y="40" width="188" height="226" rx="6" fill="#fff"/>
+          <g clip-path="url(#artclip)">
+            <rect x="122" y="56" width="156" height="92" fill="#e9603b"/>
+            <rect x="122" y="148" width="156" height="64" fill="#23354d"/>
+            <circle cx="200" cy="212" r="60" fill="#f6c35a"/>
+            <g stroke="#23354d" stroke-width="3" opacity=".35">
+              <line x1="122" y1="160" x2="278" y2="160"/>
+              <line x1="122" y1="172" x2="278" y2="172"/>
+              <line x1="122" y1="184" x2="278" y2="184"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- front block with the sloped control face -->
+        <path d="M60 246 Q60 236 70 236 H330 Q340 236 340 246 L344 344 Q344 352 336 352 H64 Q56 352 56 344 Z" fill="url(#wood)"/>
+        <path d="M60 246 Q60 236 70 236 H330 Q340 236 340 246 L341 268 H59 Z" fill="url(#face)"/>
+        <path d="M60 246 Q60 236 70 236 H330 Q340 236 340 246 L344 344 Q344 352 336 352 H64 Q56 352 56 344 Z" fill="url(#grain)"/>
+        <line x1="58" y1="236.5" x2="342" y2="236.5" stroke="#fff" stroke-opacity=".25"/>
+
+        <!-- OLED window 2:1 -->
+        <rect x="104" y="262" width="150" height="79" rx="5" fill="#0b0909"/>
+        <rect x="112" y="268" width="134" height="67" fill="#000"/>
+        <g font-family="DM Mono, ui-monospace, monospace" fill="var(--oled)">
+          <g class="scr-idle">
+            <text x="179" y="296" font-size="10" text-anchor="middle">Stand a photo</text>
+            <text x="179" y="310" font-size="10" text-anchor="middle">on the easel</text>
+          </g>
+          <g class="scr-play" opacity="0">
+            <text x="119" y="279" font-size="6.5" opacity=".75">&#9654; Kitchen speaker</text>
+            <text x="119" y="298" font-size="11" font-weight="500">Sunday Kitchen</text>
+            <text x="119" y="310" font-size="7.5" opacity=".8">The Low Hums</text>
+            <rect x="119" y="319" width="120" height="5" fill="none" stroke="var(--oled)" stroke-width=".8"/>
+            <rect class="progress" x="120" y="320" width="118" height="3" fill="var(--oled)"/>
+          </g>
+          <g class="scr-pause" opacity="0">
+            <text x="179" y="296" font-size="11" text-anchor="middle">&#10074;&#10074; Paused</text>
+            <text x="179" y="310" font-size="7.5" text-anchor="middle" opacity=".8">put it back to carry on</text>
+          </g>
+        </g>
+
+        <!-- joystick -->
+        <circle cx="290" cy="302" r="17" fill="#0b0909"/>
+        <circle cx="290" cy="302" r="9" fill="#2e2727"/>
+        <circle cx="287" cy="299" r="3" fill="#fff" opacity=".15"/>
+        <!-- three buttons beside the screen -->
+        <circle cx="84" cy="280" r="5.5" fill="#0b0909"/>
+        <circle cx="84" cy="302" r="5.5" fill="#0b0909"/>
+        <circle cx="84" cy="324" r="5.5" fill="#0b0909"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">How it works</p>
+      <h2 id="how-title">Your music, as things you can pick up and hand to someone.</h2>
+    </div>
+    <ol class="steps">
+      <li class="step">
+        <h3>Print the cover</h3>
+        <p>While an album or playlist is playing, choose <b>Print Album</b> on the box. It prints the artwork on a paired Instax Square Link, then writes an NFC sticker for the back.</p>
+      </li>
+      <li class="step">
+        <h3>Stand it up</h3>
+        <p>Set the photo in the groove. The reader behind it picks up the tag and the album starts on your speaker.</p>
+      </li>
+      <li class="step">
+        <h3>Lift it to pause</h3>
+        <p>There's no pause button. Take the photo off to pause, put it back to carry on, or swap in another one to change records.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="photos" class="paper" aria-labelledby="photos-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">The photos</p>
+      <h2 id="photos-title">A shelf of albums you can write on.</h2>
+      <p>Each print is a real Instax Square photo: a 62 mm square image on a 72 × 86 mm card, with room underneath for a note. Keep them in a crate, pin them to a board, or give one to a friend with a box of their own.</p>
+    </div>
+    <div class="shelf">
+      <figure class="polaroid" style="--r:-3deg; margin:0"><div class="art art-1"></div><figcaption>sunday kitchen</figcaption></figure>
+      <figure class="polaroid" style="--r:2deg; margin:0"><div class="art art-2"></div><figcaption>for the drive north</figcaption></figure>
+      <figure class="polaroid" style="--r:-1deg; margin:0"><div class="art art-3"></div><figcaption>party, obviously</figcaption></figure>
+      <figure class="polaroid" style="--r:3deg; margin:0"><div class="art art-4"></div><figcaption>dad's record</figcaption></figure>
+      <figure class="polaroid" style="--r:-2deg; margin:0"><div class="art art-5"></div><figcaption>rainy afternoons</figcaption></figure>
+    </div>
+    <div class="tag-note">
+      <div>
+        <h3>What's on the tag</h3>
+        <p>A small NFC sticker on the back holds a link such as <span class="mono-chip">spotify:album:…</span> or a playlist. Tags can carry more than one link, so a photo can also point to the same album on Apple Music.</p>
+      </div>
+      <div>
+        <h3>Albums and playlists</h3>
+        <p>Choose <b>Print Playlist</b> to turn a playlist into a photo the same way. Mixtapes for people who never owned a tape deck.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="controls-title">
+  <div class="wrap controls">
+    <div>
+      <div class="oled-frame">
+        <div class="oled" aria-label="Example of the home screen">
+          <div class="row"><span>&#9654; Living room</span><span>&#8635; album</span></div>
+          <div class="title">Sunday Kitchen<small>The Low Hums &middot; 4/11</small></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+      <p class="oled-caption">1.3" OLED, 128 × 64 pixels. Shown larger than life.</p>
+    </div>
+    <div>
+      <div class="sec-head" style="margin-bottom:28px">
+        <p class="eyebrow">On the box</p>
+        <h2 id="controls-title">A little screen and a joystick. That's the whole interface.</h2>
+      </div>
+      <ul class="keys">
+        <li><b>Left / Right</b><span>Tap for the previous or next track. Hold to scrub through the song.</span></li>
+        <li><b>Up</b><span>Repeat: off, the whole album, or one track.</span></li>
+        <li><b>Down</b><span>Shuffle on or off.</span></li>
+        <li><b>Press</b><span>Switch the screen between now playing, the time, and the album.</span></li>
+        <li><b>Side buttons</b><span>Volume up, volume down, and the menu, where you choose a speaker, print, or pair a device.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="setup" aria-labelledby="setup-title" style="padding-top:24px">
+  <div class="wrap setup">
+    <div>
+      <div class="sec-head">
+        <p class="eyebrow">Setup</p>
+        <h2 id="setup-title">No keyboard, no app to install.</h2>
+      </div>
+      <ol class="setup-list">
+        <li><div><h3>Join your Wi-Fi from your phone</h3><p>On first start the box makes its own network. Connect to it and a setup page opens where you pick your Wi-Fi and type the password.</p></div></li>
+        <li><div><h3>Scan to sign in to Spotify</h3><p>The screen shows a QR code. Scan it, log in, and the box shows up in the Spotify app as <b>Spotifactory</b>.</p></div></li>
+        <li><div><h3>Pick where it plays</h3><p>Choose any Spotify Connect speaker from the menu, or pair a Bluetooth speaker and play from the box itself. It remembers your choice.</p></div></li>
+      </ol>
+    </div>
+    <div class="phone"><img src="/portal.png" alt="The Wi-Fi setup page on a phone, listing nearby networks with a password field and a Connect button" width="780" height="1240"></div>
+  </div>
+</section>
+
+<section aria-labelledby="inside-title" style="padding-top:24px">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">What's inside</p>
+      <h2 id="inside-title">Off-the-shelf parts in a printed wooden case.</h2>
+    </div>
+    <dl class="spec">
+      <div><dt>Computer</dt><dd>Raspberry Pi Zero 2 W<small>Runs the player as a service and starts on power-up.</small></dd></div>
+      <div><dt>Reader</dt><dd>PN532 NFC reader<small>Sits behind the photo panel, under the tag.</small></dd></div>
+      <div><dt>Screen</dt><dd>1.3" SH1106 OLED<small>128 × 64, with a 5-way joystick and three buttons.</small></dd></div>
+      <div><dt>Printer</dt><dd>Instax Square Link<small>Paired over Bluetooth. Shows film and battery left.</small></dd></div>
+      <div><dt>Sound</dt><dd>Spotify Connect<small>Any Connect speaker, or Bluetooth from the box. Sonos pauses when you lift the photo.</small></dd></div>
+      <div><dt>Case</dt><dd>Wood-fill PLA, 3D printed<small>Prints without supports. USB-C power at the back.</small></dd></div>
+    </dl>
+    <p style="margin-top:22px;color:var(--muted);max-width:62ch">It keeps itself up to date. Each night at about 3:30, when nobody's listening, it checks for a new release, and rolls back on its own if the update doesn't start cleanly.</p>
+  </div>
+</section>
+
+<section id="build" aria-labelledby="build-title" style="padding-top:24px">
+  <div class="wrap">
+    <div class="build">
+      <div>
+        <p class="eyebrow" style="margin-bottom:14px">Build one</p>
+        <h2 id="build-title">The code, the case and the parts list are all on GitHub.</h2>
+        <p>Flash a Pi, run one setup script, print the case, and screw it together. The parts list imports straight into DigiKey, and the case model renders print-ready STL files.</p>
+        <p>Free for personal, noncommercial use under the PolyForm Noncommercial license.</p>
+      </div>
+      <a class="btn btn-primary" href="https://github.com/peasus/spotifactory">View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Spotifactory is an independent hobby project by Joe Pease. It is not affiliated with, sponsored or endorsed by Spotify. Spotify is a trademark of Spotify AB. Instax is a trademark of Fujifilm.</p>
+    <p>&copy; 2025–2026 Joe Pease</p>
+  </div>
+</footer>
+</body>
+</html>
