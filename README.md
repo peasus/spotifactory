@@ -17,7 +17,8 @@ off pauses.
   (librespot, shown in the Spotify app as "Spotifactory") and a paired
   Bluetooth speaker.
 - **Print Album / Print Playlist** prints the current artwork on a paired
-  **Instax Square Link** and then writes the tag.
+  **Instax Square Link** and then writes the tag. **Film Left** asks the
+  printer how many shots are left in the pack (and its battery).
 - First-run setup needs no keyboard: a captive portal (Balena WiFi Connect)
   for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
   Worker relay (`deploy/relay/`, PKCE — no client secret on the device).
