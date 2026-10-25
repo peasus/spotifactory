@@ -1,8 +1,10 @@
 # spotifactory.com
 
-The website is the static page in `site/`: `index.html`, the favicon, the
-link-preview image (`og.png`) and the setup-portal screenshot. There is no
-build step.
+The website is the static pages in `site/`: the home page (`index.html`),
+`why-spotify.html` (served at /why-spotify), `build.html` (served at /build)
+and their shared `style.css`, plus the favicon, the link-preview image
+(`og.png`) and the setup-portal screenshot. There is no build step: Cloudflare
+Pages serves `/build` from `build.html` on its own.
 
 ## Hosting (Cloudflare Pages, free tier)
 
