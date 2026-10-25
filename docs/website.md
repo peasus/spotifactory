@@ -30,5 +30,5 @@ and each pull request gets its own preview URL.
 
 ## Colours
 
-Ink `#191414`, green `#1DB96E` (on light backgrounds `#128A52`). The green is
-deliberately a little off Spotify's own brand green.
+Ink `#191414` and avocado chartreuse `#A9C23F` (on light backgrounds
+`#5C6B1C`). The accent was moved off Spotify's brand green on purpose.
