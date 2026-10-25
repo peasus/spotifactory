@@ -1,0 +1,142 @@
+<!doctype html>
+<!--
+  Spotifactory WiFi setup page, served by Balena WiFi Connect (--ui-directory).
+  The phone has no internet while it's on the portal, so everything is inline.
+  API: GET /networks -> [{ssid, security: none|wep|wpa|enterprise}]
+       POST /connect {ssid, identity, passphrase} (JSON) -> 200, then the AP drops.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#191414">
+<title>Spotifactory setup</title>
+<style>
+  :root { --bg: #191414; --card: #241f1f; --line: #3a3333; --text: #fff;
+          --muted: #b3b3b3; --green: #1DB954; --red: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+         font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 420px; margin: 0 auto; padding: 40px 16px; }
+  header { text-align: center; margin-bottom: 28px; }
+  header svg { width: 72px; height: 72px; }
+  h1 { margin: 12px 0 4px; font-size: 1.6em; letter-spacing: -0.02em; }
+  h1 span { color: var(--green); }
+  header p { margin: 0; color: var(--muted); }
+  h2 { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 0 0 8px; }
+  ul { list-style: none; margin: 0; padding: 0; background: var(--card);
+       border-radius: 12px; overflow: hidden; }
+  li button { all: unset; box-sizing: border-box; display: flex; width: 100%;
+              align-items: center; justify-content: space-between; padding: 14px 16px;
+              border-bottom: 1px solid var(--line); cursor: pointer; }
+  li:last-child button { border-bottom: 0; }
+  li button[aria-pressed="true"] { background: #2e2727; color: var(--green); }
+  .lock { color: var(--muted); font-size: 0.85em; }
+  form { margin-top: 20px; display: none; }
+  form.open { display: block; }
+  label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 0.9em; }
+  input { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--card); color: var(--text); font-size: 16px; }
+  input:focus { outline: 2px solid var(--green); border-color: transparent; }
+  .submit { width: 100%; margin-top: 20px; padding: 14px; border: 0; border-radius: 999px;
+            background: var(--green); color: #000; font-weight: 700; font-size: 1em; cursor: pointer; }
+  .submit:disabled { opacity: 0.5; }
+  .msg { text-align: center; color: var(--muted); padding: 24px 8px; }
+  .err { color: var(--red); }
+  .done h2 { color: var(--green); font-size: 1.2em; text-transform: none; letter-spacing: 0; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <!-- An instant photo with a record on it: the thing you put on the box. -->
+    <svg viewBox="0 0 72 72" aria-hidden="true">
+      <rect x="10" y="6" width="52" height="60" rx="4" fill="#fff"/>
+      <rect x="15" y="11" width="42" height="42" fill="#191414"/>
+      <circle cx="36" cy="32" r="15" fill="#1DB954"/>
+      <circle cx="36" cy="32" r="10" fill="none" stroke="#191414" stroke-width="1.2" opacity="0.5"/>
+      <circle cx="36" cy="32" r="3.5" fill="#191414"/>
+    </svg>
+    <h1>Spoti<span>factory</span></h1>
+    <p>Let's get your box online.</p>
+  </header>
+
+  <section id="pick">
+    <h2>Choose your WiFi</h2>
+    <ul id="networks"></ul>
+    <p class="msg" id="status">Looking for networks…</p>
+    <form id="form" autocomplete="off">
+      <div id="identity-row" hidden>
+        <label for="identity">Username</label>
+        <input id="identity" name="identity" autocapitalize="off">
+      </div>
+      <div id="passphrase-row">
+        <label for="passphrase">Password</label>
+        <input id="passphrase" name="passphrase" type="password">
+      </div>
+      <button class="submit" type="submit">Connect</button>
+    </form>
+  </section>
+
+  <section id="done" class="msg done" hidden>
+    <h2>Connecting to <span id="done-ssid"></span>…</h2>
+    <p>This setup network will now disappear. Watch the screen on your Spotifactory:
+       it moves on to the Spotify login once it's online.</p>
+    <p>If it can't connect, it restarts and this page comes back, so you can try again.</p>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let chosen = null;
+
+  function choose(net, button) {
+    chosen = net;
+    document.querySelectorAll("#networks button").forEach((b) => b.setAttribute("aria-pressed", b === button));
+    $("identity-row").hidden = net.security !== "enterprise";
+    $("passphrase-row").hidden = net.security === "none";
+    $("form").classList.add("open");
+    (net.security === "enterprise" ? $("identity") : $("passphrase")).focus();
+  }
+
+  fetch("/networks")
+    .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    .then((nets) => {
+      if (!nets.length) { $("status").textContent = "No networks found. Move the box closer to your router and restart it."; return; }
+      $("status").hidden = true;
+      for (const net of nets) {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = net.ssid;
+        if (net.security !== "none") {
+          const lock = document.createElement("span");
+          lock.className = "lock";
+          lock.textContent = "🔒";
+          b.append(lock);
+        }
+        b.onclick = () => choose(net, b);
+        li.append(b);
+        $("networks").append(li);
+      }
+    })
+    .catch((e) => { $("status").textContent = "Couldn't list networks (" + e.message + ")."; $("status").classList.add("err"); });
+
+  $("form").onsubmit = (ev) => {
+    ev.preventDefault();
+    if (!chosen) return;
+    ev.submitter && (ev.submitter.disabled = true);
+    $("done-ssid").textContent = chosen.ssid;
+    // Show the next steps straight away: once the box starts joining, the setup
+    // network goes down and the response may never reach the phone.
+    $("pick").hidden = true;
+    $("done").hidden = false;
+    fetch("/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ssid: chosen.ssid, identity: $("identity").value, passphrase: $("passphrase").value }),
+    }).catch(() => {});
+  };
+</script>
+</body>
+</html>
