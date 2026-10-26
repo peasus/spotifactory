@@ -768,10 +768,11 @@ class Runner:
 
         # A cross laid out like the joystick: repeat (up) over shuffle (down),
         # skips (left/right) halfway between. A setting that's on is inverted.
+        # It sits clear of the progress bar along the bottom edge.
         sw, sh = icons.size(icons.SHUFFLE)
         rw, rh = icons.size(icons.REPEAT)
         pw, ph = icons.size(icons.PREV)
-        shuf_top = 61 - sh
+        shuf_top = 58 - sh
         rep_top = shuf_top - 6 - rh
         skip_top = (rep_top + shuf_top + sh) // 2 - ph // 2
         sx = 64 - sw // 2
@@ -780,7 +781,33 @@ class Runner:
         (icons.draw_badge if shuffle else icons.draw)(d, sx, shuf_top, icons.SHUFFLE)
         icons.draw(d, sx - 8 - pw, skip_top, icons.PREV)
         icons.draw(d, sx + sw + 8, skip_top, icons.NEXT)
+        if getattr(step, "tag_active", False):
+            self._draw_track_count(step, skip_top - 1)
+            if not scrub:                       # the scrub line shows it then
+                self._draw_progress(step)
         d.update()
+
+    def _draw_track_count(self, step, y: int) -> None:
+        """Which track of how many ("3/12"), left of the skip-back icon; just
+        the track when both won't fit beside it (an album of 100 or more)."""
+        track, total = step.track_number, step.total_tracks
+        if not track:
+            return
+        text = f"{track}/{total}" if total else str(track)
+        self.display.draw_text(2, y, text if len(text) <= 5 else str(track))
+
+    def _draw_progress(self, step) -> None:
+        """A thin bar along the bottom edge: dotted for the whole track, solid
+        (two pixels tall) for the part played."""
+        dur = step.duration_ms
+        if not dur:
+            return
+        d = self.display
+        for x in range(0, 128, 2):
+            d.draw_rect(x, 63, x, 63)
+        played = round(127 * min(step.position_ms(), dur) / dur)
+        if played:
+            d.draw_rect(0, 62, played, 63)
 
     def _render_time(self, step, shuffle: bool, repeat: str) -> None:
         """CD-player time display: track number, the repeat and shuffle flags,
