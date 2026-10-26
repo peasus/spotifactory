@@ -114,8 +114,9 @@ enclosure/.venv/bin/python enclosure/easel.py   # renders + STL/STEP into enclos
 enclosure/.venv/bin/python enclosure/check.py   # fit, assembly and printability checks
 ```
 
-Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus screws
-and a spare micro-USB cable for the power lead:
+Parts to buy are in `enclosure/BOM.md`, with DigiKey and Mouser part numbers
+and what neither distributor carries. `enclosure/bom_digikey.csv` and
+`enclosure/bom_mouser.csv` import straight into either cart. The screws:
 
 - 4× M2.5×14 pan or button head: up through the Pi, spacers and HAT into the
   faceplate. M2.5×16 also works with one of the printed 2 mm washers (second
