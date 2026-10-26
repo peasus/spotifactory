@@ -50,15 +50,51 @@
 <div class="doc">
   <div class="wrap">
     <nav class="toc" aria-label="On this page">
+      <a href="#ai">Build it with an AI helper</a>
       <a href="#parts">1. Get the parts</a>
       <a href="#print">2. Print the case</a>
-      <a href="#pi">3. Set up the Pi</a>
-      <a href="#assemble">4. Put it together</a>
-      <a href="#first-start">5. First start</a>
+      <a href="#spotify-app">3. Make a Spotify app</a>
+      <a href="#pi">4. Set up the Pi</a>
+      <a href="#assemble">5. Put it together</a>
+      <a href="#first-start">6. First start</a>
       <a href="#license">Sharing and selling</a>
     </nav>
 
     <div class="prose">
+      <section id="ai" aria-labelledby="h-ai">
+        <h2 id="h-ai">Build it with an AI helper</h2>
+        <p>An AI assistant such as Claude can be a patient build partner. It can read the instructions, work out what you still need to buy, walk you through each step, give you the exact commands, and help when something doesn't work. You still do the hands-on parts: printing, screwing it together, and signing in to Spotify.</p>
+        <p>Copy this into a new chat to start:</p>
+        <div class="prompt">
+<pre id="ai-prompt"><code>I want to build a Spotifactory: a Raspberry Pi music box that plays Spotify albums from NFC-tagged Instax photos. The instructions, code and case model are at https://github.com/peasus/spotifactory (start with README.md) and the build guide is at https://spotifactory.com/build.
+
+Please be my build guide:
+- Read those first. If you can't open links, tell me and I'll paste the README.
+- Ask what I already have (parts, 3D printer, computer, Spotify Premium) and make me a shopping list for the rest.
+- Then take me through it one step at a time: printing the parts, creating the Spotify developer app, setting up the Pi, assembly, and first start. Wait for me to say I'm done before moving on.
+- For every command, tell me exactly what to type, where to type it (my computer or the Pi), and what I should see.
+- If something goes wrong, ask me to paste the error or describe what I see, and help me fix it.
+- Never ask for my Spotify password.
+
+About me: I'm [new to this / comfortable with a terminal], and my computer runs [Mac / Windows / Linux].</code></pre>
+          <button type="button" class="btn btn-primary copy" id="copy-prompt">Copy prompt</button>
+        </div>
+        <script>
+          (function () {
+            var btn = document.getElementById("copy-prompt");
+            var src = document.getElementById("ai-prompt");
+            btn.addEventListener("click", function () {
+              var text = src.innerText;
+              function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = "Copy prompt"; }, 2000); }
+              function select() { var r = document.createRange(); r.selectNodeContents(src); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); done("Selected, press Copy"); }
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () { done("Copied"); }, select);
+              } else { select(); }
+            });
+          })();
+        </script>
+      </section>
+
       <section id="parts" aria-labelledby="h-parts">
         <h2 id="h-parts">1. Get the parts</h2>
         <ul class="parts-list">
@@ -68,7 +104,7 @@
           <li><div><b>USB-C power socket</b><small>Adafruit 5993, so any USB-C charger works. A spare micro-USB cable makes the power lead.</small></div><span class="qty">1</span></li>
           <li><div><b>Instax Square Link printer</b><small>Plus Instax Square film.</small></div><span class="qty">1</span></li>
           <li><div><b>NFC stickers, 25 mm square</b><small>One for the back of each photo.</small></div><span class="qty">a roll</span></li>
-          <li><div><b>Screws and fittings</b><small>M2.5×14 pan or button head (6), M2.5×8 (4), M3×4 mm brass heat-set inserts (4), rubber feet (4).</small></div><span class="qty">&nbsp;</span></li>
+          <li><div><b>Screws and fittings</b><small>M2.5×14 pan or button head (6), M2.5×8 (4), M3 flat-head about 6 mm (4), M3×4 mm brass heat-set inserts (4), rubber feet (4).</small></div><span class="qty">&nbsp;</span></li>
           <li><div><b>A speaker</b><small>Any Spotify Connect speaker, or a Bluetooth speaker that the box plays to directly.</small></div><span class="qty">1</span></li>
           <li><div><b>Spotify Premium</b><small>Needed to control playback. <a href="/why-spotify">Why only Spotify?</a></small></div><span class="qty">&nbsp;</span></li>
         </ul>
@@ -77,43 +113,86 @@
 
       <section id="print" aria-labelledby="h-print">
         <h2 id="h-print">2. Print the case</h2>
-        <p>The case is a parametric <a href="https://github.com/gumyr/build123d">build123d</a> model in <code>enclosure/</code>. It has a body, a faceplate, a base plate, spacers and two reader keepers, and every part prints without supports. Any PLA works, in whatever colour you like. The walls are sized for a <strong>0.6 mm nozzle</strong>.</p>
-        <p>To get the print files, run this on your computer:</p>
-<pre><code>python3 -m venv enclosure/.venv
+        <p>The case is a parametric <a href="https://github.com/gumyr/build123d">build123d</a> model in <code>enclosure/</code>. Any PLA works, in whatever colour you like, and nothing needs supports.</p>
+        <h3>Make the STL files</h3>
+        <p>Run this on your computer in the cloned repo. It writes one STL per part to <code>enclosure/out/print/</code>, each already turned the way it should sit on the bed. It also writes <code>print_layout.png</code>, a picture of the big parts on a bed.</p>
+<pre><code>git clone https://github.com/peasus/spotifactory.git &amp;&amp; cd spotifactory
+python3 -m venv enclosure/.venv
 enclosure/.venv/bin/pip install build123d trimesh matplotlib networkx
-enclosure/.venv/bin/python enclosure/easel.py   # STL + STEP into enclosure/out/print/
+enclosure/.venv/bin/python enclosure/easel.py   # STLs into enclosure/out/print/
 enclosure/.venv/bin/python enclosure/check.py   # fit and printability checks</code></pre>
-        <p>The same folder also has a crate for your photos, a dispenser for the roll of tag stickers, and small test prints to check the fit before the big parts.</p>
+        <h3>What to print</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">File</th><th scope="col">What it is</th><th scope="col">On the bed</th></tr></thead>
+            <tbody>
+              <tr><td><code>spotifactory_body.stl</code></td><td>The easel itself: photo panel, sloped screen face and walls</td><td>Upright, open bottom down</td></tr>
+              <tr><td><code>spotifactory_faceplate.stl</code></td><td>Holds the screen, joystick and buttons</td><td>Visible face down</td></tr>
+              <tr><td><code>spotifactory_baseplate.stl</code></td><td>Bottom plate, with the power socket bracket</td><td>Flat side down</td></tr>
+              <tr><td><code>spotifactory_spacers.stl</code></td><td>4 tubes for between the Pi and the screen, plus 4 washers you only need with M2.5×16 screws</td><td>As exported</td></tr>
+              <tr><td><code>spotifactory_keepers.stl</code></td><td>2 blocks that hold the NFC reader in place</td><td>As exported</td></tr>
+              <tr><td><code>spotifactory_buttoncaps.stl</code></td><td>3 caps: volume up, volume down and menu</td><td>Standing on their flanges</td></tr>
+              <tr><td><code>spotifactory_nub.stl</code></td><td>The joystick knob</td><td>Upright</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><strong>Nozzle:</strong> the walls are sized for four lines from a 0.6 mm nozzle.</li>
+          <li><strong>Second colour (optional):</strong> the icons on the caps and the joystick knob stand 0.48 mm proud, which is four layers at 0.12 mm. Add a filament change at that height to print them in an accent colour.</li>
+          <li><strong>Test prints:</strong> <code>keeper_test.py</code> and <code>joystick_nub_test.py</code> make small pieces for checking the fit on your printer before you print the big parts.</li>
+          <li><strong>Extras:</strong> <code>crate.py</code> makes a crate for your photos and <code>dispenser.py</code> a holder for the roll of tag stickers.</li>
+        </ul>
+      </section>
+
+      <section id="spotify-app" aria-labelledby="h-app">
+        <h2 id="h-app">3. Make a Spotify app</h2>
+        <p>The box signs in to Spotify through a developer app. Spotify only lets five people use an app while it's in development mode, so make your own. It's free and takes a few minutes. You won't need a client secret.</p>
+        <ol class="steps-n">
+          <li><div><p>Go to the <a href="https://developer.spotify.com/dashboard">Spotify developer dashboard</a> and log in with your Spotify account. Accept the developer terms if it asks.</p></div></li>
+          <li><div><p>Choose <strong>Create app</strong> and fill in:</p>
+            <ul>
+              <li><strong>App name and description:</strong> anything, for example "My Spotifactory".</li>
+              <li><strong>Redirect URI:</strong> <code>https://auth.spotifactory.workers.dev/callback</code>, then press <strong>Add</strong>. It has to match exactly.</li>
+              <li><strong>Which API/SDKs:</strong> tick <strong>Web API</strong>.</li>
+            </ul>
+            <p>Agree to the terms and save.</p></div></li>
+          <li><div><p>Open the app's <strong>Settings</strong> and copy the <strong>Client ID</strong>.</p></div></li>
+          <li><div><p>Under <strong>User Management</strong>, add the name and email address of every Spotify account that will use the box, yours included, up to five.</p></div></li>
+          <li><div><p>In the repo on your computer, copy <code>deploy/provision.env.example</code> to <code>deploy/provision.env</code> and paste in your ID:</p>
+<pre><code>SPOTIPY_CLIENT_ID=your-client-id-here
+RELAY_URL=https://auth.spotifactory.workers.dev</code></pre></div></li>
+        </ol>
+        <div class="callout"><p>The relay is a small Cloudflare Worker that passes the login from your phone to the box. You can use the shared one above. To run your own, deploy <code>deploy/relay/</code> with Wrangler, set <code>RELAY_URL</code> to its address, and use its <code>/callback</code> address as the redirect URI instead.</p></div>
       </section>
 
       <section id="pi" aria-labelledby="h-pi">
-        <h2 id="h-pi">3. Set up the Pi</h2>
+        <h2 id="h-pi">4. Set up the Pi</h2>
         <ol class="steps-n">
           <li><div><p>In Raspberry Pi Imager, flash <strong>Raspberry Pi OS Lite (64-bit)</strong>. Set the hostname to <code>spotifactory</code> and the user to <code>spotifactory</code>, and turn on SSH and Wi-Fi.</p></div></li>
-          <li><div><p>On your computer, copy <code>deploy/provision.env.example</code> to <code>deploy/provision.env</code> and copy it over to the Pi:</p>
+          <li><div><p>From your computer, copy your <code>provision.env</code> over to the Pi:</p>
 <pre><code>scp deploy/provision.env spotifactory@spotifactory.local:~/spotifactory-provision.env</code></pre></div></li>
           <li><div><p>On the Pi, run:</p>
 <pre><code>sudo apt-get update &amp;&amp; sudo apt-get install -y git
 git clone https://github.com/peasus/spotifactory.git ~/spotifactory
 cd ~/spotifactory &amp;&amp; bash deploy/setup.sh</code></pre></div></li>
         </ol>
-        <div class="callout"><p>Spotify lets each developer app have only five users while it's in development mode. If you're building boxes for more people, create your own app at <a href="https://developer.spotify.com/dashboard">developer.spotify.com</a> and put its client ID in <code>provision.env</code>.</p></div>
+        
       </section>
 
       <section id="assemble" aria-labelledby="h-assemble">
-        <h2 id="h-assemble">4. Put it together</h2>
-        <p>First, set the screen HAT to I2C: turn both switches on its back (SW1 and SW2) to 0. Then, with the body upside down or on its back:</p>
+        <h2 id="h-assemble">5. Put it together</h2>
+        <p>First, press the four M3 heat-set inserts into the bosses in the body's bottom corners with a soldering iron. Set the screen HAT to I2C by turning both switches on its back (SW1 and SW2) to 0. Then, with the body upside down or on its back:</p>
         <ol class="steps-n">
           <li><div><p>Plug the right-angle cable into the reader. Bring the reader in from below with the antenna side facing the panel, and slide it about 4 mm up until its top corners sit in the caps.</p></div></li>
           <li><div><p>Put a keeper under each bottom corner of the reader and drive an M2.5×14 screw straight up through it into the post.</p></div></li>
           <li><div><p>Screw the Pi and HAT stack to the faceplate through the spacers, using four M2.5×14 screws. Plug in the cables, then fit it from below into the pocket under the screen window.</p></div></li>
-          <li><div><p>Fit the base plate, with the power socket on its bracket, and screw it into the corner inserts.</p></div></li>
+          <li><div><p>Screw the power socket to its bracket on the base plate with the four M2.5×8 screws. Fit the base plate and screw it into the corner inserts with the M3 flat-head screws, then stick on the feet.</p></div></li>
         </ol>
-        <p>Use pan or button head screws, never countersunk. The <a href="https://github.com/peasus/spotifactory#enclosure">README</a> has the exact screw lengths and the cable sizes that fit.</p>
+        <p>Use pan or button head screws for the M2.5 ones, never countersunk. The <a href="https://github.com/peasus/spotifactory#enclosure">README</a> has the exact screw lengths and the cable sizes that fit.</p>
       </section>
 
       <section id="first-start" aria-labelledby="h-first">
-        <h2 id="h-first">5. First start</h2>
+        <h2 id="h-first">6. First start</h2>
         <ol class="steps-n">
           <li><div><p>Plug it in. With no Wi-Fi yet, the box makes its own network called <strong>Spotifactory</strong>. Join it from your phone and pick your Wi-Fi on the page that opens.</p></div></li>
           <li><div><p>Scan the QR code on the screen and log in to Spotify.</p></div></li>

@@ -296,7 +296,7 @@ footer p { max-width: 62ch; }
 .prose p strong, .prose li strong { color: var(--fg); font-weight: 500; }
 .prose a { color: var(--fg); text-underline-offset: 3px; }
 .prose ul, .prose ol { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; }
-.prose code { font: 400 .88em var(--f-mono); color: var(--fg); background: var(--ink-2); padding: 1px 5px; border-radius: 4px; }
+.prose code { overflow-wrap: anywhere; font: 400 .88em var(--f-mono); color: var(--fg); background: var(--ink-2); padding: 1px 5px; border-radius: 4px; }
 .prose pre { margin: 0; background: #0b0909; border: 1px solid var(--ink-3); border-radius: 10px; padding: 16px 18px; overflow-x: auto; max-width: 100%; }
 .prose pre code { background: none; padding: 0; font-size: .86rem; line-height: 1.7; color: var(--fg); }
 .callout { border-left: 3px solid var(--green); background: var(--ink-2); padding: 16px 20px; border-radius: 0 10px 10px 0; max-width: 70ch; }
@@ -325,3 +325,9 @@ td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
   .doc .wrap { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .toc { position: static; display: flex; flex-wrap: wrap; gap: 8px 18px; }
 }
+.prompt { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; justify-items: start; }
+.prompt pre { width: 100%; }
+.prompt pre code { white-space: pre-wrap; }
+.copy { border: 0; cursor: pointer; }
+.prose pre code { overflow-wrap: normal; }
+.steps-n > li > div > * { min-width: 0; }
