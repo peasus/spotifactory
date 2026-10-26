@@ -42,68 +42,56 @@
 <section class="page-hero" aria-labelledby="page-title">
   <div class="wrap">
     <p class="eyebrow">Why only Spotify?</p>
-    <h1 id="page-title">A photo can only start an album if the service lets it.</h1>
-    <p class="lede">Spotifactory doesn't play music itself. It asks your music service to play an album on a speaker. Right now Spotify is the only big service that lets a small home-made box do that.</p>
+    <h1 id="page-title">The box needs three things from a music service.</h1>
+    <p class="lede">Control over playback, a way to stream to a speaker, and the album art. Spotify is the only big service that offers all three to a small home-made box.</p>
   </div>
 </section>
 
 <div class="doc">
   <div class="wrap">
     <nav class="toc" aria-label="On this page">
-      <a href="#what-it-needs">What the box needs</a>
-      <a href="#spotify">How Spotify does it</a>
+      <a href="#control">1. Playback control</a>
+      <a href="#streaming">2. Streaming to a speaker</a>
+      <a href="#art">3. Album art</a>
       <a href="#others">The other services</a>
-      <a href="#sonos">Sonos speakers</a>
-      <a href="#later">Could that change?</a>
     </nav>
 
     <div class="prose">
-      <section id="what-it-needs" aria-labelledby="h-needs">
-        <h2 id="h-needs">What the box needs from a music service</h2>
-        <p>When you stand a photo on the easel, the box reads a link from the tag on the back, something like <code>spotify:album:…</code>. It then needs to do three things on its own, with no phone in the loop:</p>
-        <ul>
-          <li><strong>Start that exact album</strong> on the speaker you chose, from the beginning.</li>
-          <li><strong>Pause and resume</strong> when you lift the photo off and put it back.</li>
-          <li><strong>Know what's playing,</strong> so it can show it on the screen and print the right cover when you choose Print Album.</li>
-        </ul>
-        <p>Plenty of services let your phone send music to a speaker. Very few let a third device take charge of playback. That second part is what the photos depend on.</p>
+      <section id="control" aria-labelledby="h-control">
+        <h2 id="h-control">1. Playback control</h2>
+        <p>When you stand a photo on the easel, the box reads a link from the tag, something like <code>spotify:album:…</code>, and has to <strong>start that exact album</strong> by itself, with no phone involved. Lifting the photo has to <strong>pause</strong> it, and putting it back has to resume.</p>
+        <p>Spotify's public <strong>Web API</strong> allows exactly this. Once you've signed the box in, it can say "play this album there", pause, skip and change the volume. Most other services only let you control playback from inside their own apps.</p>
+        <div class="callout"><p>Spotify only allows playback control through its API on <strong>Premium</strong> accounts, so the box needs Premium.</p></div>
       </section>
 
-      <section id="spotify" aria-labelledby="h-spotify">
-        <h2 id="h-spotify">How Spotify does it</h2>
-        <p>Spotify has two pieces that fit together. <strong>Spotify Connect</strong> lets any Connect speaker, or the box itself, appear as a place to play. The public <strong>Spotify Web API</strong> lets an app you've signed in to say "play this album on that speaker", pause it, and read what's playing.</p>
-        <p>The box plays through its own speaker with <a href="https://github.com/dtcooper/raspotify">Raspotify</a>, an open-source Connect receiver, so it shows up in the Spotify app as <strong>Spotifactory</strong> like any other speaker.</p>
-        <div class="callout"><p>Spotify only allows playback control through its API on <strong>Premium</strong> accounts, so the box needs Premium.</p></div>
+      <section id="streaming" aria-labelledby="h-streaming">
+        <h2 id="h-streaming">2. Streaming to a speaker</h2>
+        <p>The music has to come out of a real speaker. <strong>Spotify Connect</strong> lets the box send the album to any Connect speaker in your home.</p>
+        <p>The box can also be the speaker. It runs <a href="https://github.com/dtcooper/raspotify">Raspotify</a>, an open-source Connect receiver, and plays to a Bluetooth speaker you pair with it. In the Spotify app it shows up as <strong>Spotifactory</strong>, like any other speaker.</p>
+      </section>
+
+      <section id="art" aria-labelledby="h-art">
+        <h2 id="h-art">3. Album art</h2>
+        <p>The photos are the whole idea, so the box needs the cover. When you choose <strong>Print Album</strong>, it asks Spotify what's playing, gets the cover art, prints it on Instax film and writes that album's link to the tag. The same information fills the now-playing screen.</p>
       </section>
 
       <section id="others" aria-labelledby="h-others">
         <h2 id="h-others">The other services</h2>
-        <p>Here's where the main alternatives stood when we last looked, in October 2026. Services change their rules, so treat this as a snapshot.</p>
+        <p>Here's how the main alternatives compare on those three needs, as of October 2026. Services change their rules, so treat this as a snapshot.</p>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Service</th><th scope="col">Box can start an album?</th><th scope="col">Why</th></tr></thead>
+            <thead><tr><th scope="col">Service</th><th scope="col">Playback control</th><th scope="col">Streaming to a speaker</th><th scope="col">Album art</th></tr></thead>
             <tbody>
-              <tr><td>Spotify</td><td><span class="pill yes">Yes</span></td><td>Official Web API plus Spotify Connect.</td></tr>
-              <tr><td>Apple Music</td><td><span class="pill">No</span></td><td>Your iPhone can AirPlay to a speaker, but there's no way for another device to tell it which album to play.</td></tr>
-              <tr><td>YouTube Music</td><td><span class="pill part">Unofficial</span></td><td>No public API. It can be done with community tools that fetch the audio directly, but that's against YouTube's terms and breaks whenever YouTube changes things.</td></tr>
-              <tr><td>Tidal</td><td><span class="pill">No</span></td><td>Tidal Connect exists, but only for hardware makers. There's no public way to start playback.</td></tr>
-              <tr><td>Qobuz</td><td><span class="pill">No</span></td><td>Qobuz Connect is for hardware partners. The hobby versions are small and have been taken down before.</td></tr>
-              <tr><td>Amazon Music</td><td><span class="pill">No</span></td><td>No public API for controlling playback.</td></tr>
+              <tr><td>Spotify</td><td><span class="pill yes">Yes</span> Web API</td><td><span class="pill yes">Yes</span> Spotify Connect</td><td><span class="pill yes">Yes</span> Web API</td></tr>
+              <tr><td>Apple Music</td><td><span class="pill">No</span> Only from Apple's own apps</td><td><span class="pill part">Phone only</span> AirPlay from your iPhone</td><td><span class="pill yes">Yes</span> Public catalogue search</td></tr>
+              <tr><td>YouTube Music</td><td><span class="pill part">Unofficial</span> No public API</td><td><span class="pill part">Unofficial</span> Community tools only</td><td><span class="pill part">Unofficial</span> No public API</td></tr>
+              <tr><td>Tidal</td><td><span class="pill">No</span> No public playback API</td><td><span class="pill part">Partners only</span> Tidal Connect is for hardware makers</td><td><span class="pill yes">Yes</span> Developer catalogue API</td></tr>
+              <tr><td>Amazon Music</td><td><span class="pill">No</span> No public API</td><td><span class="pill part">Echo only</span> Alexa devices</td><td><span class="pill">No</span> No public API</td></tr>
             </tbody>
           </table>
         </div>
-        <p>"Unofficial" matters more than it sounds. A Spotifactory is meant to sit on a shelf for years and just work, often in someone else's house. Something that could break with any update, or get an account flagged, isn't a good fit.</p>
-      </section>
-
-      <section id="sonos" aria-labelledby="h-sonos">
-        <h2 id="h-sonos">Sonos speakers</h2>
-        <p>Sonos is a special case even with Spotify. Spotify blocks its API from starting music on Sonos speakers, and Sonos turned off the old local route in a December 2024 update. So today a Sonos speaker <strong>pauses</strong> when you lift the photo, but the album has to be started from the Spotify app the first time. Work to fix this is under way.</p>
-      </section>
-
-      <section id="later" aria-labelledby="h-later">
-        <h2 id="h-later">Could that change?</h2>
-        <p>Possibly. The most promising route is <a href="https://www.music-assistant.io/">Music Assistant</a>, an open-source server that already controls many services and speakers. It would need to run on another computer in your home, since the box's Raspberry Pi Zero is too small to host it. Nothing is built yet.</p>
-        <p>The tags are ready for it either way. When the box writes a tag it also adds the album's Apple Music link if it can find an exact match, so your photos won't need redoing if another service becomes possible.</p>
+        <p>"Unofficial" matters more than it sounds. A Spotifactory is meant to sit on a shelf for years and just work, often in someone else's house. Tools that could break with any update, or get an account flagged, aren't a good fit.</p>
+        <p>If another service opens up all three, the box can learn it. The tags already make room for that: when the box writes a tag it also adds the album's Apple Music link if it finds an exact match.</p>
         <div class="next">
           <a href="/">&larr; Back to Spotifactory</a>
           <a href="/build">How to build one &rarr;</a>
