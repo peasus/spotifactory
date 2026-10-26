@@ -27,6 +27,10 @@ Neither distributor carries everything: see [Buy elsewhere](#buy-elsewhere).
 Neither DigiKey nor Mouser carries these:
 
 - **SeenGreat 1.3" OLED HAT.** The case is shaped around this board.
+  Waveshare's 1.3inch OLED HAT (SKU 13890) is the same size and also works
+  (set `SPOTIFACTORY_HAT=waveshare`), but neither distributor stocks it.
+  Adafruit's 128x64 OLED Bonnet (DigiKey 1528-2320-ND, Mouser 485-3531) is
+  not supported: different controls and layout.
 - **PN532 NFC reader, USB-C (CH340).** Both sell Adafruit's PN532 boards
   (364, 789), but they're a different size and need a separate USB serial
   adapter, so they don't fit the reader keepers.

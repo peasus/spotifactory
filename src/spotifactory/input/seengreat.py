@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import os
 import time
 
 import RPi.GPIO as GPIO
@@ -15,16 +18,26 @@ _K1 = 21
 _K2 = 20
 _K3 = 16
 
-_MAPPING = [
-    (_UP,     "Up"),
-    (_DOWN,   "Down"),
-    (_LEFT,   "Left"),
-    (_RIGHT,  "Right"),
-    (_SELECT, "Select"),
+# The Waveshare 1.3inch OLED HAT has the same buttons, and its joystick on the
+# same five pins wired differently. From Waveshare's pin table (up 6, down 19,
+# left 5, right 26, press 13), turned round as the screen is (rotate=2).
+_WAVESHARE_JOYSTICK = {"Up": 19, "Down": 6, "Left": 26, "Right": 5, "Select": 13}
+
+_KEYS = [
     (_K3,     "VolUp"),       # top
     (_K2,     "VolDown"),
     (_K1,     "Menu"),        # bottom
 ]
+_MAPPINGS = {
+    "seengreat": [
+        (_UP,     "Up"),
+        (_DOWN,   "Down"),
+        (_LEFT,   "Left"),
+        (_RIGHT,  "Right"),
+        (_SELECT, "Select"),
+    ] + _KEYS,
+    "waveshare": [(pin, action) for action, pin in _WAVESHARE_JOYSTICK.items()] + _KEYS,
+}
 
 # Held down, these repeat: after _REPEAT_DELAY, every _REPEAT_EVERY.
 _REPEATS = {"VolUp", "VolDown"}
@@ -37,9 +50,16 @@ _HOLD_EVERY = 0.2
 
 
 class SeenGreatInput:
-    def __init__(self):
+    """The joystick and three buttons on the SeenGreat HAT, or on the Waveshare
+    one (SPOTIFACTORY_HAT=waveshare)."""
+
+    def __init__(self, hat: str | None = None):
+        hat = hat or os.environ.get("SPOTIFACTORY_HAT", "seengreat")
+        if hat not in _MAPPINGS:
+            raise ValueError(f"SPOTIFACTORY_HAT={hat!r}: expected one of {', '.join(_MAPPINGS)}")
+        self._mapping = _MAPPINGS[hat]
         GPIO.setmode(GPIO.BCM)
-        for pin, _ in _MAPPING:
+        for pin, _ in self._mapping:
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self._held = None
         self._held_since = 0.0
@@ -53,7 +73,7 @@ class SeenGreatInput:
             action, self._queued = self._queued, None
             return action
         pressed = None
-        for pin, action in _MAPPING:
+        for pin, action in self._mapping:
             if not GPIO.input(pin):  # active-low
                 pressed = action
                 break
