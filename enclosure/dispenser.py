@@ -49,7 +49,7 @@ STICKER_T = 0.18              # measured: backing + sticker together
 # ---------------------------------------------------------------- box
 SIDE_CLEAR = 1.5              # each side of the roll
 ROLL_CLEAR = 3.0              # all round a full roll
-WALL = 2.4                    # 4 lines at 0.6 mm nozzle
+WALL = 2.4                    # 6 lines at 0.4 mm nozzle (4 at 0.6 mm)
 FLOOR = 2.4
 TAPER = 4.0                   # walls lean in, degrees
 FILLET = 6.0                  # outside corner radius (matches the easel)
