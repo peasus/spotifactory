@@ -994,15 +994,16 @@ class TestDisplayModes:
         r, step = self._runner()
         step.is_playing = False                 # hold the position still
         r._render_home()
-        assert self._texts(r) == ["Song", "Artist"]   # the count is in seven-segment
+        assert self._texts(r) == ["Song", "Artist", "3/14"]
         # 41 s into 3:20 fills the bottom edge about a fifth of the way.
         assert call(0, 62, round(127 * 41 / 200), 63) in r.display.draw_rect.call_args_list
 
-    def test_seven_segment_slash(self):
-        from spotifactory.display import lcd
-        d = MagicMock()
-        end = lcd.seg_text(d, 0, 0, "3/12", w=8, h=17, gap=3)
-        assert end == lcd.seg_width("3/12", 8, 3, h=17) == 8 * 3 + 17 // 3 + 3 * 3
+    def test_now_playing_track_count_sits_against_the_right_edge(self):
+        r, step = self._runner()
+        r.display.text_width.side_effect = lambda t: 6 * len(t)
+        r._render_home()
+        x = next(c.args[0] for c in r.display.draw_text.call_args_list if c.args[2] == "3/14")
+        assert x == 126 - 6 * len("3/14")
 
     def test_now_playing_without_a_tag_has_no_count_or_bar(self):
         r, step = self._runner()

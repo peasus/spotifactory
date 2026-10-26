@@ -63,6 +63,10 @@ class DisplaySim:
             if scroll_px > 0:
                 self.canvas.create_rectangle(0, sy, sx, sy + row_h, fill="black", outline="")
 
+    def text_width(self, text: str) -> int:
+        """How many pixels wide `text` draws."""
+        return round(self._font.measure(text) / self.scale)
+
     def draw_image(self, x: int, y: int, image) -> None:
         from PIL import Image, ImageTk
         scaled = image.convert("L").resize(
