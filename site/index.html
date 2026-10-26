@@ -107,34 +107,23 @@
         <line x1="58" y1="236.5" x2="342" y2="236.5" stroke="#fff" stroke-opacity=".25"/>
 
         <!-- OLED window 2:1 -->
+        <g transform="translate(20 0)">
         <rect x="104" y="262" width="150" height="79" rx="5" fill="#0b0909"/>
         <rect x="112" y="268" width="134" height="67" fill="#000"/>
-        <g font-family="DM Mono, ui-monospace, monospace" fill="var(--oled)">
-          <g class="scr-idle">
-            <text x="179" y="296" font-size="10" text-anchor="middle">Stand a photo</text>
-            <text x="179" y="310" font-size="10" text-anchor="middle">on the easel</text>
-          </g>
-          <g class="scr-play" opacity="0">
-            <text x="119" y="279" font-size="6.5" opacity=".75">&#9654; Kitchen speaker</text>
-            <text x="119" y="298" font-size="11" font-weight="500">Sunday Kitchen</text>
-            <text x="119" y="310" font-size="7.5" opacity=".8">The Low Hums</text>
-            <rect x="119" y="319" width="120" height="5" fill="none" stroke="var(--oled)" stroke-width=".8"/>
-            <rect class="progress" x="120" y="320" width="118" height="3" fill="var(--oled)"/>
-          </g>
-          <g class="scr-pause" opacity="0">
-            <text x="179" y="296" font-size="11" text-anchor="middle">&#10074;&#10074; Paused</text>
-            <text x="179" y="310" font-size="7.5" text-anchor="middle" opacity=".8">put it back to carry on</text>
-          </g>
+        <image class="scr-idle" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAIAAABdtOgoAAABWElEQVR42u2cSxKDIBBEgcrepfc/XpY5QbKjKD6CRpzRea+yIEQx6cYeKqU6BwDOOff+fOMr7TxrcBSu8krfrIuPesU2XGfA4CxOfer2xM5o6sZe2Y7mIqhsjzRSiVuZs2scu2dAdf6mPS2BqnN5Y0tKQqcGtM6PdfHb2nUDZHAcO4TxTbv2DC57KO/7inBZPKOOWWSVPXvHqW6cNeCK4m8Hr8oD5jgAAAAAAAAAAAAAAAAAAABAzk0vaQl4IIt/nspcXCRjQHZvDxEkAHNfPoK46l0+iIggVjusgmC2B2T9acK17qeclELdw13sbhC35Jis/+TM4YM+zQBBIfR4EAyqr8qDYFN9PV9DxoAswaUWjhq+hlgEif94JZNAsgjPkGAwRpSoL78MPV2IkadQ6FH/Zn9FlM84GP8U5vph/HkHwh6gvqJcAs4AasCtPGAVBFQF1AcAsMkPP7pEkrE0HVEAAAAASUVORK5CYII=" x="112" y="268" width="134" height="67" preserveAspectRatio="none" style="image-rendering: pixelated"/>
+          <image class="scr-play" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAIAAABdtOgoAAACEklEQVR42u2cy46DMAxFC2LfZf//82Y5XzCziIQQzsPkUTtwrrpAbZyQ62dc2tcLACV+fv/ut6klur3PexlBX8u0V8VP2hqxo4H2NcLWGuesE/fvNJt+D8GIUo5yGhZ9R9qyUiq8uQvq15KLhpH7dWpCLx4Qvch8eiQrOiblZ/k582tlLD1z//kJbTxAGoK0+qKZhE+jgjKORzcchvU1xs97aUxC31CAvL/dYa+aRlRQsiBXlIGieyHgKjGsGtupC2V1Rcsg6qU3zJeElVuSiTEVCqJSxRVTUld5P4ZZF0kYAAAAAOCZCGf0/VVxLu9SXKc6EHfFJo+g1MKODmL5g5JGVbKZmulKFrsIp+vj5KmurXN7Kp+EJXGSiEusZcbU9RWiKpnFpzfN9jrGek1XslfcH9FVNfAApVYqqEkRre8LaTzDeRRaG3lsEa/rSipF/FNf6QH53uEpBEcHp7qS3bV1+xIWAAAAAAAAAMCjMem5d0UHtljuxzLf6Nko4PjcPCHIBti+fQiiBW0fiAhBVDtUQWC0Doj13YirexaxWgHF5b6s3dVcJXW0Nv7o3k9GWWdkf+qlvSjAnAInOlifyb6f27BRwCmCWxWOHm7DLASZb96JEVgm4REUKMOIE/bty9DuRGgeIfXD/mStiPyftsz3F1k3OFcXr8E3dAD7juISwAPIAVPpgCoIkBVgHwAAnol/qmotMXBRuHYAAAAASUVORK5CYII=" x="112" y="268" width="134" height="67" preserveAspectRatio="none" style="image-rendering: pixelated" opacity="0"/>
+          <image class="scr-pause" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAIAAABdtOgoAAABWElEQVR42u2cSxKDIBBEgcrepfc/XpY5QbKjKD6CRpzRea+yIEQx6cYeKqU6BwDOOff+fOMr7TxrcBSu8krfrIuPesU2XGfA4CxOfer2xM5o6sZe2Y7mIqhsjzRSiVuZs2scu2dAdf6mPS2BqnN5Y0tKQqcGtM6PdfHb2nUDZHAcO4TxTbv2DC57KO/7inBZPKOOWWSVPXvHqW6cNeCK4m8Hr8oD5jgAAAAAAAAAAAAAAAAAAABAzk0vaQl4IIt/nspcXCRjQHZvDxEkAHNfPoK46l0+iIggVjusgmC2B2T9acK17qeclELdw13sbhC35Jis/+TM4YM+zQBBIfR4EAyqr8qDYFN9PV9DxoAswaUWjhq+hlgEif94JZNAsgjPkGAwRpSoL78MPV2IkadQ6FH/Zn9FlM84GP8U5vph/HkHwh6gvqJcAs4AasCtPGAVBFQF1AcAsMkPP7pEkrE0HVEAAAAASUVORK5CYII=" x="112" y="268" width="134" height="67" preserveAspectRatio="none" style="image-rendering: pixelated" opacity="0"/>
+
         </g>
 
-        <!-- joystick -->
-        <circle cx="290" cy="302" r="17" fill="#0b0909"/>
-        <circle cx="290" cy="302" r="9" fill="#2e2727"/>
-        <circle cx="287" cy="299" r="3" fill="#fff" opacity=".15"/>
-        <!-- three buttons beside the screen -->
-        <circle cx="84" cy="280" r="5.5" fill="#0b0909"/>
-        <circle cx="84" cy="302" r="5.5" fill="#0b0909"/>
-        <circle cx="84" cy="324" r="5.5" fill="#0b0909"/>
+        <!-- joystick, left of the screen -->
+        <circle cx="92" cy="292" r="15" fill="#0b0909"/>
+        <circle cx="92" cy="292" r="8" fill="#2e2727"/>
+        <circle cx="89" cy="289" r="3" fill="#fff" opacity=".15"/>
+        <!-- three buttons right of the screen -->
+        <rect x="296" y="276" width="18" height="10" rx="3" fill="#0b0909"/>
+        <rect x="296" y="297" width="18" height="10" rx="3" fill="#0b0909"/>
+        <rect x="296" y="318" width="18" height="10" rx="3" fill="#0b0909"/>
       </svg>
     </div>
   </div>
@@ -194,13 +183,9 @@
   <div class="wrap controls">
     <div>
       <div class="oled-frame">
-        <div class="oled" aria-label="Example of the home screen">
-          <div class="row"><span>&#9654; Living room</span><span>&#8635; album</span></div>
-          <div class="title">Sunday Kitchen<small>The Low Hums &middot; 4/11</small></div>
-          <div class="bar"></div>
-        </div>
+        <img class="oled-img" src="/img/oled-playing-4x.png" alt="The now-playing screen: song title, artist, and joystick icons for previous, next, repeat and shuffle" width="512" height="256">
       </div>
-      <p class="oled-caption">1.3" OLED, 128 × 64 pixels. Shown larger than life.</p>
+      <p class="oled-caption">The real now-playing screen, 128 × 64 pixels, shown four times size. The icons sit where the joystick moves: repeat up, shuffle down, skip left and right.</p>
     </div>
     <div>
       <div class="sec-head" style="margin-bottom:28px">

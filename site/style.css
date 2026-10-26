@@ -331,3 +331,7 @@ td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .copy { border: 0; cursor: pointer; }
 .prose pre code { overflow-wrap: normal; }
 .steps-n > li > div > * { min-width: 0; }
+.fig { margin: 8px 0 0; display: grid; gap: 8px; }
+.fig img { display: block; width: 100%; height: auto; border-radius: 12px; background: #fff; }
+.fig figcaption { font: 400 .78rem/1.4 var(--f-mono); color: var(--muted); }
+.oled-img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
