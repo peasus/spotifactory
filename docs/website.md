@@ -8,17 +8,13 @@ Pages serves `/build` from `build.html` on its own.
 
 ## Case files and screen images
 
-`site/stl/` holds the case STLs (and a zip of them) generated from
-`enclosure/easel.py`. After changing the case model, regenerate and copy
-them over:
-
-```
-enclosure/.venv/bin/python enclosure/easel.py
-cp enclosure/out/print/*.stl site/stl/
-(cd enclosure/out/print && zip -9 ../../../site/stl/spotifactory-stl.zip *.stl)
-cp enclosure/out/easel.png site/img/case-render.png
-cp enclosure/out/print_layout.png site/img/print-layout.png
-```
+The build guide links the case STLs, a zip of them, and the two case renders
+straight from the rolling **case-files** GitHub release
+(`https://github.com/peasus/spotifactory/releases/download/case-files/<file>`).
+The `Case files` workflow (`.github/workflows/case-files.yml`) rebuilds them
+from `enclosure/easel.py` and re-uploads them whenever `enclosure/` changes on
+`main`, so nothing in `site/` needs regenerating. To rebuild by hand, run the
+workflow from the Actions tab.
 
 `site/img/oled-*.png` are the home screen drawn with the app's own layout and
 icons, so redo them if the now-playing screen changes.
