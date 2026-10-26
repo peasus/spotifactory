@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -989,6 +989,28 @@ class TestDisplayModes:
         r.handle_select()
         r._render_home()
         assert self._texts(r) == ["Place tag..."]
+
+    def test_now_playing_shows_track_count_and_progress(self):
+        r, step = self._runner()
+        step.is_playing = False                 # hold the position still
+        r._render_home()
+        assert self._texts(r) == ["Song", "Artist", "3/14"]
+        # 41 s into 3:20 fills the bottom edge about a fifth of the way.
+        assert call(0, 62, round(127 * 41 / 200), 63) in r.display.draw_rect.call_args_list
+
+    def test_now_playing_track_count_sits_against_the_right_edge(self):
+        r, step = self._runner()
+        r.display.text_width.side_effect = lambda t: 6 * len(t)
+        r._render_home()
+        x = next(c.args[0] for c in r.display.draw_text.call_args_list if c.args[2] == "3/14")
+        assert x == 126 - 6 * len("3/14")
+
+    def test_now_playing_without_a_tag_has_no_count_or_bar(self):
+        r, step = self._runner()
+        step.tag_active, step.status, step.artist = False, "Place tag...", ""
+        r._render_home()
+        assert self._texts(r) == ["Place tag..."]
+        assert not [c for c in r.display.draw_rect.call_args_list if c.args[1] >= 62]
 
     def test_press_that_wakes_the_screen_keeps_the_mode(self):
         r, step = self._runner()
