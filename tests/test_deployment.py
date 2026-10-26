@@ -136,6 +136,15 @@ class TestStartupMain:
         assert "--portal-ssid" in cmd
         m["run_platform"].assert_called_once()
 
+    def test_wifi_connect_uses_spotifactory_portal_page(self):
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=True):
+            startup.main()
+        cmd = m["subprocess"].call_args[0][0]
+        ui_dir = Path(cmd[cmd.index("--ui-directory") + 1])
+        assert (ui_dir / "index.html").exists()
+
     def test_exits_if_still_offline_after_wifi_connect(self):
         from spotifactory import startup
         stack, m = self._patches(network_up=False)
