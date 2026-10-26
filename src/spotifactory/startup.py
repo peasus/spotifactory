@@ -14,6 +14,9 @@ import time
 from pathlib import Path
 
 _BOOT_NETWORK_WAIT_SECS = 30.0  # saved WiFi can take a while to associate after boot
+# Our own setup page (deploy/portal) in place of WiFi Connect's stock one.
+# The app is installed editable from the checkout, so this ships with updates.
+_PORTAL_UI_DIR = Path(__file__).resolve().parents[2] / "deploy" / "portal"
 # 128x64 1-bit logo shown while the box boots, held at least this long.
 _SPLASH_PATH = Path(__file__).resolve().parent / "display" / "splash.png"
 _SPLASH_SECS = 2.0
@@ -160,11 +163,11 @@ def main() -> None:
     if not online:
         _show(display, "Connect to WiFi:", "Spotifactory")
         print("[startup] no network — launching WiFi Connect", flush=True)
+        cmd = ["wifi-connect", "--portal-ssid", "Spotifactory"]
+        if (_PORTAL_UI_DIR / "index.html").exists():
+            cmd += ["--ui-directory", str(_PORTAL_UI_DIR)]
         try:
-            subprocess.run(
-                ["wifi-connect", "--portal-ssid", "Spotifactory"],
-                check=True,
-            )
+            subprocess.run(cmd, check=True)
         except FileNotFoundError:
             print("[startup] wifi-connect not found — skipping", flush=True)
         except subprocess.CalledProcessError as e:
