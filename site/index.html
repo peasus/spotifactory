@@ -137,16 +137,78 @@
     </div>
     <ol class="steps">
       <li class="step">
-        <h3>Print the cover</h3>
-        <p>While an album or playlist is playing, choose <b>Print Album</b> on the box. It prints the artwork on a paired Instax Square Link, then writes an NFC sticker for the back.</p>
+        <svg class="scene scene-print" viewBox="0 0 240 172" role="img" aria-label="A photo of the album cover slides out of the top of an Instax printer">
+          <defs>
+            <clipPath id="s1-slot"><rect x="0" y="0" width="240" height="96"/></clipPath>
+          </defs>
+          <ellipse cx="120" cy="160" rx="66" ry="5" fill="#000" opacity=".35"/>
+          <g clip-path="url(#s1-slot)">
+            <g class="s1-photo">
+              <rect x="88" y="12" width="64" height="76" rx="2" fill="#fbfaf7"/>
+              <g class="s1-art">
+                <rect x="92" y="16" width="56" height="32" fill="#e9603b"/>
+                <rect x="92" y="48" width="56" height="24" fill="#23354d"/>
+                <path d="M104 48 a16 16 0 0 1 32 0z" fill="#f6c35a"/>
+              </g>
+              <rect class="s1-fog" x="92" y="16" width="56" height="56" fill="#3b3434"/>
+            </g>
+          </g>
+          <rect x="66" y="92" width="108" height="64" rx="14" fill="#e6e0d6"/>
+          <rect x="66" y="92" width="108" height="64" rx="14" fill="none" stroke="#fff" stroke-opacity=".5"/>
+          <rect x="82" y="92" width="76" height="6" rx="3" fill="#2b2424"/>
+          <circle class="s1-led" cx="156" cy="140" r="3" fill="#A9C23F"/>
+          <text x="80" y="143" font-family="DM Sans, sans-serif" font-size="9" font-weight="700" fill="#9b928a" letter-spacing=".5">instax</text>
+        </svg>
+        <h3>Print the album</h3>
+        <p>While an album or playlist is playing, choose <b>Print Album</b> on the box. The cover comes out of your Instax Square Link printer.</p>
       </li>
       <li class="step">
-        <h3>Stand it up</h3>
-        <p>Set the photo in the groove. The reader behind it picks up the tag and the album starts on your speaker.</p>
+        <svg class="scene scene-sticker" viewBox="0 0 240 172" role="img" aria-label="An NFC sticker is pressed onto the back of the photo">
+          <ellipse cx="120" cy="160" rx="54" ry="5" fill="#000" opacity=".35"/>
+          <g transform="rotate(-4 120 92)">
+            <rect x="72" y="30" width="96" height="116" rx="3" fill="#3d3636" stroke="#5a5151"/>
+            <text x="120" y="134" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="7" fill="#6e6460" letter-spacing="1.5">INSTAX SQUARE</text>
+            <rect class="s2-spot" x="103" y="62" width="34" height="34" rx="5" fill="none" stroke="#A9C23F" stroke-dasharray="3 3"/>
+            <g class="s2-sticker">
+              <rect x="103" y="62" width="34" height="34" rx="5" fill="#f3efe9"/>
+              <rect x="108" y="67" width="24" height="24" rx="3" fill="none" stroke="#c99a5a" stroke-width="1.2"/>
+              <rect x="111.5" y="70.5" width="17" height="17" rx="2" fill="none" stroke="#c99a5a" stroke-width="1.2"/>
+              <rect x="115" y="74" width="10" height="10" rx="1.5" fill="none" stroke="#c99a5a" stroke-width="1.2"/>
+              <rect x="118" y="77" width="4" height="4" fill="#2b2424"/>
+            </g>
+          </g>
+        </svg>
+        <h3>Stick on a tag</h3>
+        <p>Turn the photo over and press a small NFC sticker onto the back. A roll of them does a whole shelf of albums.</p>
       </li>
       <li class="step">
-        <h3>Lift it to pause</h3>
-        <p>There's no pause button. Take the photo off to pause, put it back to carry on, or swap in another one to change records.</p>
+        <svg class="scene scene-write" viewBox="0 0 240 172" role="img" aria-label="The photo stands on the box, which writes the album to the tag and shows Album ready">
+          <ellipse cx="120" cy="164" rx="106" ry="5" fill="#000" opacity=".35"/>
+          <g class="s3-photo">
+            <rect x="34" y="18" width="64" height="76" rx="2" fill="#fbfaf7"/>
+            <rect x="38" y="22" width="56" height="32" fill="#e9603b"/>
+            <rect x="38" y="54" width="56" height="24" fill="#23354d"/>
+            <path d="M50 54 a16 16 0 0 1 32 0z" fill="#f6c35a"/>
+          </g>
+          <g class="s3-waves" fill="none" stroke="#A9C23F" stroke-width="2.5" stroke-linecap="round">
+            <path d="M106 40 a14 14 0 0 1 0 24"/>
+            <path d="M114 32 a24 24 0 0 1 0 40"/>
+            <path d="M122 24 a34 34 0 0 1 0 56"/>
+          </g>
+          <g class="s3-check">
+            <circle cx="96" cy="20" r="11" fill="#A9C23F"/>
+            <path d="M91 20 l3.5 3.5 l6.5 -7" fill="none" stroke="#191414" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <rect x="14" y="94" width="212" height="68" rx="10" fill="#c8955e"/>
+          <rect x="14" y="94" width="212" height="5" rx="2.5" fill="#ddb07c"/>
+          <rect x="28" y="94" width="76" height="4" rx="2" fill="#9c6c3c"/>
+          <rect x="111" y="101" width="106" height="56" rx="3" fill="#000"/>
+          <image class="s3-scr s3-place" href="/img/oled-place-tag.png" x="114" y="104" width="100" height="50"/>
+          <image class="s3-scr s3-writing" href="/img/oled-writing.png" x="114" y="104" width="100" height="50"/>
+          <image class="s3-scr s3-ready" href="/img/oled-ready.png" x="114" y="104" width="100" height="50"/>
+        </svg>
+        <h3>Write the tag</h3>
+        <p>Stand the photo on the easel and the box writes the album to the sticker. From then on, standing it up plays the album and lifting it off pauses.</p>
       </li>
     </ol>
   </div>
@@ -165,16 +227,6 @@
       <figure class="polaroid" style="--r:-1deg; margin:0"><div class="art art-3"></div><figcaption>party, obviously</figcaption></figure>
       <figure class="polaroid" style="--r:3deg; margin:0"><div class="art art-4"></div><figcaption>dad's record</figcaption></figure>
       <figure class="polaroid" style="--r:-2deg; margin:0"><div class="art art-5"></div><figcaption>rainy afternoons</figcaption></figure>
-    </div>
-    <div class="tag-note">
-      <div>
-        <h3>What's on the tag</h3>
-        <p>A small NFC sticker on the back holds a link such as <span class="mono-chip">spotify:album:…</span> or a playlist. Tags can carry more than one link, so a photo can also point to the same album on Apple Music.</p>
-      </div>
-      <div>
-        <h3>Albums and playlists</h3>
-        <p>Choose <b>Print Playlist</b> to turn a playlist into a photo the same way. Mixtapes for people who never owned a tape deck.</p>
-      </div>
     </div>
   </div>
 </section>
