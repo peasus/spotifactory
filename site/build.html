@@ -168,7 +168,7 @@ enclosure/.venv/bin/python enclosure/check.py   # fit and printability checks</c
 <pre><code>SPOTIPY_CLIENT_ID=your-client-id-here
 RELAY_URL=https://auth.spotifactory.workers.dev</code></pre></div></li>
         </ol>
-        <div class="callout"><p>The relay is a small Cloudflare Worker that passes the login from your phone to the box. You can use the shared one above. To run your own, deploy <code>deploy/relay/</code> with Wrangler, set <code>RELAY_URL</code> to its address, and use its <code>/callback</code> address as the redirect URI instead.</p></div>
+        <div class="callout"><p>The relay address is the Spotifactory login relay, which passes the sign-in from your phone to the box. It works with any Spotify app, so just use it as is. If you'd rather host your own, you can deploy <code>deploy/relay/</code> to Cloudflare Workers.</p></div>
       </section>
 
       <section id="pi" aria-labelledby="h-pi">
