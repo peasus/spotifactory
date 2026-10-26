@@ -62,6 +62,45 @@ def _make_instax(print_enabled: bool, quiet: bool):
     return _TrackedInstaxBLE(print_enabled=print_enabled, quiet=quiet)
 
 
+@dataclass
+class PrinterStatus:
+    printer_found: bool
+    photos_left: int = 0
+    battery_pct: int | None = None
+    charging: bool = False
+    error: str | None = None
+
+
+def _connect(instax) -> None:
+    if sys.platform == "linux":
+        # The printer asks to confirm a passkey on every RFCOMM connect.
+        from spotifactory.hardware.bluetooth import auto_accept_agent
+        with auto_accept_agent():
+            instax.connect(timeout=CONNECT_TIMEOUT)
+    else:
+        instax.connect(timeout=CONNECT_TIMEOUT)
+
+
+def get_status() -> PrinterStatus:
+    """Connect to the printer just long enough to read its film count and battery."""
+    instax = _make_instax(print_enabled=False, quiet=True)
+    try:
+        _connect(instax)
+        if not instax.peripheral.is_connected():
+            return PrinterStatus(printer_found=False, error="Printer not found")
+        batt = instax.batteryPercentage
+        return PrinterStatus(
+            printer_found=True,
+            photos_left=instax.photosLeft,
+            battery_pct=batt if batt > 0 else None,
+            charging=bool(instax.isCharging),
+        )
+    except Exception as e:
+        return PrinterStatus(printer_found=True, error=str(e))
+    finally:
+        instax.disconnect()
+
+
 def print_image(
     image: str | BytesIO,
     dry_run: bool = False,
@@ -85,13 +124,7 @@ def print_image(
     instax = _make_instax(print_enabled=not dry_run, quiet=True)
     try:
         _report("Connecting...")
-        if sys.platform == "linux":
-            # The printer asks to confirm a passkey on every RFCOMM connect.
-            from spotifactory.hardware.bluetooth import auto_accept_agent
-            with auto_accept_agent():
-                instax.connect(timeout=CONNECT_TIMEOUT)
-        else:
-            instax.connect(timeout=CONNECT_TIMEOUT)
+        _connect(instax)
 
         if not instax.peripheral.is_connected():
             return PrintResult(printer_found=False, error="Printer not found")

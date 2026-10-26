@@ -93,6 +93,31 @@ class TestBtReconnectLoop:
         move.assert_called_once()
 
 
+class TestSplash:
+    def test_draws_full_screen_logo(self):
+        from spotifactory.startup import _show_splash
+        display = MagicMock()
+        _show_splash(display)
+        img = display.draw_image.call_args[0][2]
+        assert display.draw_image.call_args[0][:2] == (0, 0)
+        assert img.size == (128, 64) and img.mode == "1"
+        display.update.assert_called_once()
+
+    def test_missing_image_does_not_block_boot(self, tmp_path):
+        from spotifactory.startup import _show_splash
+        display = MagicMock()
+        with patch("spotifactory.startup._SPLASH_PATH", tmp_path / "nope.png"):
+            _show_splash(display)
+        display.update.assert_not_called()
+
+    def test_shown_before_network_check(self):
+        from spotifactory import startup
+        stack, _ = TestStartupMain._patches()
+        with stack, patch("spotifactory.startup._show_splash") as splash:
+            startup.main()
+        splash.assert_called_once()
+
+
 class TestStartupMain:
     """Integration-style tests for the startup sequencing logic.
 
@@ -110,6 +135,7 @@ class TestStartupMain:
         stack.enter_context(patch(f"{s}._make_display", return_value=MagicMock()))
         stack.enter_context(patch(f"{s}._wait_for_network", return_value=network_up))
         stack.enter_context(patch(f"{s}._has_valid_token", return_value=token_valid))
+        stack.enter_context(patch(f"{s}._SPLASH_SECS", 0.0))
         mocks = {
             "run_platform": stack.enter_context(patch("spotifactory.startup._run_platform")),
             "auth": stack.enter_context(patch("spotifactory.auth_server.run_pkce_auth")),
@@ -135,6 +161,15 @@ class TestStartupMain:
         assert cmd[0] == "wifi-connect"
         assert "--portal-ssid" in cmd
         m["run_platform"].assert_called_once()
+
+    def test_wifi_connect_uses_spotifactory_portal_page(self):
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=True):
+            startup.main()
+        cmd = m["subprocess"].call_args[0][0]
+        ui_dir = Path(cmd[cmd.index("--ui-directory") + 1])
+        assert (ui_dir / "index.html").exists()
 
     def test_exits_if_still_offline_after_wifi_connect(self):
         from spotifactory import startup
