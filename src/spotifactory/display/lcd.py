@@ -48,12 +48,16 @@ def _digit(d, x: int, y: int, ch: str, w: int, h: int, t: int) -> None:
         d.draw_rect(*boxes[s])
 
 
-def seg_width(text: str, w: int, gap: int) -> int:
-    return sum(2 + gap if c == ":" else w + gap for c in text) - gap
+def _char_width(c: str, w: int, h: int) -> int:
+    return 2 if c == ":" else h // 3 if c == "/" else w
+
+
+def seg_width(text: str, w: int, gap: int, h: int = 25) -> int:
+    return sum(_char_width(c, w, h) + gap for c in text) - gap
 
 
 def seg_text(d, x: int, y: int, text: str, w: int = 13, h: int = 25, gap: int = 4) -> int:
-    """Seven-segment `text` (digits, '-' and ':') with its top-left at (x, y);
+    """Seven-segment `text` (digits, '-', ':' and '/') with its top-left at (x, y);
     returns the x after it."""
     t = 3 if h >= 21 else 2
     for ch in text:
@@ -62,6 +66,12 @@ def seg_text(d, x: int, y: int, text: str, w: int = 13, h: int = 25, gap: int = 
             d.draw_rect(x, y + dot, x + 1, y + dot + 1)
             d.draw_rect(x, y + h - dot - 2, x + 1, y + h - dot - 1)
             x += 2 + gap
+        elif ch == "/":
+            sw = _char_width(ch, w, h)
+            for row in range(h):                       # bottom-left to top-right
+                col = (h - 1 - row) * (sw - 1) // (h - 1)
+                d.draw_rect(x + col, y + row, x + col, y + row)
+            x += sw + gap
         else:
             _digit(d, x, y, ch, w, h, t)
             x += w + gap

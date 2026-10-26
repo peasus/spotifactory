@@ -768,33 +768,37 @@ class Runner:
 
         # A cross laid out like the joystick: repeat (up) over shuffle (down),
         # skips (left/right) halfway between. A setting that's on is inverted.
-        # It sits clear of the progress bar along the bottom edge.
+        # It sits on the left, the side of the box the joystick is on, clear
+        # of the progress bar along the bottom edge.
         sw, sh = icons.size(icons.SHUFFLE)
         rw, rh = icons.size(icons.REPEAT)
         pw, ph = icons.size(icons.PREV)
         shuf_top = 58 - sh
         rep_top = shuf_top - 6 - rh
         skip_top = (rep_top + shuf_top + sh) // 2 - ph // 2
-        sx = 64 - sw // 2
+        sx = 2 + pw + 8
         rep_icon = icons.REPEAT_ONE if repeat == "track" else icons.REPEAT
-        (icons.draw_badge if repeat != "off" else icons.draw)(d, 64 - rw // 2, rep_top, rep_icon)
+        (icons.draw_badge if repeat != "off" else icons.draw)(d, sx + sw // 2 - rw // 2, rep_top, rep_icon)
         (icons.draw_badge if shuffle else icons.draw)(d, sx, shuf_top, icons.SHUFFLE)
         icons.draw(d, sx - 8 - pw, skip_top, icons.PREV)
         icons.draw(d, sx + sw + 8, skip_top, icons.NEXT)
         if getattr(step, "tag_active", False):
-            self._draw_track_count(step, skip_top - 1)
+            self._draw_track_count(step, rep_top + 1)
             if not scrub:                       # the scrub line shows it then
                 self._draw_progress(step)
         d.update()
 
     def _draw_track_count(self, step, y: int) -> None:
-        """Which track of how many ("3/12"), left of the skip-back icon; just
-        the track when both won't fit beside it (an album of 100 or more)."""
+        """Which track of how many ("03/12"), right of the controls, in the
+        album screen's seven-segment digits."""
         track, total = step.track_number, step.total_tracks
         if not track:
             return
-        text = f"{track}/{total}" if total else str(track)
-        self.display.draw_text(2, y, text if len(text) <= 5 else str(track))
+        text = f"{track:02d}/{total}" if total else f"{track:02d}"
+        d = self.display
+        x = 127 - lcd.seg_width(text, 8, 3, h=17)
+        lcd.tiny_text(d, x, y, "TRACK")
+        lcd.seg_text(d, x, y + 8, text, w=8, h=17, gap=3)
 
     def _draw_progress(self, step) -> None:
         """A thin bar along the bottom edge: dotted for the whole track, solid
