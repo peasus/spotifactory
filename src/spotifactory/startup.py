@@ -17,6 +17,9 @@ _BOOT_NETWORK_WAIT_SECS = 30.0  # saved WiFi can take a while to associate after
 # Our own setup page (deploy/portal) in place of WiFi Connect's stock one.
 # The app is installed editable from the checkout, so this ships with updates.
 _PORTAL_UI_DIR = Path(__file__).resolve().parents[2] / "deploy" / "portal"
+# 128x64 1-bit logo shown while the box boots, held at least this long.
+_SPLASH_PATH = Path(__file__).resolve().parent / "display" / "splash.png"
+_SPLASH_SECS = 2.0
 
 
 def _has_network(timeout: float = 3.0) -> bool:
@@ -53,6 +56,19 @@ def _show(display, line1: str, line2: str = "") -> None:
     if line2:
         display.draw_text(2, 28, line2)
     display.update()
+
+
+def _show_splash(display) -> None:
+    """Logo on the OLED while the network and Spotify checks run. Never blocks boot."""
+    try:
+        from PIL import Image
+        with Image.open(_SPLASH_PATH) as img:
+            splash = img.convert("1")
+        display.clear()
+        display.draw_image(0, 0, splash)
+        display.update()
+    except Exception as e:
+        print(f"[startup] splash skipped: {e}", flush=True)
 
 
 def _make_qr(url: str):
@@ -138,9 +154,13 @@ def main() -> None:
     load_dotenv()
 
     display = _make_display()
+    _show_splash(display)
+    splash_until = time.monotonic() + _SPLASH_SECS
 
     # ------------------------------------------------------------------ WiFi
-    if not _wait_for_network():
+    online = _wait_for_network()
+    time.sleep(max(0.0, splash_until - time.monotonic()))
+    if not online:
         _show(display, "Connect to WiFi:", "Spotifactory")
         print("[startup] no network — launching WiFi Connect", flush=True)
         cmd = ["wifi-connect", "--portal-ssid", "Spotifactory"]
