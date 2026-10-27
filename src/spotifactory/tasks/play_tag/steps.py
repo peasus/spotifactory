@@ -31,13 +31,11 @@ class ScanStep(Step):
 
 class PlayStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.spotify import get_client
         self.status = "Starting playback..."
         uri = ctx.data["uri"]
         try:
-            from spotifactory.spotify import get_playback_device_id
-            sp = get_client()
-            sp.start_playback(context_uri=uri, device_id=get_playback_device_id())
+            from spotifactory.spotify import get_playback_device_id, start_playback
+            start_playback(get_playback_device_id(), uri)
         except spotipy.SpotifyException as e:
             if "device" in str(e).lower() or "restricted" in str(e).lower():
                 self.show_for("Choose Speaker first", 3.0)

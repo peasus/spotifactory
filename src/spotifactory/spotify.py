@@ -42,12 +42,16 @@ _client: spotipy.Spotify | None = None
 # Spotify forgets the "active device" after idle and the app restarts on reboot.
 _DEVICE_ID_KEY = "SPOTIFACTORY_DEVICE_ID"
 _DEVICE_NAME_KEY = "SPOTIFACTORY_DEVICE_NAME"
+# Set for a speaker the Web API won't control (Sonos): it's played through
+# the Connect route instead (spotifactory/connect.py).
+_DEVICE_RESTRICTED_KEY = "SPOTIFACTORY_DEVICE_RESTRICTED"
 
 
 @dataclass
 class ChosenDevice:
     id: str
     name: str
+    restricted: bool = False
 
 
 class _DevicePKCE(SpotifyPKCE):
@@ -112,24 +116,54 @@ def _with_auth_retry(fn):
     return wrapper
 
 
+def _connect_target() -> ChosenDevice | None:
+    """The chosen speaker, when the Web API won't control it and the Connect
+    helper is installed: player commands then go there through the helper."""
+    chosen = get_active_device()
+    if chosen is None or not chosen.restricted:
+        return None
+    from spotifactory import connect
+    return chosen if connect.available() else None
+
+
 @_with_auth_retry
 def prev_track() -> None:
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.prev_track(target.id)
+        return
     get_client().previous_track()
 
 
 @_with_auth_retry
 def next_track() -> None:
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.next_track(target.id)
+        return
     get_client().next_track()
 
 
 @_with_auth_retry
 def set_repeat(state: str) -> None:
     """"off", "context" (the album or playlist) or "track"."""
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.repeat(target.id, state)
+        return
     get_client().repeat(state)
 
 
 @_with_auth_retry
 def seek(position_ms: int) -> None:
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.seek(target.id, position_ms)
+        return
     get_client().seek_track(max(0, int(position_ms)))
 
 
@@ -141,14 +175,28 @@ def toggle_shuffle() -> bool | None:
     if not state:
         return None
     new_state = not state["shuffle_state"]
-    sp.shuffle(new_state)
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.shuffle(target.id, new_state)
+    else:
+        sp.shuffle(new_state)
     return new_state
 
 
 @_with_auth_retry
 def get_volume() -> int | None:
     """The playing device's volume (0-100), or None if there's no device or
-    Spotify can't set its volume (some speakers, e.g. Sonos, don't allow it)."""
+    Spotify can't set its volume (some speakers, e.g. Sonos, don't allow it).
+    A chosen Sonos is asked directly over the local network."""
+    target = _connect_target()
+    if target:
+        from spotifactory.hardware.sonos import get_volume as sonos_volume
+        try:
+            return sonos_volume(target.name)
+        except Exception as e:
+            print(f"[spotify] Sonos volume for {target.name!r}: {e}", flush=True)
+            return None
     state = get_client().current_playback()
     dev = (state or {}).get("device") or {}
     if dev.get("is_restricted") or dev.get("supports_volume") is False or dev.get("volume_percent") is None:
@@ -158,6 +206,16 @@ def get_volume() -> int | None:
 
 @_with_auth_retry
 def set_volume(percent: int) -> None:
+    target = _connect_target()
+    if target:
+        from spotifactory.hardware.sonos import set_volume as sonos_set_volume
+        try:
+            sonos_set_volume(target.name, percent)
+        except Exception as e:
+            print(f"[spotify] Sonos volume over UPnP failed ({e}); trying Connect", flush=True)
+            from spotifactory import connect
+            connect.set_volume(target.id, percent)
+        return
     get_client().volume(max(0, min(100, int(percent))))
 
 
@@ -170,10 +228,49 @@ def play_pause() -> bool | None:
     if not state or not state.get("device"):
         return None
     if state.get("is_playing"):
-        sp.pause_playback()
+        pause()
         return False
-    sp.start_playback(device_id=state["device"]["id"])
+    start_playback(state["device"]["id"])
     return True
+
+
+def _routes_to_connect(device_id: str) -> bool:
+    target = _connect_target()
+    return target is not None and target.id == device_id
+
+
+@_with_auth_retry
+def start_playback(device_id: str, context_uri: str | None = None,
+                   restricted: bool | None = None) -> None:
+    """Play `context_uri` from the top on `device_id`, or resume there if None.
+
+    A speaker the Web API won't control goes through the Connect helper:
+    the chosen one when it's marked restricted, or any one when `restricted`
+    says so (and the helper is installed).
+    """
+    from spotifactory import connect
+    if restricted is None:
+        restricted = _routes_to_connect(device_id)
+    if restricted and connect.available():
+        if context_uri:
+            connect.play(device_id, context_uri)
+        else:
+            connect.resume(device_id)
+        return
+    if context_uri:
+        get_client().start_playback(context_uri=context_uri, device_id=device_id)
+    else:
+        get_client().start_playback(device_id=device_id)
+
+
+@_with_auth_retry
+def pause() -> None:
+    target = _connect_target()
+    if target:
+        from spotifactory import connect
+        connect.pause(target.id)
+        return
+    get_client().pause_playback()
 
 
 @_with_auth_retry
@@ -193,18 +290,20 @@ def find_device_by_name(name: str) -> dict | None:
     return None
 
 
-def set_active_device(device_id: str, name: str = "") -> None:
+def set_active_device(device_id: str, name: str = "", restricted: bool = False) -> None:
     """Remember the speaker chosen in Choose Speaker, across idle and restarts."""
     from spotifactory.settings import save_setting
     save_setting(_DEVICE_ID_KEY, device_id)
     save_setting(_DEVICE_NAME_KEY, name)
+    save_setting(_DEVICE_RESTRICTED_KEY, "1" if restricted else "")
 
 
 def get_active_device() -> ChosenDevice | None:
     device_id = os.environ.get(_DEVICE_ID_KEY, "").strip()
     if not device_id:
         return None
-    return ChosenDevice(device_id, os.environ.get(_DEVICE_NAME_KEY, "").strip())
+    return ChosenDevice(device_id, os.environ.get(_DEVICE_NAME_KEY, "").strip(),
+                        restricted=os.environ.get(_DEVICE_RESTRICTED_KEY, "").strip() == "1")
 
 
 @_with_auth_retry
@@ -212,8 +311,13 @@ def resolve_chosen_device(chosen: ChosenDevice) -> str | None:
     """Return the chosen speaker's current device id, or None if Spotify doesn't list it.
 
     Matches by id first, then by name, since some speakers get a new id when
-    they reconnect.
+    they reconnect. A restricted speaker (Sonos) is taken as it is: Spotify
+    leaves it out of the list while it's idle.
     """
+    if chosen.restricted:
+        from spotifactory import connect
+        if connect.available():
+            return chosen.id
     devices = get_client().devices().get("devices", [])
     for d in devices:
         if d.get("id") == chosen.id:
@@ -275,7 +379,11 @@ def get_playback_device_id() -> str | None:
 
 
 @_with_auth_retry
-def transfer_playback(device_id: str) -> None:
+def transfer_playback(device_id: str, restricted: bool = False) -> None:
+    from spotifactory import connect
+    if restricted and connect.available():
+        connect.transfer(device_id)
+        return
     get_client().transfer_playback(device_id, force_play=False)
 
 

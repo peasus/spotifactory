@@ -1,0 +1,19 @@
+[package]
+name = "spotifactory-connect"
+version = "0.1.0"
+edition = "2021"
+description = "Sends Spotify Connect commands to speakers the Web API won't control (Sonos)"
+license = "PolyForm-Noncommercial-1.0.0"
+publish = false
+
+[dependencies]
+librespot-core = { version = "0.8", default-features = false, features = ["rustls-tls-native-roots"] }
+tokio = { version = "1", features = ["rt", "macros", "io-std", "io-util"] }
+serde_json = "1"
+http = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

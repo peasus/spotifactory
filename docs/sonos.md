@@ -1,11 +1,57 @@
 # Sonos Integration Status
 
+## Playing through the Connect route (experimental, untested on a real Sonos)
+
+Spotify's own apps start music on Sonos through Spotify's internal Connect state
+service, not the Web API. A librespot session can call that service too, which is how
+[Spotifast](https://github.com/crmne/spotifast/pull/823) started playlists and tracks on a
+Sonos Move and Arc (S2) in October 2026. Spotifactory does the same:
+
+- `connect-helper/` is a small Rust program (`spotifactory-connect`) built on
+  `librespot-core`. It signs in with the login Raspotify saved in `~/.cache/librespot` and
+  sends `POST /connect-state/v1/player/command/from/<its device>/to/<the Sonos>` with
+  bodies like `{"command": {"endpoint": "play", "context": {"uri": "spotify:album:…"}}}`.
+- `src/spotifactory/connect.py` keeps one helper running and builds the commands (play,
+  resume, pause, skip, seek, shuffle, repeat).
+- **Choose Speaker** lists Sonos rooms found on the network (port 1400, `/spotifyzc`), since
+  Spotify leaves idle Sonos speakers out of its device list. A chosen Sonos is saved with
+  `SPOTIFACTORY_DEVICE_RESTRICTED=1`, and tags and buttons for it go through the helper.
+  Volume is set on the speaker itself with SoCo.
+- What's playing (the screen, Print Album) still comes from the Web API, which can read a
+  Sonos's playback even though it can't control it.
+
+The Sonos needs Spotify linked to the same account in the Sonos app. Without the helper
+installed, nothing changes from the pause-only behaviour below.
+
+### Installing the helper on a box
+
+Build it for the Pi (the **Connect helper** GitHub workflow uploads an arm64 build as an
+artifact, or `cargo build --release` in `connect-helper/` on an arm64 Linux machine), then:
+
+```
+scp spotifactory-connect spotifactory@spotifactory.local:~/.local/bin/
+ssh spotifactory@spotifactory.local 'chmod +x ~/.local/bin/spotifactory-connect && sudo systemctl restart spotifactory'
+```
+
+The app looks for it in `$SPOTIFACTORY_CONNECT_HELPER`, `~/.local/bin/spotifactory-connect`,
+then `connect-helper/target/release/spotifactory-connect`.
+
+### Testing it
+
+1. Pick the Sonos in **Choose Speaker**, place a tag, and watch `journalctl -u spotifactory -f`
+   for `[connect] play → …` and any error the helper passes back.
+2. If Spotify refuses commands sent from the helper's own session, try sending them from
+   Raspotify's device instead: set `SPOTIFACTORY_CONNECT_FROM` in `.env` to the
+   "Spotifactory" device id (`scripts/list_spotify_devices.py` prints it) and restart.
+3. Things to check: an idle Sonos waking up for a tag, lift-to-pause, the buttons, and
+   playback after a Sonos firmware update.
+
 ## What works
 
 **Pause / resume via SoCo UPnP** — reliable on all Sonos hardware during an active Spotify
 Connect session. `coordinator.pause()` and `coordinator.play()` work regardless of firmware.
-This is what Spotifactory uses: tag removed → SoCo pause; tag placed again → SoCo resume
-(if the user has already started playback manually).
+This is what Spotifactory uses without the Connect helper: tag removed → SoCo pause; tag
+placed again → SoCo resume (if the user has already started playback manually).
 
 ## What doesn't work and why
 

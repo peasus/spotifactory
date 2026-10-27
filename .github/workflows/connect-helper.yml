@@ -1,0 +1,31 @@
+name: Connect helper
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ "connect-helper/**", ".github/workflows/connect-helper.yml" ]
+  pull_request:
+    paths: [ "connect-helper/**", ".github/workflows/connect-helper.yml" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Arm64, and an older glibc than Raspberry Pi OS (Bookworm: 2.36), so the
+    # binary runs on the box as built.
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        working-directory: connect-helper
+        run: cargo build --release --locked
+      - name: Check it starts
+        working-directory: connect-helper
+        run: |
+          mkdir -p /tmp/nocache
+          echo '{"op":"ping"}' | ./target/release/spotifactory-connect --cache /tmp/nocache | grep -q 'no saved Spotify login'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spotifactory-connect-aarch64
+          path: connect-helper/target/release/spotifactory-connect
