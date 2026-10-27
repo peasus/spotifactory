@@ -9,11 +9,11 @@ off pauses.
 
 ## How it works
 
-- **Raspberry Pi Zero 2 W** with a **SeenGreat 1.3" OLED HAT** (SH1106 screen,
+- **Raspberry Pi Zero 2 W** with a **SeenGreat 1.3" OLED HAT** ([this one](https://a.co/d/09jW1LQh); SH1106 screen,
   5-way joystick) runs the app (`spotifactory.startup`) as a systemd service.
   Waveshare's 1.3inch OLED HAT also works: set `SPOTIFACTORY_HAT=waveshare`
   in `.env` (or `deploy/provision.env`).
-- A **PN532 NFC reader** (USB-C, CH340 serial) behind the photo reads the
+- A **PN532 NFC reader** (USB-C, CH340 serial; [this one](https://a.co/d/0b7JEN1F)) behind the photo reads the
   tag's `spotify:album:` / `spotify:playlist:` URI and starts playback through
   the Spotify Web API.
 - Music plays on whichever speaker you pick in **Choose Speaker** (remembered
@@ -159,6 +159,7 @@ Assembly order, with the body upside down or on its back:
 | `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
 | `deploy/` | Pi setup script, systemd unit, auth relay Worker |
 | `enclosure/` | Case model, checks and parts list |
+| `connect-helper/` | Rust helper that plays Spotify on Sonos speakers (experimental) |
 | `docs/sonos.md` | What does and doesn't work with Sonos speakers |
 
 ## License
