@@ -26,7 +26,7 @@ Neither distributor carries everything: see [Buy elsewhere](#buy-elsewhere).
 
 Neither DigiKey nor Mouser carries these:
 
-- **SeenGreat 1.3" OLED HAT.** The case is shaped around this board.
+- **SeenGreat 1.3" OLED HAT.** [On Amazon](https://a.co/d/09jW1LQh). The case is shaped around this board.
 - **PN532 NFC reader, USB-C (CH340).** [On Amazon](https://a.co/d/0b7JEN1F). Both
   distributors sell Adafruit's PN532 boards (364, 789), but they cost far
   more, are a different size and need a separate USB serial adapter, so they
