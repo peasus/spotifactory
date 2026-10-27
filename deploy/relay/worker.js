@@ -21,7 +21,7 @@ const SUCCESS_HTML = `<!DOCTYPE html>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 60px 20px;
            background: #191414; color: #fff; }
-    h1   { color: #1DB954; font-size: 2em; margin-bottom: 0.5em; }
+    h1   { color: #A9C23F; font-size: 2em; margin-bottom: 0.5em; }
     p    { color: #ccc; }
   </style>
 </head>

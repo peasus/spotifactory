@@ -1,0 +1,52 @@
+name: Case files
+
+# Builds the case STLs from enclosure/easel.py and publishes them to the
+# rolling "case-files" release, which the website's build guide links to:
+# https://github.com/peasus/spotifactory/releases/download/case-files/<file>
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "enclosure/**"
+      - ".github/workflows/case-files.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: case-files
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install build123d==0.13.0 trimesh matplotlib networkx
+      - name: Build STLs and renders
+        run: python enclosure/easel.py
+      - name: Package
+        run: |
+          mkdir dist
+          cp enclosure/out/print/*.stl dist/
+          (cd enclosure/out/print && zip -9 "$GITHUB_WORKSPACE/dist/spotifactory-stl.zip" *.stl)
+          cp enclosure/out/easel.png dist/case-render.png
+          cp enclosure/out/print_layout.png dist/print-layout.png
+          ls -la dist
+      - name: Publish to the case-files release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Case STLs built from enclosure/easel.py at ${GITHUB_SHA::7}. Updated automatically whenever the case model changes on main."
+          if ! gh release view case-files >/dev/null 2>&1; then
+            gh release create case-files --title "Case files (latest)" --notes "$notes" --latest=false
+          fi
+          gh release upload case-files dist/* --clobber
+          gh release edit case-files --notes "$notes"

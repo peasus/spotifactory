@@ -42,7 +42,7 @@ PRINT_DIR = OUT / "print"
 # ---------------------------------------------------------------- slots
 CAPACITY = 40                 # prints, one per slot
 SLOT_W = 1.8                  # a ~1 mm print slides in and can rock
-FIN_T = 1.2                   # 2 lines at 0.6 mm nozzle
+FIN_T = 1.2                   # 3 lines at 0.4 mm nozzle (2 at 0.6 mm)
 FIN_H = 14.0                  # below the image: an Instax Square's bottom border is ~18 mm
 FIN_LEAN = 3.0                # degrees back: prints settle back but still drop straight in
 FRONT_ROOM = 10.0             # open floor in front of the first slot, for bending prints forward
@@ -51,7 +51,7 @@ PITCH = SLOT_W + FIN_T
 # ---------------------------------------------------------------- box
 SIDE_CLEAR = 1.5              # each side of a print, so they slide without rubbing
 IW = PRINT_W + 2 * SIDE_CLEAR # inner width at the rim
-WALL = 2.4                    # 4 lines at 0.6 mm nozzle
+WALL = 2.4                    # 6 lines at 0.4 mm nozzle (4 at 0.6 mm)
 FLOOR = 2.4
 H_BACK, H_FRONT = 60.0, 38.0  # rim height at the back and front (prints are 86 tall)
 TAPER = 4.0                   # walls lean in, degrees

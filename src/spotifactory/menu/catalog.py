@@ -1,6 +1,7 @@
 from spotifactory.menu.definitions import ItemDef, MenuDef
 from spotifactory.tasks.bluetooth import BluetoothTask
 from spotifactory.tasks.capture import CapturePlaylistTask, CaptureTask, WriteTagTask
+from spotifactory.tasks.film import FilmCountTask
 from spotifactory.tasks.reauth import ReAuthTask
 from spotifactory.tasks.speaker import SpeakerTask
 
@@ -8,6 +9,7 @@ MENUS: dict[str, MenuDef] = {
     "main": MenuDef("Main Menu", [
         ItemDef("Print Album",    task=CaptureTask),
         ItemDef("Print Playlist", task=CapturePlaylistTask),
+        ItemDef("Film Left",      task=FilmCountTask),
         ItemDef("Choose Speaker", task=SpeakerTask),
         ItemDef("Pair Device",    task=BluetoothTask),
         ItemDef("Connect Spotify", task=ReAuthTask),

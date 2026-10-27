@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -990,6 +990,28 @@ class TestDisplayModes:
         r._render_home()
         assert self._texts(r) == ["Place tag..."]
 
+    def test_now_playing_shows_track_count_and_progress(self):
+        r, step = self._runner()
+        step.is_playing = False                 # hold the position still
+        r._render_home()
+        assert self._texts(r) == ["Song", "Artist", "3/14"]
+        # 41 s into 3:20 fills the bottom edge about a fifth of the way.
+        assert call(0, 62, round(127 * 41 / 200), 63) in r.display.draw_rect.call_args_list
+
+    def test_now_playing_track_count_sits_against_the_right_edge(self):
+        r, step = self._runner()
+        r.display.text_width.side_effect = lambda t: 6 * len(t)
+        r._render_home()
+        x = next(c.args[0] for c in r.display.draw_text.call_args_list if c.args[2] == "3/14")
+        assert x == 126 - 6 * len("3/14")
+
+    def test_now_playing_without_a_tag_has_no_count_or_bar(self):
+        r, step = self._runner()
+        step.tag_active, step.status, step.artist = False, "Place tag...", ""
+        r._render_home()
+        assert self._texts(r) == ["Place tag..."]
+        assert not [c for c in r.display.draw_rect.call_args_list if c.args[1] >= 62]
+
     def test_press_that_wakes_the_screen_keeps_the_mode(self):
         r, step = self._runner()
         step.screen_off = True
@@ -1058,3 +1080,57 @@ class TestHomeComesBackFromTheMenu:
         from spotifactory.tasks.home.steps import HomeScanStep
         HomeScanStep.remember(HomeScanStep())
         assert HomeScanStep._carried is None
+
+
+# ---------------------------------------------------------------------------
+# Menu > Film Left
+# ---------------------------------------------------------------------------
+
+class TestFilmLeft:
+    def _run(self, status):
+        from spotifactory.tasks.film.steps import FilmCountStep
+        step = FilmCountStep()
+        shown = []
+        step.show_for = lambda msg, secs: shown.append((msg, step.artist))
+        with patch("spotifactory.hardware.printer.get_status", return_value=status):
+            outcome = step.run(TaskContext())
+        return outcome, shown
+
+    def test_is_on_the_main_menu(self):
+        from spotifactory.menu.catalog import MENUS
+        from spotifactory.tasks.film import FilmCountTask
+        assert any(i.label == "Film Left" and i.task is FilmCountTask
+                   for i in MENUS["main"].items)
+
+    def test_shows_shots_and_battery(self):
+        from spotifactory.hardware.printer import PrinterStatus
+        outcome, shown = self._run(PrinterStatus(True, photos_left=7, battery_pct=80))
+        assert isinstance(outcome, Done)
+        assert shown == [("7 shots left", "Battery 80%")]
+
+    @pytest.mark.parametrize("n,text", [(1, "1 shot left"), (0, "No film left")])
+    def test_one_or_none(self, n, text):
+        from spotifactory.hardware.printer import PrinterStatus
+        _, shown = self._run(PrinterStatus(True, photos_left=n))
+        assert shown == [(text, "")]
+
+    def test_printer_off_offers_retry(self):
+        from spotifactory.hardware.printer import PrinterStatus
+        from spotifactory.tasks.base import PushMenu
+        outcome, shown = self._run(PrinterStatus(False, error="Printer not found"))
+        assert isinstance(outcome, PushMenu)
+        assert outcome.menu.title == "Printer Off?"
+        assert outcome.on_confirm == Continue(next_step="check")
+        assert shown == []
+
+    def test_get_status_reads_the_printer_without_printing(self):
+        from spotifactory.hardware import printer
+        fake = MagicMock(photosLeft=4, batteryPercentage=0, isCharging=True)
+        fake.peripheral.is_connected.return_value = True
+        with patch.object(printer, "_make_instax", return_value=fake) as make, \
+             patch.object(printer, "_connect"):
+            status = printer.get_status()
+        make.assert_called_once_with(print_enabled=False, quiet=True)
+        fake.print_image.assert_not_called()
+        fake.disconnect.assert_called_once()
+        assert status == printer.PrinterStatus(True, photos_left=4, battery_pct=None, charging=True)

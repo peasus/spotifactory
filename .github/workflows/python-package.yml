@@ -8,8 +8,8 @@ on:
 
 jobs:
   build:
-    # 22.04: setup-python has no 3.9 build for newer Ubuntu images.
-    runs-on: ubuntu-22.04
+    # ubuntu-latest moved to 26.04, which has no Python 3.9 for setup-python.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       matrix:

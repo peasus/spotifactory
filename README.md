@@ -1,5 +1,7 @@
 # Spotifactory
 
+[spotifactory.com](https://spotifactory.com) · website source in `site/` (see `docs/website.md`)
+
 A Raspberry Pi music box that plays albums from instant photos. Print an
 album's cover on an Instax Square printer, stick an NFC tag on the back, and
 from then on standing that photo on Spotifactory plays the album; lifting it
@@ -17,9 +19,10 @@ off pauses.
   (librespot, shown in the Spotify app as "Spotifactory") and a paired
   Bluetooth speaker.
 - **Print Album / Print Playlist** prints the current artwork on a paired
-  **Instax Square Link** and then writes the tag.
-- First-run setup needs no keyboard: a captive portal (Balena WiFi Connect)
-  for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
+  **Instax Square Link** and then writes the tag. **Film Left** asks the
+  printer how many shots are left in the pack (and its battery).
+- First-run setup needs no keyboard: a Spotifactory-branded captive portal
+  (Balena WiFi Connect serving `deploy/portal/`) for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
   Worker relay (`deploy/relay/`, PKCE — no client secret on the device).
 
 ## Controls
@@ -111,8 +114,9 @@ enclosure/.venv/bin/python enclosure/easel.py   # renders + STL/STEP into enclos
 enclosure/.venv/bin/python enclosure/check.py   # fit, assembly and printability checks
 ```
 
-Parts to buy are in `enclosure/bom_digikey.csv` (DigiKey import), plus screws
-and a spare micro-USB cable for the power lead:
+Parts to buy are in `enclosure/BOM.md`, with DigiKey and Mouser part numbers
+and what neither distributor carries. `enclosure/bom_digikey.csv` and
+`enclosure/bom_mouser.csv` import straight into either cart. The screws:
 
 - 4× M2.5×14 pan or button head: up through the Pi, spacers and HAT into the
   faceplate. M2.5×16 also works with one of the printed 2 mm washers (second

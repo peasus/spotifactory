@@ -40,14 +40,15 @@ class DisplaySH1106:
                 self.draw.rectangle((0, y, x - 1, y + row_h), fill=0)
 
     def _scroll_offset(self, key: tuple, text: str, x: int) -> float:
-        text_w = self._text_width(text)
+        text_w = self.text_width(text)
         overflow = text_w - (WIDTH - x)
         if overflow <= 0:
             self._scroll.clear(key)
             return 0.0
         return self._scroll.offset(key, text, float(overflow))
 
-    def _text_width(self, text: str) -> int:
+    def text_width(self, text: str) -> int:
+        """How many pixels wide `text` draws."""
         try:
             bbox = self.draw.textbbox((0, 0), text, font=self.font)
             return bbox[2] - bbox[0]

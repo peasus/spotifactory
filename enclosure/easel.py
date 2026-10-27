@@ -54,7 +54,7 @@ PRINT_DIR = OUT / "print"
 # ---------------------------------------------------------------- body
 W = 104.0                 # width at the base
 TOP_W = 81.0              # width at the top of the panel (print is 72)
-WALL = 2.4                # 4 lines at 0.6 mm nozzle (wood-fill PLA)
+WALL = 2.4                # 6 lines at 0.4 mm nozzle (4 at 0.6 mm)
 FILLET = 6.0              # outside edge radius (panel top is 14 mm deep, so < 7)
 BOTTOM_CHAMFER = 1.0      # bottom outside edge: with the inset base plate, a clean shadow line
 SLOPE = 12.0              # control face angle, degrees
