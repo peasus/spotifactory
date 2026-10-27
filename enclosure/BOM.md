@@ -27,9 +27,10 @@ Neither distributor carries everything: see [Buy elsewhere](#buy-elsewhere).
 Neither DigiKey nor Mouser carries these:
 
 - **SeenGreat 1.3" OLED HAT.** The case is shaped around this board.
-- **PN532 NFC reader, USB-C (CH340).** Both sell Adafruit's PN532 boards
-  (364, 789), but they're a different size and need a separate USB serial
-  adapter, so they don't fit the reader keepers.
+- **PN532 NFC reader, USB-C (CH340).** [On Amazon](https://a.co/d/0b7JEN1F). Both
+  distributors sell Adafruit's PN532 boards (364, 789), but they cost far
+  more, are a different size and need a separate USB serial adapter, so they
+  don't fit the reader keepers.
 - **Instax Square Link printer and Instax Square film.**
 - **NFC stickers, 25 mm square, on a roll.** The closest is Adafruit 4032
   (NTAG213, 40 × 25 mm, sold singly: DigiKey
