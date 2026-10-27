@@ -11,6 +11,8 @@ off pauses.
 
 - **Raspberry Pi Zero 2 W** with a **SeenGreat 1.3" OLED HAT** ([this one](https://a.co/d/09jW1LQh); SH1106 screen,
   5-way joystick) runs the app (`spotifactory.startup`) as a systemd service.
+  Waveshare's 1.3inch OLED HAT also works: set `SPOTIFACTORY_HAT=waveshare`
+  in `.env` (or `deploy/provision.env`).
 - A **PN532 NFC reader** (USB-C, CH340 serial; [this one](https://a.co/d/0b7JEN1F)) behind the photo reads the
   tag's `spotify:album:` / `spotify:playlist:` URI and starts playback through
   the Spotify Web API.
@@ -130,9 +132,10 @@ The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
 straight cable: a USB-C plug up to 12.5 mm wide and 6.5 mm thick (plug and
 strain relief up to 28 mm long), and any straight micro-USB plug at the Pi.
 
-Before assembly, set the screen HAT to I2C: both switches on its back (SW1,
-SW2) to 0. The app talks to the screen over I2C only (at 400 kHz, which setup
-configures).
+Before assembly, set the SeenGreat HAT to I2C: both switches on its back (SW1,
+SW2) to 0. The app talks to it over I2C (at 400 kHz, which setup configures).
+The Waveshare HAT can stay as it comes (SPI): with `SPOTIFACTORY_HAT=waveshare`
+the app uses I2C if the HAT has been switched to it, and SPI otherwise.
 
 Assembly order, with the body upside down or on its back:
 

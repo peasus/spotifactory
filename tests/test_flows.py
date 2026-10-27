@@ -1134,3 +1134,56 @@ class TestFilmLeft:
         fake.print_image.assert_not_called()
         fake.disconnect.assert_called_once()
         assert status == printer.PrinterStatus(True, photos_left=4, battery_pct=None, charging=True)
+
+
+# ---------------------------------------------------------------------------
+# Waveshare 1.3inch OLED HAT
+# ---------------------------------------------------------------------------
+
+def test_waveshare_joystick_has_its_own_pins_and_the_same_buttons():
+    from spotifactory.input import seengreat
+    pins = {}
+    gpio = MagicMock()
+    gpio.input.side_effect = lambda pin: pins.get(pin, 1)
+    with patch.object(seengreat, "GPIO", gpio):
+        buttons = seengreat.SeenGreatInput(hat="waveshare")
+        for pin, action in [(19, "Up"), (6, "Down"), (13, "Select"), (16, "VolUp"), (21, "Menu")]:
+            pins[pin] = 0
+            assert buttons.read() == action
+            pins[pin] = 1
+            assert buttons.read() is None
+        pins[26] = 0
+        assert buttons.read() == "Left"
+        pins[26], pins[5] = 1, 0
+        assert buttons.read() == "LeftRelease"
+        assert buttons.read() == "Right"
+
+
+def test_hat_comes_from_the_environment_and_unknown_ones_are_refused(monkeypatch):
+    from spotifactory.input import seengreat
+    with patch.object(seengreat, "GPIO", MagicMock()):
+        monkeypatch.setenv("SPOTIFACTORY_HAT", "waveshare")
+        assert seengreat.SeenGreatInput()._mapping is seengreat._MAPPINGS["waveshare"]
+        monkeypatch.delenv("SPOTIFACTORY_HAT")
+        assert seengreat.SeenGreatInput()._mapping is seengreat._MAPPINGS["seengreat"]
+        with pytest.raises(ValueError):
+            seengreat.SeenGreatInput(hat="adafruit")
+
+
+def test_only_the_waveshare_screen_falls_back_to_spi():
+    from spotifactory.display import sh1106 as display
+
+    class NotFound(Exception):
+        pass
+
+    with patch.object(display, "DeviceNotFoundError", NotFound), \
+         patch.object(display, "i2c"), \
+         patch.object(display, "spi") as spi, \
+         patch.object(display, "sh1106") as device:
+        device.side_effect = [NotFound(), "spi device"]
+        assert display._open_device("waveshare") == "spi device"
+        spi.assert_called_once_with(port=0, device=0, gpio_DC=24, gpio_RST=25)
+
+        device.side_effect = [NotFound()]
+        with pytest.raises(NotFound):
+            display._open_device("seengreat")

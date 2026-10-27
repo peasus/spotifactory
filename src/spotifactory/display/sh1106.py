@@ -1,4 +1,9 @@
-from luma.core.interface.serial import i2c
+from __future__ import annotations
+
+import os
+
+from luma.core.error import DeviceNotFoundError
+from luma.core.interface.serial import i2c, spi
 from luma.oled.device import sh1106
 from PIL import Image, ImageDraw, ImageFont
 
@@ -9,12 +14,28 @@ HEIGHT = 64
 
 # I2C — SeenGreat 1.3" OLED HAT (A) with SW1=0, SW2=0 (I2C mode)
 _I2C_ADDRESS = 0x3C
+# SPI — Waveshare 1.3inch OLED HAT as shipped: CE0, DC on BCM 24, RST on 25
+_SPI_DC, _SPI_RST = 24, 25
+
+
+def _open_device(hat: str):
+    """The screen over I2C, or for the Waveshare HAT over SPI if nothing answers on I2C.
+
+    The SeenGreat HAT is set to I2C. The Waveshare one ships set to SPI and
+    talks I2C only after moving resistors on its back, so it tries both. (SPI
+    writes can't fail, so the SeenGreat doesn't fall back: a missing screen
+    should stop the app, not blank it.)"""
+    try:
+        return sh1106(i2c(port=1, address=_I2C_ADDRESS), rotate=2)
+    except (DeviceNotFoundError, OSError):
+        if hat != "waveshare":
+            raise
+        return sh1106(spi(port=0, device=0, gpio_DC=_SPI_DC, gpio_RST=_SPI_RST), rotate=2)
 
 
 class DisplaySH1106:
-    def __init__(self):
-        serial = i2c(port=1, address=_I2C_ADDRESS)
-        self.device = sh1106(serial, rotate=2)
+    def __init__(self, hat: str | None = None):
+        self.device = _open_device(hat or os.environ.get("SPOTIFACTORY_HAT", "seengreat"))
         self.image = Image.new("1", (WIDTH, HEIGHT))
         self.draw = ImageDraw.Draw(self.image)
         self.font = ImageFont.load_default()
