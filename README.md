@@ -171,6 +171,24 @@ Assembly order, with the body upside down or on its back:
 4. Fit the base plate (with the power board on its bracket) and screw it into
    the corner inserts.
 
+### Black square behind the photo (optional)
+
+A square of black self-adhesive vinyl on the panel, exactly where the photo's
+picture sits. `enclosure/vinyl_stencil.py` writes `out/print/vinyl_stencil.stl`:
+a dummy Instax Square print (72 × 86 × 1.6 mm) with a 62 × 62 window where
+the picture is, and BOTTOM engraved below it. It stands in the groove like a
+real print. Print it flat; it needs no supports.
+
+1. **Cut:** lay the stencil on the vinyl and run a knife round the inside of
+   the window, blade against the wall, in a few light passes. That gives a
+   62 mm square.
+2. **Stick:** stand the stencil in the groove, peel the square and lay it into
+   the window bottom edge first, smoothing upward. Lift the stencil off.
+
+The top few mm of the square wrap over the panel's rounded top edge; press
+that edge down firmly. The stencil assumes the picture starts 6 mm below the
+print's top edge (`TOP_BORDER`); if yours differs, change it and re-run.
+
 ## Layout
 
 | Path | What |
