@@ -1,0 +1,18 @@
+[Unit]
+Description=Spotifactory boot logo
+# Early in boot: needs only the filesystem and the I2C bus, not the network
+# that spotifactory.service waits for.
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+
+[Service]
+Type=oneshot
+User=spotifactory
+WorkingDirectory=/home/spotifactory/spotifactory
+EnvironmentFile=-/home/spotifactory/spotifactory/.env
+ExecStart=/home/spotifactory/spotifactory/.venv/bin/python -m spotifactory.splash
+TimeoutStartSec=30
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=sysinit.target

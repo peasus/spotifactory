@@ -118,6 +118,43 @@ class TestSplash:
         splash.assert_called_once()
 
 
+class TestEarlySplash:
+    """spotifactory.splash: the logo drawn early in boot, before the app."""
+
+    def test_draws_logo_and_leaves_it_on_screen(self, monkeypatch):
+        from spotifactory import splash
+        monkeypatch.delenv("SPOTIFACTORY_PLATFORM", raising=False)
+        display = MagicMock()
+        with patch("os.path.exists", return_value=True), \
+             patch("spotifactory.display.sh1106.DisplaySH1106", return_value=display), \
+             patch("spotifactory.startup._show_splash") as show:
+            splash.main()
+        show.assert_called_once_with(display)
+        assert display.device.persist is True
+
+    def test_skips_other_platforms(self, monkeypatch):
+        from spotifactory import splash
+        monkeypatch.setenv("SPOTIFACTORY_PLATFORM", "pi")
+        with patch("spotifactory.startup._show_splash") as show:
+            splash.main()
+        show.assert_not_called()
+
+    def test_gives_up_without_the_i2c_bus(self, monkeypatch):
+        from spotifactory import splash
+        monkeypatch.delenv("SPOTIFACTORY_PLATFORM", raising=False)
+        monkeypatch.setattr(splash, "_I2C_WAIT_SECS", 0.0)
+        with patch("os.path.exists", return_value=False), \
+             patch("spotifactory.startup._show_splash") as show:
+            splash.main()
+        show.assert_not_called()
+
+    def test_unit_runs_before_the_network(self):
+        unit = (Path(__file__).parent.parent / "deploy" / "spotifactory-splash.service").read_text()
+        assert "DefaultDependencies=no" in unit
+        assert "After=network" not in unit and "Wants=network" not in unit
+        assert "-m spotifactory.splash" in unit
+
+
 class TestStartupMain:
     """Integration-style tests for the startup sequencing logic.
 
@@ -292,7 +329,8 @@ def test_setup_and_updates_share_the_system_steps():
     assert "deploy/upgrade.sh" in (deploy / "setup.sh").read_text()
     assert "deploy/upgrade.sh" in (deploy / "update.sh").read_text()
     upgrade = (deploy / "upgrade.sh").read_text()
-    for unit in ("spotifactory.service", "spotifactory-update.service", "spotifactory-update.timer"):
+    for unit in ("spotifactory.service", "spotifactory-splash.service",
+                 "spotifactory-update.service", "spotifactory-update.timer"):
         assert unit in upgrade and (deploy / unit).exists(), unit
     assert "deploy/sudoers.sh" in upgrade
     assert "deploy/update.sh" in (deploy / "spotifactory-update.service").read_text()

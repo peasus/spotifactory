@@ -22,11 +22,11 @@ install_unit() {
   install -m 644 "$tmp" "/etc/systemd/system/$1"
   rm -f "$tmp"
 }
-for unit in spotifactory.service spotifactory-update.service spotifactory-update.timer; do
+for unit in spotifactory.service spotifactory-splash.service spotifactory-update.service spotifactory-update.timer; do
   install_unit "$unit"
 done
 systemctl daemon-reload
-systemctl enable --quiet spotifactory
+systemctl enable --quiet spotifactory spotifactory-splash
 systemctl enable --quiet --now spotifactory-update.timer
 
 SUDO_USER="$APP_USER" bash "$REPO_DIR/deploy/sudoers.sh"
