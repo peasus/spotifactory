@@ -123,10 +123,11 @@ the bed. Settings that matter:
 - **Wall loops 4–5** (body especially). The screw posts have about 1.7 mm of
   plastic round each pilot hole; with 4 walls that's solid plastic rather
   than infill, so screws hold instead of stripping.
-- **Body: inner brim, plus brim ears on the outside of the back corners.** It
-  stands on its thin walls and is tall, so the corners tend to lift. Brim type
-  "Inner brim only" (or "Painted") keeps the outer chamfer clean; a brim-object
-  gap of 0.1 mm makes it peel off easily.
+- **Body: brim ears on the back corners.** It stands on its thin walls and is
+  tall, so the back corners tend to lift. Brim type "Painted" (or "Mouse
+  ear"), with ears painted around the back corners only: they touch the
+  outer chamfer at a point and trim off with a knife. A brim-object gap of
+  0.1 mm makes them peel off easily.
 - **Against warping:** auxiliary part cooling fan 0% (on a P1S it blows across
   the left of the bed), door and lid closed, no cooling for the first 3
   layers, bed 60 °C (65 °C first layer), and the part in the middle of the
