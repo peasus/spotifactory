@@ -106,7 +106,9 @@ log in through the browser instead of the relay.
 faceplate, a base plate, spacers and two reader keepers, all designed to print
 without supports. There are also models for a print crate (`crate.py`) and a
 tag-sticker dispenser (`dispenser.py`), and small fit-test prints
-(`keeper_test.py`, `crate_test.py`).
+(`keeper_test.py`, `crate_test.py`). `vinyl_stencil.py` makes a dummy print with a window
+where the photo's picture is: a guide for cutting a vinyl square and for
+sticking it on the panel behind the photo.
 
 ```
 python3 -m venv enclosure/.venv && enclosure/.venv/bin/pip install build123d trimesh matplotlib networkx
