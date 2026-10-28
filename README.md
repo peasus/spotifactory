@@ -124,7 +124,9 @@ and what neither distributor carries. `enclosure/bom_digikey.csv` and
   top of the base plate's posts, which are 5.5 mm wide and 4 mm deep. Pan or
   button heads only: don't use countersunk heads.
 - 4× M2.5×8: USB-C power board to its bracket.
-- 2× M2.5×14 (pan or button head): the reader keepers into their posts. Not 12 (too little thread in the post) or 16 (runs past the pilot hole).
+- 2× M2.5×20 (pan or button head): the reader keepers into their posts.
+  16 or 18 also work, with less thread in the post; not 22 or longer (runs
+  past the pilot hole).
 
 The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
 straight cable: a USB-C plug up to 12.5 mm wide and 6.5 mm thick (plug and
@@ -139,7 +141,7 @@ Assembly order, with the body upside down or on its back:
 1. Plug the right-angle USB-C cable into the reader. Bring the reader in from
    below, antenna side to the panel. Slide it about 4 mm up the panel until its
    top corners are in the caps.
-2. Put a keeper under each bottom corner and drive an M2.5×14 straight up
+2. Put a keeper under each bottom corner and drive an M2.5×20 straight up
    through it into the post.
 3. Screw the Pi stack to the faceplate. Plug in its cables, then fit it from
    below into the pocket under the screen window.

@@ -38,8 +38,8 @@ Neither DigiKey nor Mouser carries these:
   Mouser [485-4032](https://www.mouser.com/ProductDetail/485-4032)). It works,
   but it's too wide for the sticker dispenser and costs far more per tag than
   a roll.
-- **M2.5 × 14 pan head screws (2) for the reader keepers.** Neither has a
-  14 mm, and 12 or 16 mm won't do here.
+- **M2.5 × 20 pan head screws (2) for the reader keepers.** 16 or 18 mm
+  also work, with less grip; 22 mm or longer runs past the pilot hole.
 - **M3 flat-head screws, about 6 mm (4) for the base plate.** Neither stocks a
   steel M3 countersunk screw near this length.
 - **A speaker.**

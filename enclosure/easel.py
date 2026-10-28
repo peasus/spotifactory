@@ -11,7 +11,7 @@ Parts and print orientation:
   spacers    4 tubes between the HAT and the Pi, plus 4 washers (only for
              M2.5 x 16 stack screws)
   keepers    2 blocks under the reader's bottom corners; each takes an
-             M2.5 x 14 screw up into a post in the body
+             M2.5 x 20 screw up into a post in the body
   baseplate  flat, under the body; screws into M3 heat-set inserts in the
              body's corners, carries the USB-C power board on a bracket, and
              its posts press the stack up against the lip
@@ -271,7 +271,7 @@ SKIN_IN = -(GAP + WALL)                    # inside of the panel's front wall
 BOARD_FRONT = SKIN_IN - 0.3                # reader's antenna side, just off the panel's inside
 
 # Reader mount (proven with keeper_test.py): caps over the board's top corners,
-# and keepers under its bottom corners, each held by an M2.5 x 14 screw driven
+# and keepers under its bottom corners, each held by an M2.5 x 20 screw driven
 # straight up into a post. The reader goes in from below with its plug in,
 # slides READER_SLIDE up the wall into the caps, then the keepers go in.
 MOUNT_CLEAR = 0.4             # board's back to the lips
@@ -288,8 +288,8 @@ READER_SLIDE = CAP_LEN - 1.06 + 0.5
 KPOST_R = 2.75
 KPOST_X = READER_W / 2 + EDGE_CLEAR + KPOST_R   # posts touch the board's edges: they guide its bottom
 KPOST_Z = -5.0                 # pilot axis behind the board's front face: clears a 7 mm screwdriver shaft
-KPOST_LEN = 14.0
-KEEPER_PILOT_DEPTH = 8.0      # M2.5 x 14: ~9.25 mm through the keeper, ~4.75 into the post, tip inside the pilot
+KPOST_LEN = 20.0
+KEEPER_PILOT_DEPTH = 14.0     # M2.5 x 20: ~9.25 mm through the keeper, ~10.75 into the post, tip inside the pilot
 # Posts (and the caps' bottoms) stick out behind a wall leaning back, so a square
 # underside would start printing at its back edge, in mid-air. Instead the
 # underside is level for LEDGE mm off the wall, then rises at 45° (in the
