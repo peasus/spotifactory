@@ -124,8 +124,8 @@ the bed. Settings that matter:
   plastic round each pilot hole; with 4 walls that's solid plastic rather
   than infill, so screws hold instead of stripping.
 - **Body: brim ears on the back corners.** It stands on its thin walls and is
-  tall, so the back corners tend to lift. Brim type "Painted" (or "Mouse
-  ear"), with ears painted around the back corners only: they touch the
+  tall, so the back corners tend to lift. Brim type "Painted", with ears
+  (the Brim Ears tool) around the back corners only: they touch the
   outer chamfer at a point and trim off with a knife. A brim-object gap of
   0.1 mm makes them peel off easily.
 - **Against warping:** auxiliary part cooling fan 0% (on a P1S it blows across
