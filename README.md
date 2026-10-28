@@ -114,6 +114,26 @@ enclosure/.venv/bin/python enclosure/easel.py   # renders + STL/STEP into enclos
 enclosure/.venv/bin/python enclosure/check.py   # fit, assembly and printability checks
 ```
 
+### Printing
+
+Printed in PLA on a Bambu P1S (0.4 mm nozzle) with Bambu Studio's Generic PLA
+filament profile, at 0.12 mm layers. The STLs come out already oriented for
+the bed. Settings that matter:
+
+- **Wall loops 4–5** (body especially). The screw posts have about 1.7 mm of
+  plastic round each pilot hole; with 4 walls that's solid plastic rather
+  than infill, so screws hold instead of stripping.
+- **Body: inner brim, plus brim ears on the outside of the back corners.** It
+  stands on its thin walls and is tall, so the corners tend to lift. Brim type
+  "Inner brim only" (or "Painted") keeps the outer chamfer clean; a brim-object
+  gap of 0.1 mm makes it peel off easily.
+- **Against warping:** auxiliary part cooling fan 0% (on a P1S it blows across
+  the left of the bed), door and lid closed, no cooling for the first 3
+  layers, bed 60 °C (65 °C first layer), and the part in the middle of the
+  plate. Wash the plate with dish soap first.
+- **Screws into printed plastic:** stop as soon as the head is snug. A
+  quarter-turn more strips PLA.
+
 Parts to buy are in `enclosure/BOM.md`, with DigiKey and Mouser part numbers
 and what neither distributor carries. `enclosure/bom_digikey.csv` and
 `enclosure/bom_mouser.csv` import straight into either cart. The screws:
