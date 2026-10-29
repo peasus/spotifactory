@@ -132,6 +132,12 @@ section { padding-block: 88px; }
 .sec-head h2 { font-size: var(--step-2); font-weight: 700; letter-spacing: -0.02em; }
 .sec-head p { color: var(--muted); }
 
+/* ---------- demo video ---------- */
+.demo { padding-bottom: 0; }
+.demo .sec-head { margin-bottom: 28px; }
+.video { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 960px; border-radius: 14px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--ink-3), 0 24px 60px -30px #000; }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
 /* ---------- steps ---------- */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
 .step { border-top: 1px solid var(--ink-3); padding-top: 22px; display: grid; gap: 10px; align-content: start; counter-increment: step; }
