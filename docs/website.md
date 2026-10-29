@@ -19,6 +19,17 @@ workflow from the Actions tab.
 `site/img/oled-*.png` are the home screen drawn with the app's own layout and
 icons, so redo them if the now-playing screen changes.
 
+## Stylesheet version
+
+The pages link `/style.css?v=<hash>` so browsers (iPhone Safari especially)
+never pair a new page with an old cached stylesheet. After changing
+`site/style.css`, update the hash in all three pages:
+
+```sh
+H=$(sha1sum site/style.css | cut -c1-8)
+sed -i -E "s#/style.css(\?v=[0-9a-f]+)?\"#/style.css?v=$H\"#" site/*.html
+```
+
 ## Hosting (Cloudflare Pages, free tier)
 
 One-time setup in the Cloudflare dashboard:
