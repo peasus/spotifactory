@@ -242,7 +242,25 @@
       <h2 id="demo-title">Watch one at work.</h2>
     </div>
     <div class="video">
-      <iframe src="https://www.youtube-nocookie.com/embed/2KMNx6qTVck?rel=0&amp;mute=1" title="Spotifactory demo video" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <a class="video-cover" href="https://youtu.be/2KMNx6qTVck" data-yt="2KMNx6qTVck" aria-label="Play the Spotifactory demo video">
+        <img src="/img/demo-poster.jpg" alt="A Spotifactory on a counter, next to a crate of album photos, an Instax Square Link printer and a holder of NFC stickers" width="1280" height="720" loading="lazy">
+        <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6.5v11l9-5.5z"/></svg></span>
+      </a>
+      <script>
+        (function () {
+          var a = document.querySelector(".video-cover");
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            var f = document.createElement("iframe");
+            f.src = "https://www.youtube-nocookie.com/embed/" + a.dataset.yt + "?rel=0&mute=1&autoplay=1&playsinline=1";
+            f.title = "Spotifactory demo video";
+            f.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+            f.referrerPolicy = "strict-origin-when-cross-origin";
+            f.allowFullscreen = true;
+            a.replaceWith(f);
+          });
+        })();
+      </script>
     </div>
     <p class="oled-caption">The music is muted in the video to avoid copyright issues.</p>
   </div>

@@ -137,6 +137,15 @@ section { padding-block: 88px; }
 .demo .sec-head { margin-bottom: 28px; }
 .video { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 960px; border-radius: 14px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--ink-3), 0 24px 60px -30px #000; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-cover { position: absolute; inset: 0; display: block; cursor: pointer; }
+.video-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-cover .play {
+  position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px;
+  border-radius: 50%; background: var(--green); display: grid; place-items: center;
+  box-shadow: 0 10px 30px -8px rgba(0,0,0,.6); transition: transform .15s ease;
+}
+.video-cover .play svg { width: 36px; height: 36px; fill: var(--ink); }
+.video-cover:hover .play, .video-cover:focus-visible .play { transform: scale(1.08); }
 
 /* ---------- steps ---------- */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
