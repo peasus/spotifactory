@@ -91,7 +91,7 @@ def _reset_uart(dev_path: str) -> None:
 
 def _parse_tag(tag) -> dict:
     """uid, plus "uri" (the first link: what plays) and "uris" (every link,
-    e.g. an album's Spotify link then its Apple Music one) if it has any."""
+    e.g. a Spotify link then another service's) if it has any."""
     entry = {"uid": tag.identifier.hex().upper()}
     if tag.ndef and tag.ndef.records:
         uris = [r.uri for r in tag.ndef.records if isinstance(r, ndef.UriRecord)]
