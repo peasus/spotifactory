@@ -135,10 +135,13 @@ section { padding-block: 88px; }
 /* ---------- demo video ---------- */
 .demo { padding-top: 0; }
 .demo .sec-head { margin-bottom: 28px; }
-.video { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 960px; border-radius: 14px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--ink-3), 0 24px 60px -30px #000; }
-.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-cover { position: absolute; inset: 0; display: block; cursor: pointer; }
-.video-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-frame { max-width: 960px; border-radius: 14px; box-shadow: 0 0 0 1px var(--ink-3), 0 24px 60px -30px #000; }
+/* 16:9 box via padding (works in older Safari, which lacks aspect-ratio and inset);
+   isolation + translateZ keep Safari clipping the rounded corners. */
+.video { position: relative; height: 0; padding-top: 56.25%; border-radius: 14px; overflow: hidden; background: #000; isolation: isolate; -webkit-transform: translateZ(0); transform: translateZ(0); }
+.video iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+.video-cover { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+.video-cover img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; display: block; }
 .video-cover .play {
   position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px;
   border-radius: 50%; background: var(--green); display: grid; place-items: center;
