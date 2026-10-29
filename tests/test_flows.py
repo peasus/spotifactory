@@ -170,12 +170,11 @@ class _FakeReader:
     """Stands in for the RFID calls: `present` is the tag on the reader now,
     `placed` the tags put on it after, in turn. Lifting happens when asked."""
 
-    def __init__(self, present=None, placed=(), on_read=None, apple=None):
+    def __init__(self, present=None, placed=(), on_read=None):
         self.present, self.placed, self.writes = present, list(placed), []
         self.extras = []                        # links written after the first, per write
         self.lift_asked = False
         self.on_read = on_read
-        self.apple = apple                      # what the Apple Music lookup finds
 
     def wait_until_clear(self, terminate=None, on_seen=None, settle=1.0):
         if self.present:
@@ -204,7 +203,6 @@ class _FakeReader:
         for name in ("wait_until_clear", "read_next", "write_uri"):
             stack.enter_context(patch(f"spotifactory.hardware.rfid.{name}", getattr(self, name)))
         stack.enter_context(patch("spotifactory.spotify.uri_name", return_value="Other Album"))
-        stack.enter_context(patch("spotifactory.apple_music.link_for_spotify_album", return_value=self.apple))
         stack.enter_context(patch("spotifactory.tasks.base.time.sleep"))
         return stack
 
@@ -278,8 +276,9 @@ class TestWriteTagStep:
         assert step.artist == "Not NDEF formatted"
 
 
-class TestAppleMusicLinkOnTags:
-    """Album tags carry the album's Apple Music link too, after the Spotify one."""
+class TestNoAppleMusicLinkOnTags:
+    """Album tags get the Spotify link only. Tags written earlier with an
+    Apple Music link after it still count as this album and are left alone."""
 
     APPLE = "https://music.apple.com/album/1440892370"
 
@@ -287,80 +286,20 @@ class TestAppleMusicLinkOnTags:
         from spotifactory.tasks.capture.steps import ScanStep
         return ScanStep(), TaskContext(data={"info": MagicMock(album_uri="spotify:album:x")})
 
-    def test_album_tag_gets_both_links_spotify_first(self):
+    def test_album_tag_gets_the_spotify_link_only(self):
         step, ctx = self._step()
-        reader = _FakeReader(placed=[{"uid": "T"}], apple=self.APPLE)
+        reader = _FakeReader(placed=[{"uid": "T"}])
         with reader.patch():
             assert isinstance(step.run(ctx), Continue)
-        assert reader.writes == [("spotify:album:x", "T")] and reader.extras == [[self.APPLE]]
+        assert reader.writes == [("spotify:album:x", "T")] and reader.extras == [[]]
 
-    def test_no_sure_match_writes_spotify_only(self):
-        step, ctx = self._step()
-        reader = _FakeReader(placed=[{"uid": "T"}], apple=None)
-        with reader.patch():
-            step.run(ctx)
-        assert reader.extras == [[]]
-
-    def test_same_album_without_the_apple_link_is_topped_up_without_asking(self):
-        step, ctx = self._step()
-        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x", "uris": ["spotify:album:x"]}],
-                             apple=self.APPLE)
-        with reader.patch():
-            assert isinstance(step.run(ctx), Continue)      # no overwrite question
-        assert reader.extras == [[self.APPLE]]
-
-    def test_same_album_with_both_links_is_left_alone(self):
+    def test_same_album_with_an_old_apple_link_is_left_alone(self):
         step, ctx = self._step()
         reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x",
-                                      "uris": ["spotify:album:x", self.APPLE]}], apple=self.APPLE)
+                                      "uris": ["spotify:album:x", self.APPLE]}])
         with reader.patch():
             step.run(ctx)
         assert reader.writes == [] and step.status == "Tag already set"
-
-    def test_playlists_dont_look_for_an_apple_link(self):
-        from spotifactory.tasks.capture.steps import PlaylistScanStep
-        step = PlaylistScanStep()
-        ctx = TaskContext(data={"playlist": {"uri": "spotify:playlist:p"}})
-        reader = _FakeReader(placed=[{"uid": "T"}], apple=self.APPLE)
-        with reader.patch(), patch("spotifactory.apple_music.link_for_spotify_album") as look:
-            step.run(ctx)
-        look.assert_not_called()
-        assert reader.extras == [[]]
-
-
-class TestAppleMusicMatch:
-    """Only a sure match: same artist, name and track count. Barcodes alone
-    land on reissues."""
-
-    def _search(self, results, upc_results=()):
-        def get(url, params=None, timeout=None):
-            r = MagicMock()
-            r.json.return_value = {"results": list(upc_results if "lookup" in url else results)}
-            return r
-        return patch("spotifactory.apple_music.requests.get", side_effect=get)
-
-    def _album(self, cid, name, tracks, artist="Nirvana"):
-        return {"wrapperType": "collection", "collectionId": cid, "collectionName": name,
-                "trackCount": tracks, "artistName": artist}
-
-    def test_picks_the_edition_with_the_same_tracks(self):
-        from spotifactory.apple_music import album_link
-        results = [self._album(2, "MTV Unplugged In New York (Live Acoustic) [25th Anniversary Edition]", 19),
-                   self._album(1, "MTV Unplugged In New York (Live Acoustic)", 14)]
-        with self._search(results):
-            assert album_link("Nirvana", "MTV Unplugged In New York", 14) == "https://music.apple.com/album/1"
-
-    def test_a_barcode_pointing_at_a_reissue_isnt_taken(self):
-        from spotifactory.apple_music import album_link
-        with self._search([], upc_results=[self._album(2, "MTV Unplugged In New York [Deluxe]", 19)]):
-            assert album_link("Nirvana", "MTV Unplugged In New York", 14, upc="0072") is None
-
-    def test_another_artist_or_a_failed_lookup_gives_nothing(self):
-        from spotifactory.apple_music import album_link
-        with self._search([self._album(1, "Wildflowers", 15, artist="Someone Else")]):
-            assert album_link("Tom Petty", "Wildflowers", 15) is None
-        with patch("spotifactory.apple_music.requests.get", side_effect=OSError("offline")):
-            assert album_link("Tom Petty", "Wildflowers", 15) is None
 
 
 class TestWriteTagFromMenu:

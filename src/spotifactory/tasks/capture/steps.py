@@ -208,17 +208,6 @@ class _WriteTagStep(Step):
     def _uri(self, ctx: TaskContext) -> str:
         raise NotImplementedError
 
-    def _extra(self, ctx: TaskContext, uri: str) -> list[str]:
-        """Links to write after `uri`: an album's Apple Music twin, when there's
-        a sure match (looked up once per task)."""
-        if not uri.startswith("spotify:album:"):
-            return []
-        if "apple_link" not in ctx.data:
-            self.status, self.artist = "Checking Apple Music...", ""
-            from spotifactory.apple_music import link_for_spotify_album
-            ctx.data["apple_link"] = link_for_spotify_album(uri)
-        return [ctx.data["apple_link"]] if ctx.data["apple_link"] else []
-
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotifactory.hardware.rfid import read_next, wait_until_clear
 
@@ -231,10 +220,9 @@ class _WriteTagStep(Step):
         uri = self._uri(ctx)
         again = Continue(next_step=self.step_name)
         try:
-            extra = self._extra(ctx, uri)
             offered = ctx.data.pop("tag_offered", None)
             if offered and ctx.data.pop("selected", None) == "overwrite":
-                return self._write(uri, offered["uid"], stop, extra)
+                return self._write(uri, offered["uid"], stop)
             # A print's tag goes on a tag placed now, not the one already
             # there; and a tag we were told not to overwrite has to go.
             if self.fresh_tag or offered:
@@ -251,28 +239,26 @@ class _WriteTagStep(Step):
                 return self._stopped()
             has = card.get("uri")
             if has == uri:
-                if set(extra) <= set(card.get("uris", [])):
-                    self.artist = ""
-                    self.show_for("Tag already set", 1.5)
-                    return Continue()
-                return self._write(uri, card["uid"], stop, extra)    # same album: add the new links
+                self.artist = ""
+                self.show_for("Tag already set", 1.5)
+                return Continue()
             if has:
                 ctx.data["tag_offered"] = card
                 return PushMenu(menu=_overwrite_menu(_describe(has)), on_confirm=again, on_cancel=again)
-            return self._write(uri, card["uid"], stop, extra)
+            return self._write(uri, card["uid"], stop)
         except Exception as e:
             print(f"[capture] RFID error: {e}", flush=True)
             self.artist = ""
             self.show_for(f"RFID error: {e}", 3.0)
             return Done()
 
-    def _write(self, uri: str, uid: str, stop, extra: list[str] = ()) -> StepOutcome:
+    def _write(self, uri: str, uid: str, stop) -> StepOutcome:
         """Write to the tag we just read, and no other."""
         from spotifactory.hardware.rfid import TagWriteError, write_uri
         self.status, self.artist = "Writing tag...", ""
         try:
-            if write_uri(uri, terminate=stop, uid=uid, extra=list(extra)):
-                print(f"[capture] wrote {', '.join([uri, *extra])} to tag {uid}", flush=True)
+            if write_uri(uri, terminate=stop, uid=uid):
+                print(f"[capture] wrote {uri} to tag {uid}", flush=True)
                 return Continue()
         except TagWriteError as e:
             print(f"[capture] tag write failed: {e}", flush=True)
