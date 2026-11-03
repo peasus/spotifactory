@@ -21,9 +21,9 @@ import crate as crate_mod
 import dispenser as disp_mod
 import easel
 
-# Printed parts in the avocado brand colour: a mid-tone, so the shading shows
-# the shape on screen (cream PLA reads as a flat white blob). Black faceplate and caps.
-BODY = "#a9c23f"
+# Printed parts in putty: the real build's cream, darkened so the shading shows
+# the shape on screen (true cream reads as a flat white blob). Black faceplate and caps.
+BODY = "#b8ad96"
 BLACK = "#141414"
 INK = "#111111"
 PAPER = "#f6f3ec"
