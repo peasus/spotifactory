@@ -50,6 +50,7 @@ class InstaxBLE:
         self.photosLeft = 0
         self.isCharging = False
         self.imageSize = (PrinterSettings['mini']['width'], PrinterSettings['mini']['height']) if self.dummyPrinter else (0, 0)
+        self.maxImageKb = 105  # largest JPEG to send; set per model by the caller
         self.waitingForResponse = False
         self.cancelled = False
 
@@ -105,7 +106,10 @@ class InstaxBLE:
                 elif (w, h) == (1260, 840):
                     self.printerSettings = PrinterSettings['wide']
                 else:
-                    exit(f'Unknown image size from printer: {w}x{h}')
+                    # A size we don't know (a newer model): print at what it
+                    # asks for, with the common chunk size.
+                    self.printerSettings = {'modelName': f'Instax {w}x{h}', 'chunkSize': 900,
+                                            'width': w, 'height': h}
                 self.chunkSize = self.printerSettings['chunkSize']
 
             elif infoType == InfoType.BATTERY_INFO:
@@ -302,11 +306,11 @@ class InstaxBLE:
         imgData = imgSrc
         if isinstance(imgSrc, str):
             image = Image.open(imgSrc)
-            imgData = self.pil_image_to_bytes(image, max_size_kb=105)
+            imgData = self.pil_image_to_bytes(image, max_size_kb=self.maxImageKb)
         elif isinstance(imgSrc, BytesIO):
             imgSrc.seek(0)
             image = Image.open(imgSrc)
-            imgData = self.pil_image_to_bytes(image, max_size_kb=105)
+            imgData = self.pil_image_to_bytes(image, max_size_kb=self.maxImageKb)
 
         self.packetsForPrinting = [
             self.create_packet(EventType.PRINT_IMAGE_DOWNLOAD_START, b'\x02\x00\x00\x00' + pack('>I', len(imgData)))

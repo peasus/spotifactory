@@ -109,6 +109,7 @@ class InstaxRFCOMM:
         self.isCharging = False
         self.printerSettings: dict | None = None
         self.imageSize: tuple[int, int] = (0, 0)
+        self.maxImageKb = 105   # largest JPEG to send; set per model by the caller
         self.chunkSize: int = 0
 
         self._sock: socket.socket | None = None
@@ -198,6 +199,11 @@ class InstaxRFCOMM:
                     self.printerSettings = PrinterSettings["square"]
                 elif (w, h) == (1260, 840):
                     self.printerSettings = PrinterSettings["wide"]
+                else:
+                    # A size we don't know (a newer model): print at what it
+                    # asks for, with the common chunk size.
+                    self.printerSettings = {"modelName": f"Instax {w}x{h}", "chunkSize": 900,
+                                            "width": w, "height": h}
                 if self.printerSettings:
                     self.chunkSize = self.printerSettings["chunkSize"]
             elif info_type == InfoType.BATTERY_INFO and len(data) >= 10:
@@ -310,7 +316,7 @@ class InstaxRFCOMM:
         else:
             img = imgSrc
 
-        img_data = self._image_to_jpeg(img)
+        img_data = self._image_to_jpeg(img, max_kb=self.maxImageKb)
 
         t = threading.Thread(target=self._do_print, args=(img_data,), daemon=True)
         t.start()
