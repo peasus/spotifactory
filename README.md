@@ -19,8 +19,12 @@ off pauses.
   (librespot, shown in the Spotify app as "Spotifactory") and a paired
   Bluetooth speaker.
 - **Print Album / Print Playlist** prints the current artwork on a paired
-  **Instax Square Link** and then writes the tag. **Film Left** asks the
-  printer how many shots are left in the pack (and its battery).
+  **Instax Square Link** and then writes the tag. Instax Mini Link and Wide
+  Link printers work too: the square art is fitted to their film with white
+  bands instead of being stretched (the stand is sized for Square prints).
+  Set `INSTAX_PRINT_UPSIDE_DOWN=1` in `.env` if your printer prints upside
+  down (reported for the Mini Link 3). **Film Left** asks the printer how many
+  shots are left in the pack (and its battery).
 - First-run setup needs no keyboard: a Spotifactory-branded captive portal
   (Balena WiFi Connect serving `deploy/portal/`) for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
   Worker relay (`deploy/relay/`, PKCE — no client secret on the device).

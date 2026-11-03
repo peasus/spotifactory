@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
 import sys
 import time
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Callable
+
+from PIL import Image
 
 from spotifactory.vendor.instax.instax_ble import InstaxBLE
 from spotifactory.vendor.instax.Types import EventType
@@ -12,6 +15,19 @@ from spotifactory.vendor.instax import LedPatterns
 
 CONNECT_TIMEOUT = 10   # seconds to scan for the printer before giving up
 PRINT_TIMEOUT   = 90   # seconds to wait for print confirmation after upload
+
+# What the art is padded with when it doesn't fill the film (square art on a
+# Mini or Wide print): white, so it reads as a wider version of the film's own
+# white border rather than as black bars.
+FILL = (255, 255, 255)
+
+# Largest JPEG each film size takes, in KB. Mini Link 3s stall on anything over
+# about 55 KB (javl/InstaxBLE#21, #24); a 600x800 JPEG still looks fine at that.
+MAX_KB = {(600, 800): 55}
+DEFAULT_MAX_KB = 105
+
+# Set to 1 for printers that print upside down (reported for the Mini Link 3).
+FLIP_SETTING = "INSTAX_PRINT_UPSIDE_DOWN"
 
 
 @dataclass
@@ -53,6 +69,39 @@ class _TrackedInstaxBLE(InstaxBLE):
         super().parse_printer_response(event, packet)
         if event == EventType.PRINT_IMAGE:
             self.print_confirmed = True
+
+
+def fit_to_film(image: str | BytesIO | Image.Image, size: tuple[int, int],
+                upside_down: bool = False) -> Image.Image:
+    """`image` scaled to fit inside a print of `size` (w, h) without stretching
+    or cropping, centred, with FILL around it: square art on a 600x800 Mini
+    print gets bands top and bottom, on a 1260x840 Wide print bands either side,
+    and on an 800x800 Square print fills it."""
+    if isinstance(image, Image.Image):
+        art = image
+    else:
+        if isinstance(image, BytesIO):
+            image.seek(0)
+        art = Image.open(image)
+    art = art.convert("RGB")
+    w, h = size
+    scale = min(w / art.width, h / art.height)
+    fit = (max(1, round(art.width * scale)), max(1, round(art.height * scale)))
+    film = Image.new("RGB", size, FILL)
+    film.paste(art.resize(fit, Image.Resampling.LANCZOS), ((w - fit[0]) // 2, (h - fit[1]) // 2))
+    return film.rotate(180) if upside_down else film
+
+
+def _prepare(instax, image: str | BytesIO) -> BytesIO:
+    """The art laid out for the connected printer's film, as lossless PNG bytes
+    (the printer code makes the one JPEG it sends from them)."""
+    size = tuple(instax.imageSize)
+    instax.maxImageKb = MAX_KB.get(size, DEFAULT_MAX_KB)
+    flip = os.environ.get(FLIP_SETTING, "").strip().lower() in ("1", "true", "yes")
+    out = BytesIO()
+    fit_to_film(image, size, upside_down=flip).save(out, "PNG")
+    out.seek(0)
+    return out
 
 
 def _make_instax(print_enabled: bool, quiet: bool):
@@ -106,7 +155,8 @@ def print_image(
     dry_run: bool = False,
     on_progress: Callable[[str], None] | None = None,
 ) -> PrintResult:
-    """Connect to the nearest Instax Square Link and print an image.
+    """Connect to the nearest Instax Link printer (Mini, Square or Wide) and
+    print an image, fitted to that printer's film without stretching.
 
     Args:
         image:       path to an image file, or a BytesIO of image bytes.
@@ -139,7 +189,7 @@ def print_image(
 
         instax.send_led_pattern(LedPatterns.rainbow, when=1)
         instax.send_led_pattern(LedPatterns.pulseGreen, when=2)
-        instax.print_image(image)
+        instax.print_image(_prepare(instax, image))
 
         # Phase 1 — upload: poll until all packets have been acknowledged.
         deadline = time.monotonic() + PRINT_TIMEOUT
