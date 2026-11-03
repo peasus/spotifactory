@@ -2,7 +2,7 @@
 
 Exports one coloured, assembled GLB per object (metres, Y up) for
 <model-viewer> on spotifactory.com/gallery. The easel is shown closed up with
-a print on it; the dispenser with its roll; the crate with some prints in it.
+a print on it, the dispenser with a tag ready to pull, and the crate empty.
 
 Run:  enclosure/.venv/bin/python enclosure/web_models.py [out_dir]
 Writes site/models/{easel,dispenser,crate}.glb by default.
@@ -21,13 +21,13 @@ import crate as crate_mod
 import dispenser as disp_mod
 import easel
 
-# Colours of the real build: cream PLA, black faceplate and caps.
-CREAM = "#e6e0d0"
+# Printed parts in the avocado brand colour: a mid-tone, so the shading shows
+# the shape on screen (cream PLA reads as a flat white blob). Black faceplate and caps.
+BODY = "#a9c23f"
 BLACK = "#141414"
-AVOCADO = "#a9c23f"
 INK = "#111111"
 PAPER = "#f6f3ec"
-COVERS = ["#3d5a80", "#e07a5f", "#a9c23f", "#2b2b2b", "#f2a541", "#8d5b9c", "#2d6a4f", "#c1121f"]
+COVER = "#3d5a80"
 
 
 def _mesh(shape, colour: str, tolerance: float) -> trimesh.Trimesh:
@@ -38,7 +38,9 @@ def _mesh(shape, colour: str, tolerance: float) -> trimesh.Trimesh:
     mesh.merge_vertices()
     # Smooth the fillets, keep the hard edges hard.
     mesh = trimesh.graph.smooth_shade(mesh, angle=np.radians(35))
-    rgba = trimesh.visual.color.hex_to_rgba(colour)
+    rgba = trimesh.visual.color.hex_to_rgba(colour) / 255.0
+    # glTF base colours are linear; convert from sRGB so the hex values look right.
+    rgba[:3] = np.where(rgba[:3] <= 0.04045, rgba[:3] / 12.92, ((rgba[:3] + 0.055) / 1.055) ** 2.4)
     mesh.visual = trimesh.visual.TextureVisuals(material=trimesh.visual.material.PBRMaterial(
         baseColorFactor=rgba, metallicFactor=0.0, roughnessFactor=0.65))
     return mesh
@@ -62,40 +64,37 @@ def _scene(parts: list[tuple[object, str]], tolerance: float = 0.15) -> trimesh.
 def easel_parts():
     inside = easel.internals()
     return [
-        (easel.body(), CREAM),
+        (easel.body(), BODY),
         (easel.faceplate(), BLACK),
-        (easel.baseplate(), CREAM),
+        (easel.baseplate(), BODY),
         (inside["screen"], INK),
         (easel.nub(), BLACK),
         ([*easel.button_caps()], BLACK),
         (inside["print"], PAPER),
-        (inside["image"], COVERS[0]),
+        (inside["image"], COVER),
     ]
 
 
 def dispenser_parts():
-    paper, sticker = disp_mod.roll_and_paper()
+    """Lid on, with a short tail of backing paper sticking up out of the slit and
+    a round tag on it, ready to pull."""
+    from build123d import Cylinder
+    d = disp_mod
+    tl = d.IL + 2 * d.WALL
+    slit_y = -tl / 2 + d.SLIT_FROM_FRONT + d.SLIT_GAP / 2
+    top, tail = d.H + d.LID_T, 26.0
+    paper = Pos(0, slit_y, top - 2) * Box(d.PAPER_W, 0.15, tail + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    tag = Pos(0, slit_y - 0.2, top + tail / 2 + 1) * Rot(90, 0, 0) * Cylinder(11, 0.25)
     return [
-        (disp_mod.base(), CREAM),
-        (disp_mod.lid(), CREAM),
-        (paper[1:], PAPER),
-        (sticker, PAPER),
+        (d.base(), BODY),
+        (d.lid(), BODY),
+        (paper, PAPER),
+        (tag, "#cfc9ba"),
     ]
 
 
-def _crate_cover(i: int):
-    """The album art on the front of the print in slot i (Instax Square: 62 mm image, 6 mm top border)."""
-    c = crate_mod
-    y, _ = c._fin_frame(i)(c.FIN_T + (c.SLOT_W - c.PRINT_T) / 2, 0)
-    return Pos(0, y, c.FLOOR + 0.2) * Rot(-c.FIN_LEAN, 0, 0) * Pos(0, -0.25, c.PRINT_H - 6 - 62) * Box(
-        62, 0.2, 62, align=(Align.CENTER, Align.MIN, Align.MIN))
-
-
-def crate_parts(shown: int = 14):
-    parts = [(crate_mod.crate(), CREAM), (crate_mod.prints()[:shown], PAPER)]
-    for i in range(shown):
-        parts.append((_crate_cover(i), COVERS[i % len(COVERS)]))
-    return parts
+def crate_parts():
+    return [(crate_mod.crate(), BODY)]
 
 
 def main(out_dir: Path) -> None:
