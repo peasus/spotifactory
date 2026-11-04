@@ -19,6 +19,18 @@ workflow from the Actions tab.
 `site/img/oled-*.png` are the home screen drawn with the app's own layout and
 icons, so redo them if the now-playing screen changes.
 
+## Gallery
+
+`site/gallery.html` shows the photos in `site/img/gallery/` (each as a 1600 px
+`name.jpg` for the lightbox and a 720 px `name-sm.jpg` for the grid; most are
+stills from the demo video) and three 3D models with
+[`<model-viewer>`](https://modelviewer.dev). The models in `site/models/*.glb`
+are the assembled easel, tag dispenser and crate, coloured like the real build
+and exported by `enclosure/web_models.py` (same build123d setup as the case
+files). Unlike the STLs they are committed, so rerun it if the case changes:
+
+    enclosure/.venv/bin/python enclosure/web_models.py
+
 ## Stylesheet version
 
 The pages link `/style.css?v=<hash>` so browsers (iPhone Safari especially)
