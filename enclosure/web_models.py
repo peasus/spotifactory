@@ -37,7 +37,7 @@ def _mesh(shape, colour: str, tolerance: float) -> trimesh.Trimesh:
         mesh = trimesh.load(path, force="mesh")
     mesh.merge_vertices()
     # Smooth the fillets, keep the hard edges hard.
-    mesh = trimesh.graph.smooth_shade(mesh, angle=np.radians(35))
+    mesh = trimesh.graph.smooth_shade(mesh, angle=np.radians(20))
     rgba = trimesh.visual.color.hex_to_rgba(colour) / 255.0
     # glTF base colours are linear; convert from sRGB so the hex values look right.
     rgba[:3] = np.where(rgba[:3] <= 0.04045, rgba[:3] / 12.92, ((rgba[:3] + 0.055) / 1.055) ** 2.4)
@@ -102,7 +102,9 @@ def main(out_dir: Path) -> None:
     for name, parts in (("easel", easel_parts()), ("dispenser", dispenser_parts()),
                         ("crate", crate_parts())):
         path = out_dir / f"{name}.glb"
-        _scene(parts).export(path)
+        # Normals must be written out: Scene Viewer and Quick Look (AR) shade a mesh
+        # without them flat, even though <model-viewer> computes its own.
+        _scene(parts).export(path, include_normals=True)
         print(f"wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
 
 
