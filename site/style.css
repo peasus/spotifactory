@@ -413,11 +413,10 @@ td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .ar-btn { position: absolute; right: 16px; bottom: 16px; border: 0; cursor: pointer; }
 .viewer-note { padding: 0 20px 18px; color: var(--muted); font-size: var(--step--1); }
 .viewer-fine { margin-top: 14px; color: var(--muted); font-size: var(--step--1); }
-.shots { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.shots li:first-child { grid-column: span 2; grid-row: span 2; }
-.shot { display: block; height: 100%; border-radius: 12px; overflow: hidden; background: var(--ink-2); }
-.shot img { display: block; width: 100%; height: 100%; aspect-ratio: 16 / 9; object-fit: cover; transition: transform .4s ease; }
-.shots li:first-child .shot img { aspect-ratio: auto; }
+.shots { list-style: none; margin: 0; padding: 0; columns: 3; column-gap: 12px; }
+.shots li { break-inside: avoid; margin-bottom: 12px; }
+.shot { display: block; border-radius: 12px; overflow: hidden; background: var(--ink-2); }
+.shot img { display: block; width: 100%; height: auto; transition: transform .4s ease; }
 .shot:hover img { transform: scale(1.03); }
 .shot:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
 .lightbox { padding: 0; border: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
@@ -430,9 +429,7 @@ td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .lb-prev { left: 12px; top: 50%; }
 .lb-next { right: 12px; top: 50%; }
 @media (max-width: 860px) {
-  .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .shots li:first-child { grid-column: span 2; grid-row: auto; }
-  .shots li:first-child .shot img { aspect-ratio: 16 / 9; }
+  .shots { columns: 2; }
   .lb-prev, .lb-next { top: auto; bottom: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .shot img { transition: none; } }
