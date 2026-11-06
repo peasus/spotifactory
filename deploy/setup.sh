@@ -12,18 +12,26 @@ USER_ID="$(id -u "$USER")"
 echo "==> Spotifactory setup (repo: $REPO_DIR, user: $USER)"
 
 # ------------------------------------------------------------------ Hostname
+# Keep the hostname set in Imager (spotifactory-1, spotifactory-kitchen, ...),
+# so several boxes on one network don't all claim spotifactory.local. Only a
+# Pi still on the stock "raspberrypi" name is renamed to "spotifactory".
 # Done first: if /etc/hosts doesn't list the hostname (fresh Imager installs
 # sometimes don't), every sudo below prints "unable to resolve host", which
 # looks like an error. This first call filters that one warning out.
-echo "==> Setting hostname to 'spotifactory'..."
+BOX_HOST="$(hostname)"
+if [ -z "$BOX_HOST" ] || [ "$BOX_HOST" = "raspberrypi" ]; then
+  BOX_HOST=spotifactory
+fi
+echo "==> Hostname: $BOX_HOST"
 sudo sh -c '
-  hostnamectl set-hostname spotifactory
+  BOX_HOST="$1"
+  hostnamectl set-hostname "$BOX_HOST"
   if grep -q "^127\.0\.1\.1" /etc/hosts; then
-    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\tspotifactory/" /etc/hosts
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$BOX_HOST/" /etc/hosts
   else
-    printf "127.0.1.1\tspotifactory\n" >> /etc/hosts
+    printf "127.0.1.1\t%s\n" "$BOX_HOST" >> /etc/hosts
   fi
-' 2> >(grep -v "unable to resolve host" >&2)
+' _ "$BOX_HOST" 2> >(grep -v "unable to resolve host" >&2)
 
 # ------------------------------------------------------------------ Packages
 echo "==> Installing system packages..."
@@ -44,7 +52,7 @@ echo "==> Enabling I2C and SPI..."
 sudo raspi-config nonint do_i2c 0
 sudo raspi-config nonint do_spi 0
 
-# Ensure avahi advertises the new hostname so spotifactory.local resolves
+# Ensure avahi advertises the hostname so <hostname>.local resolves
 sudo systemctl enable avahi-daemon
 sudo systemctl restart avahi-daemon
 

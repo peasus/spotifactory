@@ -174,7 +174,7 @@ RELAY_URL=https://auth.spotifactory.com</code></pre></div></li>
       <section id="pi" aria-labelledby="h-pi">
         <h2 id="h-pi">4. Set up the Pi</h2>
         <ol class="steps-n">
-          <li><div><p>In Raspberry Pi Imager, flash <strong>Raspberry Pi OS Lite (64-bit)</strong>. Set the hostname to <code>spotifactory</code> and the user to <code>spotifactory</code>, and turn on SSH and Wi-Fi.</p></div></li>
+          <li><div><p>In Raspberry Pi Imager, flash <strong>Raspberry Pi OS Lite (64-bit)</strong>. Set the hostname to <code>spotifactory</code> and the user to <code>spotifactory</code>, and turn on SSH and Wi-Fi. Setting up more than one box on the same network? Give each its own hostname, such as <code>spotifactory-2</code>, and use it in place of <code>spotifactory.local</code> below.</p></div></li>
           <li><div><p>From your computer, copy your <code>provision.env</code> over to the Pi:</p>
 <pre><code>scp deploy/provision.env spotifactory@spotifactory.local:~/spotifactory-provision.env</code></pre></div></li>
           <li><div><p>On the Pi, run:</p>
