@@ -116,16 +116,8 @@ sudo systemctl disable raspotify
 sudo systemctl stop raspotify || true
 
 # Install as a user service so librespot and PipeWire share the same session.
-# Spotify Connect names must be unique on a network too: "spotifactory" →
-# "Spotifactory", "spotifactory-2" → "Spotifactory 2". The app finds its own
-# receiver by the "Spotifactory" prefix, so keep that.
-CONNECT_NAME="Spotifactory"
-case "$BOX_HOST" in
-  spotifactory-*) CONNECT_NAME="Spotifactory ${BOX_HOST#spotifactory-}" ;;
-esac
-echo "  Spotify Connect name: $CONNECT_NAME"
 mkdir -p "$HOME/.config/systemd/user/"
-cat > "$HOME/.config/systemd/user/raspotify.service" << UNIT
+cat > "$HOME/.config/systemd/user/raspotify.service" << 'UNIT'
 [Unit]
 Description=Raspotify (Spotify Connect Client)
 After=pipewire.service pipewire-pulse.service wireplumber.service
@@ -134,7 +126,11 @@ Wants=pipewire.service pipewire-pulse.service
 [Service]
 # --system-cache keeps the Zeroconf login across restarts, so "Spotifactory" only
 # has to be picked in the Spotify app once. Audio caching is off to spare the SD card.
-ExecStart=/usr/bin/librespot --backend pulseaudio --name "$CONNECT_NAME" --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache
+# Connect names must be unique on a network. If another box already has
+# "Spotifactory", librespot exits on the zeroconf collision; then this one
+# takes "Spotifactory 2" until its next restart. The app finds its receiver
+# by the "Spotifactory" prefix, so either name works.
+ExecStart=/bin/sh -c '/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache || exec /usr/bin/librespot --backend pulseaudio --name "Spotifactory 2" --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache'
 Restart=on-failure
 RestartSec=5
 
