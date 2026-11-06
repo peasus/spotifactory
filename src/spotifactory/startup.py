@@ -7,12 +7,15 @@ Runs pre-flight checks with OLED feedback before handing off to the main loop:
 """
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 
+_RELAY_RETRY_SECS = 15.0   # wait between tries when the login relay is unreachable
 _BOOT_NETWORK_WAIT_SECS = 30.0  # saved WiFi can take a while to associate after boot
 # Our own setup page (deploy/portal) in place of WiFi Connect's stock one.
 # The app is installed editable from the checkout, so this ships with updates.
@@ -182,7 +185,18 @@ def main() -> None:
     if not _has_valid_token():
         print("[startup] no valid Spotify token — starting PKCE relay auth", flush=True)
         from spotifactory.auth_server import run_pkce_auth
-        run_pkce_auth(on_session_ready=lambda url: _show_auth_url(display, url))
+        while True:
+            try:
+                run_pkce_auth(on_session_ready=lambda url: _show_auth_url(display, url))
+                break
+            except OSError as e:  # URLError, DNS, timeouts: relay unreachable
+                # Say so on screen and retry, rather than exit and have systemd
+                # restart us into the same failure every few seconds.
+                relay = os.environ.get("RELAY_URL", "")
+                host = urllib.parse.urlparse(relay).hostname or relay or "RELAY_URL unset"
+                print(f"[startup] can't reach login relay {relay!r}: {e}; retrying", flush=True)
+                _show(display, "Can't reach login", host[:21])
+                time.sleep(_RELAY_RETRY_SECS)
 
     # ---------------------------------------------------------- Bluetooth
     import os as _os
