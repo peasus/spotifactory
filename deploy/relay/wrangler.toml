@@ -2,6 +2,19 @@ name = "auth"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 
+# Served on two hostnames, both live:
+#   https://auth.spotifactory.com      current address (custom domain below)
+#   https://auth.spotifactory.workers.dev  original address; boxes set up
+#       before the move and Spotify apps registered with that redirect URI
+#       still use it, so keep workers_dev on.
+# Both hit the same Worker and KV namespace, so they behave identically.
+# Self-hosting on your own account? Delete the routes line (or point it at a
+# domain on your account) and use your workers.dev URL instead.
+workers_dev = true
+routes = [
+  { pattern = "auth.spotifactory.com", custom_domain = true },
+]
+
 # Workers KV namespace for session storage.
 # One-time setup:
 #   1. wrangler login
