@@ -48,7 +48,9 @@ Once, on your computer: copy `deploy/provision.env.example` to
 merges it into each box's `.env`, so nothing needs editing on the Pi.
 
 1. Flash Raspberry Pi OS Lite (64-bit) with hostname `spotifactory`, user
-   `spotifactory`, SSH and WiFi set in Imager.
+   `spotifactory`, SSH and WiFi set in Imager. Setting up more than one box on
+   the same network? Give each its own hostname (`spotifactory-2`, ...) and use
+   that in place of `spotifactory.local` below; setup keeps it.
 2. From your computer, copy your values over:
    ```
    scp deploy/provision.env spotifactory@spotifactory.local:~/spotifactory-provision.env

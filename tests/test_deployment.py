@@ -5,7 +5,7 @@ import json
 import urllib.error
 import urllib.request
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -222,6 +222,20 @@ class TestStartupMain:
         with stack:
             startup.main()
         m["auth"].assert_called_once()
+
+    def test_retries_auth_when_relay_unreachable(self):
+        """A bad RELAY_URL or a relay outage shows a message and retries, not crash-loops."""
+        import urllib.error
+        from spotifactory import startup
+        stack, m = self._patches(token_valid=False)
+        m["auth"].side_effect = [urllib.error.URLError("Name or service not known"), True]
+        with stack, patch.dict("os.environ", {"RELAY_URL": "https://auth.example.co"}), \
+             patch("spotifactory.startup._RELAY_RETRY_SECS", 0.0), \
+             patch("spotifactory.startup._show") as show:
+            startup.main()
+        assert m["auth"].call_count == 2
+        show.assert_any_call(ANY, "Can't reach login", "auth.example.co")
+        m["run_platform"].assert_called_once()
 
     def test_skips_auth_when_token_present(self):
         from spotifactory import startup

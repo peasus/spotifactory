@@ -11,6 +11,28 @@ USER_ID="$(id -u "$USER")"
 
 echo "==> Spotifactory setup (repo: $REPO_DIR, user: $USER)"
 
+# ------------------------------------------------------------------ Hostname
+# Keep the hostname set in Imager (spotifactory-1, spotifactory-kitchen, ...),
+# so several boxes on one network don't all claim spotifactory.local. Only a
+# Pi still on the stock "raspberrypi" name is renamed to "spotifactory".
+# Done first: if /etc/hosts doesn't list the hostname (fresh Imager installs
+# sometimes don't), every sudo below prints "unable to resolve host", which
+# looks like an error. This first call filters that one warning out.
+BOX_HOST="$(hostname)"
+if [ -z "$BOX_HOST" ] || [ "$BOX_HOST" = "raspberrypi" ]; then
+  BOX_HOST=spotifactory
+fi
+echo "==> Hostname: $BOX_HOST"
+sudo sh -c '
+  BOX_HOST="$1"
+  hostnamectl set-hostname "$BOX_HOST"
+  if grep -q "^127\.0\.1\.1" /etc/hosts; then
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$BOX_HOST/" /etc/hosts
+  else
+    printf "127.0.1.1\t%s\n" "$BOX_HOST" >> /etc/hosts
+  fi
+' _ "$BOX_HOST" 2> >(grep -v "unable to resolve host" >&2)
+
 # ------------------------------------------------------------------ Packages
 echo "==> Installing system packages..."
 sudo apt-get update -q
@@ -30,9 +52,7 @@ echo "==> Enabling I2C and SPI..."
 sudo raspi-config nonint do_i2c 0
 sudo raspi-config nonint do_spi 0
 
-echo "==> Setting hostname to 'spotifactory'..."
-sudo hostnamectl set-hostname spotifactory
-# Ensure avahi advertises the new hostname so spotifactory.local resolves
+# Ensure avahi advertises the hostname so <hostname>.local resolves
 sudo systemctl enable avahi-daemon
 sudo systemctl restart avahi-daemon
 
@@ -106,7 +126,11 @@ Wants=pipewire.service pipewire-pulse.service
 [Service]
 # --system-cache keeps the Zeroconf login across restarts, so "Spotifactory" only
 # has to be picked in the Spotify app once. Audio caching is off to spare the SD card.
-ExecStart=/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache
+# Connect names must be unique on a network. If another box already has
+# "Spotifactory", librespot exits on the zeroconf collision; then this one
+# takes "Spotifactory 2" until its next restart. The app finds its receiver
+# by the "Spotifactory" prefix, so either name works.
+ExecStart=/bin/sh -c '/usr/bin/librespot --backend pulseaudio --name Spotifactory --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache || exec /usr/bin/librespot --backend pulseaudio --name "Spotifactory 2" --bitrate 160 --system-cache %h/.cache/librespot --disable-audio-cache'
 Restart=on-failure
 RestartSec=5
 

@@ -54,7 +54,12 @@ class QRAuthStep(Step):
             open_browser=False,
         )
         authorize_url = auth.get_authorize_url(state=session_id)
-        _post_register(relay_url, session_id, authorize_url)
+        try:
+            _post_register(relay_url, session_id, authorize_url)
+        except OSError as e:  # URLError, DNS, timeouts: relay unreachable
+            print(f"[reauth] can't reach login relay {relay_url!r}: {e}", flush=True)
+            self.show_for("Can't reach login", 3.0)
+            return Cancel()
 
         session_url = f"{relay_url}/{session_id}"
 
