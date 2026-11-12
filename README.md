@@ -150,8 +150,10 @@ and what neither distributor carries. `enclosure/bom_digikey.csv` and
   button heads only: don't use countersunk heads.
 - 4× M2.5×8: USB-C power board to its bracket.
 - 2× M2.5×20 (pan or button head): the reader keepers into their posts.
-  16 or 18 also work, with less thread in the post; not 22 or longer (runs
-  past the pilot hole).
+  That gives about 8 mm of thread in the post; 18 gives about 6, 16 only
+  about 4. Not 22 or longer (runs past the pilot hole). The post has a
+  straight clearance bore up to a flat seat, so the screw meets the pilot
+  square-on rather than on the sloped underside.
 
 The reader's cable (USB-C at the reader, micro-USB at the Pi) can be a regular
 straight cable: a USB-C plug up to 12.5 mm wide and 6.5 mm thick (plug and

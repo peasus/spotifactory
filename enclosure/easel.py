@@ -289,7 +289,7 @@ KPOST_R = 2.75
 KPOST_X = READER_W / 2 + EDGE_CLEAR + KPOST_R   # posts touch the board's edges: they guide its bottom
 KPOST_Z = -5.0                 # pilot axis behind the board's front face: clears a 7 mm screwdriver shaft
 KPOST_LEN = 20.0
-KEEPER_PILOT_DEPTH = 14.0     # M2.5 x 20: ~9.25 mm through the keeper, ~10.75 into the post, tip inside the pilot
+KEEPER_PILOT_DEPTH = 14.0     # M2.5 x 20: ~12 mm through the keeper and guide bore, ~8 mm of thread, tip inside the pilot
 # Posts (and the caps' bottoms) stick out behind a wall leaning back, so a square
 # underside would start printing at its back edge, in mid-air. Instead the
 # underside is level for LEDGE mm off the wall, then rises at 45° (in the
@@ -301,6 +301,13 @@ KEEPER_LIP_H = 5.0            # keeper lip behind the board's bottom corner (the
 KEEPER_X0 = READER_W / 2 - 8.0      # keepers reach 8 mm in under the board, past its rounded corners
 SCREW_CLEAR_M25 = 2.9
 KEEPER_DRIVER_R = 3.5         # room for a 7 mm screwdriver shaft
+KEEPER_GUIDE_R = SCREW_CLEAR_M25 / 2 + 0.1     # straight bore in the post, under the pilot
+
+
+def keeper_seat(p0: float) -> float:
+    """Where the keeper's pilot starts: a flat seat just above the sloped
+    underside's highest point across the guide bore."""
+    return _underside(KPOST_Z - KEEPER_GUIDE_R, p0) + 0.3
 
 
 def _hole_positions(dx, dy):
@@ -408,8 +415,15 @@ def reader_mount():
         p0, depth = -KEEPER_GAP, -(KPOST_Z - KPOST_R)
         post = _prism_x(_under_outline(p0, depth, into) + [(p0 + KPOST_LEN, -depth), (p0 + KPOST_LEN, into)],
                         *_xs(s, side0 - 0.01, KPOST_X + KPOST_R))
-        post -= Pos(s * KPOST_X, _underside(KPOST_Z + PILOT_M25 / 2, p0) - 1, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(
+        mouth = _underside(KPOST_Z + PILOT_M25 / 2, p0) - 1
+        post -= Pos(s * KPOST_X, mouth, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(
             PILOT_M25 / 2, KEEPER_PILOT_DEPTH + 1, align=C)
+        # The underside slopes steeply across the pilot, so the screw would meet
+        # one side of the hole ~3.6 mm before the other and get pushed off line.
+        # A clearance bore up to a flat seat above the slope's high side carries
+        # on the keeper's hole, so the tip meets a square-on pilot mouth.
+        post -= Pos(s * KPOST_X, mouth, KPOST_Z) * Rot(-90, 0, 0) * Cylinder(
+            KEEPER_GUIDE_R, keeper_seat(p0) - mouth, align=C)
         out = cap + post if out is None else out + cap + post
     return _mount_frame() * out
 
