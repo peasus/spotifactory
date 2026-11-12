@@ -40,7 +40,7 @@ class FetchInfoStep(Step):
 
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotifactory import backend
-        self.status = f"Checking {backend.label()}..."
+        self.status = f"Checking {backend.short_label()}..."
         info = backend.get_now_playing()
         if info is None:
             self.show_for("Nothing playing", 2.0)
@@ -202,6 +202,10 @@ class _WriteTagStep(Step):
     def _uri(self, ctx: TaskContext) -> str:
         raise NotImplementedError
 
+    def _extra(self, ctx: TaskContext) -> list[str]:
+        """More links after the first (other services' links to the same album)."""
+        return []
+
     def run(self, ctx: TaskContext) -> StepOutcome:
         from spotifactory.hardware.rfid import read_next, wait_until_clear
 
@@ -216,7 +220,7 @@ class _WriteTagStep(Step):
         try:
             offered = ctx.data.pop("tag_offered", None)
             if offered and ctx.data.pop("selected", None) == "overwrite":
-                return self._write(uri, offered["uid"], stop)
+                return self._write(uri, offered["uid"], stop, self._extra(ctx))
             # A print's tag goes on a tag placed now, not the one already
             # there; and a tag we were told not to overwrite has to go.
             if self.fresh_tag or offered:
@@ -239,19 +243,19 @@ class _WriteTagStep(Step):
             if has:
                 ctx.data["tag_offered"] = card
                 return PushMenu(menu=_overwrite_menu(_describe(has)), on_confirm=again, on_cancel=again)
-            return self._write(uri, card["uid"], stop)
+            return self._write(uri, card["uid"], stop, self._extra(ctx))
         except Exception as e:
             print(f"[capture] RFID error: {e}", flush=True)
             self.artist = ""
             self.show_for(f"RFID error: {e}", 3.0)
             return Done()
 
-    def _write(self, uri: str, uid: str, stop) -> StepOutcome:
+    def _write(self, uri: str, uid: str, stop, extra: list[str] = ()) -> StepOutcome:
         """Write to the tag we just read, and no other."""
         from spotifactory.hardware.rfid import TagWriteError, write_uri
         self.status, self.artist = "Writing tag...", ""
         try:
-            if write_uri(uri, terminate=stop, uid=uid):
+            if write_uri(uri, terminate=stop, uid=uid, extra=_fit(uri, extra)):
                 print(f"[capture] wrote {uri} to tag {uid}", flush=True)
                 return Continue()
         except TagWriteError as e:
@@ -270,20 +274,39 @@ class _WriteTagStep(Step):
         return Done()
 
 
+# The smallest tags (NTAG213) hold 144 bytes of NDEF; leave room for the
+# first link and the record headers.
+_TAG_LINK_BYTES = 120
+
+
+def _fit(uri: str, extra) -> list[str]:
+    """The extra links that fit on a small tag after `uri`, in order."""
+    kept, used = [], len(uri)
+    for link in extra or ():
+        if used + len(link) + 5 > _TAG_LINK_BYTES:
+            break
+        kept.append(link)
+        used += len(link) + 5
+    return kept
+
+
 def _describe(uri: str) -> str:
     """What a tag holds, for the overwrite question."""
-    if not uri.startswith("spotify:"):
+    from spotifactory import backend
+    if not backend.is_music_assistant() and not uri.startswith("spotify:"):
         return "something else"
     try:
-        from spotifactory import backend
         return backend.uri_name(uri)
     except Exception:
-        return "another " + uri.split(":")[1]
+        return "another " + uri.split(":")[1] if uri.startswith("spotify:") else "something else"
 
 
 class ScanStep(_WriteTagStep):
     def _uri(self, ctx: TaskContext) -> str:
         return ctx.data["info"].album_uri
+
+    def _extra(self, ctx: TaskContext) -> list[str]:
+        return list(getattr(ctx.data["info"], "links", None) or [])[1:]
 
 
 class DoneStep(Step):
@@ -449,29 +472,16 @@ def _target_menu(targets: list[dict]):
 
 
 class ChooseTagTargetStep(Step):
-    # Spotify-only for now: reads the playing context straight from the Web API.
     """What's playing: its album, and its playlist if it's playing from one."""
 
     def run(self, ctx: TaskContext) -> StepOutcome:
-        self.status = "Checking Spotify..."
+        from spotifactory import backend
+        self.status = f"Checking {backend.short_label()}..."
         try:
-            from spotifactory.spotify import get_client, uri_name
-            playback = get_client().current_playback()
+            targets = backend.tag_targets()
         except Exception as e:
-            self.show_for(f"Spotify error: {str(e)[:20]}", 3.0)
+            self.show_for(f"{backend.short_label()} error: {str(e)[:20]}", 3.0)
             return Done()
-        item = (playback or {}).get("item") or {}
-        album = item.get("album") or {}
-        targets = []
-        if album.get("uri"):
-            targets.append({"uri": album["uri"], "label": album.get("name") or "This album"})
-        context = (playback or {}).get("context") or {}
-        if context.get("type") == "playlist":
-            try:
-                name = uri_name(context["uri"])
-            except Exception:
-                name = "This playlist"
-            targets.append({"uri": context["uri"], "label": f"Playlist: {name}"})
         if not targets:
             self.show_for("Nothing playing", 2.0)
             return Done()
@@ -489,7 +499,11 @@ class WriteChosenTagStep(_WriteTagStep):
         # Kept apart: the overwrite question replaces ctx.data["selected"].
         if "tag_target" not in ctx.data:
             ctx.data["tag_target"] = ctx.data["selected"]["uri"]
+            ctx.data["tag_extra"] = list(ctx.data["selected"].get("extra") or [])
         return ctx.data["tag_target"]
+
+    def _extra(self, ctx: TaskContext) -> list[str]:
+        return ctx.data.get("tag_extra", [])
 
 
 class TagWrittenStep(Step):

@@ -177,6 +177,7 @@ class TestStartupMain:
             "run_platform": stack.enter_context(patch("spotifactory.startup._run_platform")),
             "auth": stack.enter_context(patch("spotifactory.auth_server.run_pkce_auth")),
             "subprocess": stack.enter_context(patch("subprocess.run")),
+            "services": stack.enter_context(patch("spotifactory.services.apply")),
         }
         return stack, mocks
 
@@ -226,6 +227,15 @@ class TestStartupMain:
             startup.main()
         m["auth"].assert_not_called()
         m["run_platform"].assert_called_once_with(ANY, FirstBootLoginTask)
+
+    def test_music_assistant_mode_needs_no_spotify_login(self):
+        from spotifactory import startup
+        stack, m = self._patches(token_valid=False)
+        with stack, patch.dict("os.environ", {"MUSIC_BACKEND": "music_assistant"}), \
+             patch("spotifactory.music_assistant.has_login", return_value=True):
+            startup.main()
+        m["services"].assert_called_once_with("music_assistant")
+        m["run_platform"].assert_called_once_with(ANY, None)
 
     def test_skips_auth_when_token_present(self):
         from spotifactory import startup

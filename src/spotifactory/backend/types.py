@@ -4,7 +4,7 @@ Kept apart from the backends so the UI can use them without importing one.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -24,6 +24,9 @@ class NowPlayingInfo:
     duration_ms: int = 0
     repeat_state: str = "off"     # "off", "context" (album/playlist) or "track"
     total_tracks: int | None = None   # on the track's album
+    # Every link to the album a tag can carry, album_uri first (Music
+    # Assistant: one per service it knows the album on). Empty for Spotify.
+    links: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -158,8 +158,16 @@ def main() -> None:
     # No working login: the app opens on the Connect Spotify QR code instead of
     # waiting here, so Menu still works (Reboot, Pair Device, and later the
     # choice of music service).
+    # Music Assistant mode never needs a Spotify login.
+    from spotifactory import backend, services
+    services.apply(backend.name())     # Raspotify or Squeezelite, as the setting says
     first_task_class = None
-    if not _has_valid_token():
+    if backend.is_music_assistant():
+        if not backend.has_login():
+            print("[startup] Music Assistant not reachable", flush=True)
+            _show(display, "Music Assistant", "not reachable")
+            time.sleep(2.0)
+    elif not _has_valid_token():
         print("[startup] no valid Spotify token — opening Connect Spotify", flush=True)
         from spotifactory.tasks.reauth import FirstBootLoginTask
         first_task_class = FirstBootLoginTask

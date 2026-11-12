@@ -11,6 +11,13 @@ class ItemDef:
     submenu: str | None = None  # key in the menus catalog
     action: str | None = None   # "back", "home", "reboot", "shutdown", "confirm", "cancel"
     data: Any = None            # arbitrary payload stored in ctx.data["selected"] on confirm
+    backend: str | None = None  # only shown with this music backend ("spotify", ...)
+
+    def shown(self) -> bool:
+        if self.backend is None:
+            return True
+        from spotifactory import backend
+        return backend.name() == self.backend
 
 
 @dataclass

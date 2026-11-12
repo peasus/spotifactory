@@ -1,0 +1,20 @@
+# The box's own player in Music Assistant mode (Menu > Music Source), as a
+# user service in the PipeWire session, like Raspotify. Off until that mode
+# is chosen: the app enables it and disables Raspotify (services.py).
+# upgrade.sh installs it to ~/.config/systemd/user/ with this box's paths.
+[Unit]
+Description=Squeezelite (Music Assistant player)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+Wants=pipewire.service pipewire-pulse.service
+
+[Service]
+# MA_SERVER_HOST comes from the app's settings; without it Squeezelite finds
+# the server by broadcast. "default" is PipeWire (pipewire-alsa), so it plays
+# on the paired Bluetooth speaker. -C 5 lets go of the output when idle.
+EnvironmentFile=-/home/spotifactory/spotifactory/.env
+ExecStart=/bin/sh -c 'exec /usr/bin/squeezelite -n Spotifactory -o default -C 5 $${MA_SERVER_HOST:+-s "$$MA_SERVER_HOST"}'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
