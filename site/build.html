@@ -105,7 +105,7 @@ Start by asking how comfortable I am with a terminal and what computer I use (Ma
           <li><div><b>USB-C power socket</b><small>Adafruit 5993, so any USB-C charger works. A spare micro-USB cable, cut down, makes the lead to the Pi, or use a short micro-USB power lead <a href="https://www.amazon.com/dp/B0CX1N7XGR">like these</a>.</small></div><span class="qty">1</span></li>
           <li><div><b>Instax Square Link printer</b><small>Plus Instax Square film.</small></div><span class="qty">1</span></li>
           <li><div><b>NFC stickers, 25 mm square</b><small>One for the back of each photo.</small></div><span class="qty">a roll</span></li>
-          <li><div><b>Screws and fittings</b><small>M2.5×14 pan or button head (6), M2.5×8 (4), M3 flat-head about 6 mm (4), M3×4 mm brass heat-set inserts (4), rubber feet (4).</small></div><span class="qty">&nbsp;</span></li>
+          <li><div><b>Screws and fittings</b><small>M2.5×14 pan or button head (4), M2.5×20 pan or button head (2), M2.5×8 (4), M3 flat-head about 6 mm (4), M3×4 mm brass heat-set inserts (4), rubber feet (4).</small></div><span class="qty">&nbsp;</span></li>
           <li><div><b>Tools</b><small>A soldering iron (for the power lead and the heat-set inserts) and a small screwdriver.</small></div><span class="qty">&nbsp;</span></li>
           <li><div><b>A speaker</b><small>Any Spotify Connect speaker, or a Bluetooth speaker that the box plays to directly.</small></div><span class="qty">1</span></li>
           <li><div><b>Spotify Premium</b><small>Needed to control playback. <a href="/why-spotify">Why only Spotify?</a></small></div><span class="qty">&nbsp;</span></li>
@@ -190,7 +190,7 @@ cd ~/spotifactory &amp;&amp; bash deploy/setup.sh</code></pre></div></li>
         <p>First, press the four M3 heat-set inserts into the bosses in the body's bottom corners with a soldering iron. Set the screen HAT to I2C by turning both switches on its back (SW1 and SW2) to 0. Then, with the body upside down or on its back:</p>
         <ol class="steps-n">
           <li><div><p>Plug the right-angle cable into the reader. Bring the reader in from below with the antenna side facing the panel, and slide it about 4 mm up until its top corners sit in the caps.</p></div></li>
-          <li><div><p>Put a keeper under each bottom corner of the reader and drive an M2.5×14 screw straight up through it into the post.</p></div></li>
+          <li><div><p>Put a keeper under each bottom corner of the reader and drive an M2.5×20 screw straight up through it into the post (18 also works, but not 22 or longer).</p></div></li>
           <li><div><p>Screw the Pi and HAT stack to the faceplate through the spacers, using four M2.5×14 screws. Plug in the cables, then fit it from below into the pocket under the screen window.</p></div></li>
           <li><div><p>Make the power lead: cut the spare micro-USB cable, keeping the micro-USB end long enough to reach the Pi. Strip the +5 V wire (usually red) and the ground wire (usually black), and solder them to the VBUS and GND pads on the USB-C socket board. Check with a multimeter before you plug it into the Pi.</p></div></li>
           <li><div><p>Screw the power socket to its bracket on the base plate with the four M2.5×8 screws. Fit the base plate and screw it into the corner inserts with the M3 flat-head screws, then stick on the feet.</p></div></li>
