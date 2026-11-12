@@ -26,7 +26,7 @@ class ScanStep(Step):
         from spotifactory import backend
         uri = backend.pick_uri(card.get("uris") or [card["uri"]])
         if not uri:
-            self.show_for(f"No {backend.label()} link", 3.0)
+            self.show_for(backend.no_link()[0], 3.0)
             return Done()
         ctx.data["uri"] = uri
         return Continue()

@@ -67,6 +67,28 @@ merges it into each box's `.env`, so nothing needs editing on the Pi.
 
 Logs: `journalctl -u spotifactory -f`.
 
+### Music Assistant (advanced)
+
+If you run your own [Music Assistant](https://music-assistant.io) server,
+**Menu > Music Source > Music Assistant** switches the box over to it. The box
+shows a QR code for a page it serves on your network (port 8080), where you
+enter the server address and a long-lived access token (made under your user profile in Music
+Assistant). After that nothing on the box talks to Spotify:
+
+- Home shows whatever is playing on the chosen Music Assistant player, and
+  Print Album prints that.
+- Choose Speaker lists Music Assistant's players. The box itself runs
+  **Squeezelite** instead of Raspotify, so its Bluetooth speaker appears in
+  Music Assistant as **Spotifactory**.
+- Tags hold the album's share links (Spotify, Apple Music, Qobuz, ...), and the
+  server plays the first one it has a provider for. Print Playlist and Connect
+  Spotify are hidden.
+
+**Music Source > Spotify** switches back; **Change MA Server** re-enters the
+address. The settings land in `.env` as `MUSIC_BACKEND`, `MA_URL`, `MA_TOKEN`
+and `MA_SERVER_HOST`. The first-boot Spotify QR code also has Menu, so a new
+box can go straight to Music Assistant without a Spotify login.
+
 ### Updates
 
 Boxes update themselves from the **`stable`** branch: each night around 3:30
@@ -198,7 +220,8 @@ print's top edge (`TOP_BORDER`); if yours differs, change it and re-run.
 |---|---|
 | `src/spotifactory/runner.py` | Platform-independent UI loop: input, tasks, rendering |
 | `src/spotifactory/tasks/` | Home screen, printing, speakers, Bluetooth pairing, Spotify login |
-| `src/spotifactory/backend/` | The music service the UI talks to (`spotify.py` today); never import `spotify.py` from the UI |
+| `src/spotifactory/backend/` | The music service the UI talks to (`spotify.py` or `music_assistant.py`, chosen by `MUSIC_BACKEND`); never import either from the UI |
+| `src/spotifactory/services.py` | Swaps the box's receiver: Raspotify (Spotify) or Squeezelite (Music Assistant) |
 | `src/spotifactory/hardware/` | NFC reader, Instax printer, Bluetooth, Sonos |
 | `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
 | `deploy/` | Pi setup script, systemd unit, auth relay Worker |

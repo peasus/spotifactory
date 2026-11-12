@@ -232,7 +232,7 @@ class HomeScanStep(Step):
             if not uri:
                 if card.get("uri"):
                     print(f"[home] tag {card['uid']} has no {backend.label()} link: {card.get('uris')}", flush=True)
-                    self.status, self.artist = f"No {backend.label()} link", "on this tag"
+                    self.status, self.artist = backend.no_link()
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
@@ -258,7 +258,7 @@ class HomeScanStep(Step):
         def on_remove(card: dict) -> None:
             nonlocal _active_uri
             if not _active_uri:
-                if not self.tag_active:       # clear "No Spotify link"
+                if not self.tag_active:       # clear the "no link" message
                     self.status, self.artist = "Place tag...", ""
                 return
             if self._cancel.is_set():

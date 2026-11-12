@@ -467,14 +467,14 @@ class Runner:
         )
 
     def _in_qr_auth(self) -> bool:
-        """True while QRAuthStep is showing its QR code (qr_image is set)."""
-        from spotifactory.tasks.reauth.steps import QRAuthStep
+        """True while a step shows a QR code to scan (the Spotify login, the
+        Music Assistant setup page): it has a qr_image set."""
+        step = self._task.current_step if self._task is not None else None
         return (
-            self._task is not None
-            and self._task.current_step is not None
-            and isinstance(self._task.current_step, QRAuthStep)
-            and not self._task.current_step.is_done
-            and getattr(self._task.current_step, "qr_image", None) is not None
+            step is not None
+            and not step.is_done
+            and getattr(step, "qr_image", None) is not None
+            and hasattr(step, "toggle_url")
         )
 
     def _in_home_scan(self) -> bool:
@@ -919,7 +919,7 @@ class Runner:
 
     def _draw_scrollbar(self, state, top: int, bottom: int) -> None:
         """Slim bar on the right edge when the menu has more items than fit."""
-        total, rows = len(state.menu.items), state.menu.visible_rows
+        total, rows = len(state.items), state.menu.visible_rows
         if total <= rows:
             return
         # Clear a strip so the bar stays visible beside a highlighted row.

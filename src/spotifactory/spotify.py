@@ -12,6 +12,8 @@ from spotifactory.backend.types import ChosenDevice, NowPlayingInfo, TagPlay
 load_dotenv()
 
 LABEL = "Spotify"
+SHORT_LABEL = "Spotify"
+NO_LINK = ("No Spotify link", "on this tag")
 
 SCOPES = [
     "user-read-playback-state",
@@ -622,3 +624,21 @@ def choose_speaker(device: dict) -> None:
     restricted = bool(device.get("is_restricted"))
     set_active_device(device["id"], device.get("name", ""), restricted=restricted)
     transfer_playback(device["id"], restricted=restricted)
+
+
+def tag_targets() -> list[dict]:
+    """Write Tag: what's playing's album, and its playlist if it's playing from one."""
+    playback = get_client().current_playback()
+    item = (playback or {}).get("item") or {}
+    album = item.get("album") or {}
+    targets = []
+    if album.get("uri"):
+        targets.append({"uri": album["uri"], "label": album.get("name") or "This album"})
+    context = (playback or {}).get("context") or {}
+    if context.get("type") == "playlist":
+        try:
+            name = uri_name(context["uri"])
+        except Exception:
+            name = "This playlist"
+        targets.append({"uri": context["uri"], "label": f"Playlist: {name}"})
+    return targets

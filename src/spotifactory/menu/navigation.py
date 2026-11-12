@@ -15,7 +15,7 @@ class NavState:
             self._clamp_scroll()
 
     def move_down(self) -> None:
-        if self.selected_index < len(self.menu.items) - 1:
+        if self.selected_index < len(self.items) - 1:
             self.selected_index += 1
             self._clamp_scroll()
 
@@ -26,15 +26,21 @@ class NavState:
             self.scroll_offset = self.selected_index - self.menu.visible_rows + 1
 
     @property
+    def items(self) -> list[ItemDef]:
+        """The menu's items that apply now (some are for one music service)."""
+        return [i for i in self.menu.items if i.shown()]
+
+    @property
     def selected_item(self) -> ItemDef:
-        return self.menu.items[self.selected_index]
+        items = self.items
+        return items[min(self.selected_index, len(items) - 1)]
 
     @property
     def visible_items(self) -> list[tuple[int, ItemDef]]:
         start = self.scroll_offset
         return [
             (start + i, item)
-            for i, item in enumerate(self.menu.items[start : start + self.menu.visible_rows])
+            for i, item in enumerate(self.items[start : start + self.menu.visible_rows])
         ]
 
 
