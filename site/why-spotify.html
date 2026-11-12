@@ -55,6 +55,7 @@
       <a href="#streaming">2. Streaming to a speaker</a>
       <a href="#art">3. Album art</a>
       <a href="#others">The other services</a>
+      <a href="#music-assistant">Music Assistant</a>
     </nav>
 
     <div class="prose">
@@ -93,6 +94,19 @@
         </div>
         <p>"Unofficial" matters more than it sounds. A Spotifactory is meant to sit on a shelf for years and just work, often in someone else's house. Tools that could break with any update, or get an account flagged, aren't a good fit.</p>
         <p>If another service opens up all three, the box can learn it.</p>
+      </section>
+
+      <section id="music-assistant" aria-labelledby="h-music-assistant">
+        <h2 id="h-music-assistant">Music Assistant, for advanced users</h2>
+        <p>If you already run your own <a href="https://music-assistant.io">Music Assistant</a> server, usually alongside Home Assistant, the box can use it instead of Spotify. Music Assistant does the three jobs itself: it plays the music, sends it to your speakers and has the album art. That means you can use whichever services you've set up in it.</p>
+        <p>To switch, go to <strong>Menu &gt; Music Source &gt; Music Assistant</strong>. The box shows a QR code. It opens a short page where you enter your server's address and an access token, which you make under your user profile in Music Assistant. On a brand-new box you can press Menu on the Spotify sign-in screen and go there straight away, without a Spotify account.</p>
+        <ul>
+          <li><strong>Print Album</strong> prints whatever is playing on your chosen Music Assistant player.</li>
+          <li><strong>Choose Speaker</strong> lists Music Assistant's players. The box's own Bluetooth speaker shows up in Music Assistant as <strong>Spotifactory</strong>.</li>
+          <li>Tags store the album's links, so a photo plays from any service your server can use for that album.</li>
+          <li>The box doesn't talk to Spotify at all in this mode, so Print Playlist and Connect Spotify are hidden.</li>
+        </ul>
+        <div class="callout"><p>This mode is new and less tested than Spotify. You need a Music Assistant server on the same network, and you can switch back any time from <strong>Music Source</strong>.</p></div>
         <div class="next">
           <a href="/">&larr; Back to Spotifactory</a>
           <a href="/build">How to build one &rarr;</a>
