@@ -2,20 +2,18 @@
 
 Runs pre-flight checks with OLED feedback before handing off to the main loop:
   1. Network — if offline, launches Balena WiFi Connect captive portal
-  2. Spotify auth — if no valid token, runs the PKCE relay auth flow
-  3. Main app — starts the regular run_on_pi loop
+  2. Main app — starts the regular run_on_pi loop. With no valid Spotify
+     login, it opens on the Connect Spotify QR code; Menu leaves it for the
+     main menu, so the box is usable before (or without) logging in.
 """
 from __future__ import annotations
 
-import os
 import socket
 import subprocess
 import sys
 import time
-import urllib.parse
 from pathlib import Path
 
-_RELAY_RETRY_SECS = 15.0   # wait between tries when the login relay is unreachable
 _BOOT_NETWORK_WAIT_SECS = 30.0  # saved WiFi can take a while to associate after boot
 # Our own setup page (deploy/portal) in place of WiFi Connect's stock one.
 # The app is installed editable from the checkout, so this ships with updates.
@@ -45,12 +43,8 @@ def _wait_for_network(timeout: float = _BOOT_NETWORK_WAIT_SECS) -> bool:
 
 
 def _has_valid_token() -> bool:
-    try:
-        from spotifactory.spotify import get_now_playing
-        get_now_playing()
-        return True
-    except Exception:
-        return False
+    from spotifactory import backend
+    return backend.has_login()
 
 
 def _show(display, line1: str, line2: str = "") -> None:
@@ -74,27 +68,6 @@ def _show_splash(display) -> None:
         print(f"[startup] splash skipped: {e}", flush=True)
 
 
-def _make_qr(url: str):
-    import qrcode
-    from qrcode.constants import ERROR_CORRECT_L
-    qr = qrcode.QRCode(error_correction=ERROR_CORRECT_L, box_size=2, border=0)
-    qr.add_data(url)
-    qr.make(fit=True)
-    return qr.make_image(fill_color="white", back_color="black").get_image().convert("1")
-
-
-def _show_auth_url(display, url: str) -> None:
-    """Display a QR code + label for the PKCE relay session URL."""
-    qr = _make_qr(url)
-    display.clear()
-    display.draw_image(0, 3, qr)
-    x = qr.width + 4
-    display.draw_text(x, 4, "Scan to")
-    display.draw_text(x, 18, "connect")
-    display.draw_text(x, 32, "Spotify")
-    display.update()
-
-
 def _make_display():
     import os
     platform = os.environ.get("SPOTIFACTORY_PLATFORM", "seengreat")
@@ -105,14 +78,14 @@ def _make_display():
     return DisplayOLED()
 
 
-def _run_platform(display):
+def _run_platform(display, first_task_class=None):
     import os
     platform = os.environ.get("SPOTIFACTORY_PLATFORM", "seengreat")
     if platform == "seengreat":
         from spotifactory.platforms.seengreat import main
     else:
         from spotifactory.platforms.pi import main
-    main(display=display)
+    main(display=display, first_task_class=first_task_class)
 
 
 def _bt_reconnect_loop(mac: str) -> None:
@@ -181,22 +154,15 @@ def main() -> None:
             print("[startup] still no network after WiFi Connect, exiting", flush=True)
             sys.exit(1)
 
-    # ---------------------------------------------------------- Spotify auth
+    # ---------------------------------------------------------- Login
+    # No working login: the app opens on the Connect Spotify QR code instead of
+    # waiting here, so Menu still works (Reboot, Pair Device, and later the
+    # choice of music service).
+    first_task_class = None
     if not _has_valid_token():
-        print("[startup] no valid Spotify token — starting PKCE relay auth", flush=True)
-        from spotifactory.auth_server import run_pkce_auth
-        while True:
-            try:
-                run_pkce_auth(on_session_ready=lambda url: _show_auth_url(display, url))
-                break
-            except OSError as e:  # URLError, DNS, timeouts: relay unreachable
-                # Say so on screen and retry, rather than exit and have systemd
-                # restart us into the same failure every few seconds.
-                relay = os.environ.get("RELAY_URL", "")
-                host = urllib.parse.urlparse(relay).hostname or relay or "RELAY_URL unset"
-                print(f"[startup] can't reach login relay {relay!r}: {e}; retrying", flush=True)
-                _show(display, "Can't reach login", host[:21])
-                time.sleep(_RELAY_RETRY_SECS)
+        print("[startup] no valid Spotify token — opening Connect Spotify", flush=True)
+        from spotifactory.tasks.reauth import FirstBootLoginTask
+        first_task_class = FirstBootLoginTask
 
     # ---------------------------------------------------------- Bluetooth
     import os as _os
@@ -210,7 +176,7 @@ def main() -> None:
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
     print("[startup] starting main app", flush=True)
-    _run_platform(display)
+    _run_platform(display, first_task_class)
 
 
 if __name__ == "__main__":

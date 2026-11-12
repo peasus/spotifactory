@@ -24,6 +24,7 @@ off pauses.
 - First-run setup needs no keyboard: a Spotifactory-branded captive portal
   (Balena WiFi Connect serving `deploy/portal/`) for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
   Worker relay (`deploy/relay/`, PKCE — no client secret on the device).
+  The menu button leaves the QR code for the main menu.
 
 ## Controls
 
@@ -197,6 +198,7 @@ print's top edge (`TOP_BORDER`); if yours differs, change it and re-run.
 |---|---|
 | `src/spotifactory/runner.py` | Platform-independent UI loop: input, tasks, rendering |
 | `src/spotifactory/tasks/` | Home screen, printing, speakers, Bluetooth pairing, Spotify login |
+| `src/spotifactory/backend/` | The music service the UI talks to (`spotify.py` today); never import `spotify.py` from the UI |
 | `src/spotifactory/hardware/` | NFC reader, Instax printer, Bluetooth, Sonos |
 | `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
 | `deploy/` | Pi setup script, systemd unit, auth relay Worker |

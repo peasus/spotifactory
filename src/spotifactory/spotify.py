@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import functools
 import os
-from dataclasses import dataclass
+import re
 from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError, SpotifyPKCE
 
+from spotifactory.backend.types import ChosenDevice, NowPlayingInfo, TagPlay
+
 load_dotenv()
+
+LABEL = "Spotify"
 
 SCOPES = [
     "user-read-playback-state",
@@ -15,25 +19,6 @@ SCOPES = [
     "user-read-currently-playing",
     "playlist-read-private",
 ]
-
-
-@dataclass
-class NowPlayingInfo:
-    track_name: str
-    artist_name: str
-    album_name: str               # for a podcast episode: the show
-    album_uri: str | None         # None for local files
-    artwork_url: str | None
-    shuffle_active: bool = False
-    context_uri: str | None = None  # playlist/album/artist the track is playing from
-    is_playing: bool = True
-    device_name: str | None = None
-    track_uri: str | None = None
-    track_number: int | None = None
-    progress_ms: int = 0
-    duration_ms: int = 0
-    repeat_state: str = "off"     # "off", "context" (album/playlist) or "track"
-    total_tracks: int | None = None   # on the track's album
 
 
 _client: spotipy.Spotify | None = None
@@ -45,13 +30,6 @@ _DEVICE_NAME_KEY = "SPOTIFACTORY_DEVICE_NAME"
 # Set for a speaker the Web API won't control (Sonos): it's played through
 # the Connect route instead (spotifactory/connect.py).
 _DEVICE_RESTRICTED_KEY = "SPOTIFACTORY_DEVICE_RESTRICTED"
-
-
-@dataclass
-class ChosenDevice:
-    id: str
-    name: str
-    restricted: bool = False
 
 
 class _DevicePKCE(SpotifyPKCE):
@@ -455,8 +433,11 @@ _album_lengths: dict[str, int] = {}
 
 
 @_with_auth_retry
-def album_length_ms(album_uri: str) -> int:
-    """Total running time of an album (remembered: albums don't change)."""
+def album_length_ms(album_uri: str) -> int | None:
+    """Total running time of an album (remembered: albums don't change).
+    None for anything that isn't an album, such as a podcast show."""
+    if not album_uri.startswith("spotify:album:"):
+        return None
     if album_uri not in _album_lengths:
         sp = get_client()
         page = sp.album_tracks(album_uri, limit=50)
@@ -466,3 +447,178 @@ def album_length_ms(album_uri: str) -> int:
             page = sp.next(page) if page.get("next") else None
         _album_lengths[album_uri] = total
     return _album_lengths[album_uri]
+
+
+# ---------------------------------------------------------------------------
+# The rest of the backend interface (see spotifactory/backend)
+# ---------------------------------------------------------------------------
+
+def has_login() -> bool:
+    """A saved login that Spotify accepts right now."""
+    try:
+        get_now_playing()
+        return True
+    except Exception:
+        return False
+
+
+_SHARE_LINK = re.compile(r"^https?://open\.spotify\.com/(?:intl-[\w-]+/)?(album|playlist|artist|show|track)/([A-Za-z0-9]+)")
+
+
+def pick_uri(uris: list[str]) -> str | None:
+    """The first Spotify link on a tag, as a spotify: URI. Tags can carry other
+    services' links too (an Apple Music one, or one printed in another mode),
+    and they may come first."""
+    for uri in uris:
+        if uri.startswith("spotify:"):
+            return uri
+        m = _SHARE_LINK.match(uri)
+        if m:
+            return f"spotify:{m.group(1)}:{m.group(2)}"
+    return None
+
+
+# A Sonos S2 the tag couldn't start (no Connect helper): lifting the tag
+# pauses it over the local network instead (see docs/sonos.md).
+_soco_speaker: str | None = None
+
+
+def play_tag(uri: str) -> TagPlay:
+    """Start (or resume) `uri` for a tag just placed, picking the speaker:
+    1. the one chosen in Choose Speaker, with no silent fallback;
+    2. this box's own Raspotify;
+    3. whatever Spotify is already playing on."""
+    global _soco_speaker
+    _soco_speaker = None
+    try:
+        from spotifactory.connect import ConnectError
+        from spotifactory.connect import available as connect_available
+
+        # Already in this album or playlist (even paused)? Resume rather than
+        # restart from track 1.
+        ctx_uri, alb_uri = get_current_context()
+        in_context = (ctx_uri == uri or alb_uri == uri)
+
+        def _play(device_id: str, restricted: bool | None = None) -> None:
+            start_playback(device_id, None if in_context else uri, restricted=restricted)
+
+        verb = "resume" if in_context else "start"
+
+        chosen = get_active_device()
+        if chosen is not None:
+            label = chosen.name or "Chosen speaker"
+            dev_id = resolve_chosen_device(chosen)
+            if dev_id is None:
+                print(f"[home] chosen device {label!r} not listed by Spotify", flush=True)
+                return TagPlay((label, "not available"))
+            print(f"[home] {verb} {uri} on chosen device {label!r} ({dev_id})", flush=True)
+            try:
+                _play(dev_id)
+            except (spotipy.SpotifyException, ConnectError) as e:
+                # Idle Echos stay listed but 404 until woken; a Sonos can
+                # refuse the Connect route the same way.
+                print(f"[home] chosen device {label!r} didn't respond: {e}", flush=True)
+                return TagPlay((label, "not responding"))
+            return TagPlay()
+
+        raspotify = find_device_by_name("Spotifactory")
+        if raspotify:
+            dev_id = raspotify["id"]
+            print(f"[home] {verb} {uri} on Raspotify {dev_id!r}", flush=True)
+            try:
+                get_client().transfer_playback(dev_id, force_play=False)
+            except Exception:
+                pass
+            _play(dev_id)
+            return TagPlay()
+
+        # Raspotify not logged in yet: whatever Spotify is playing on.
+        dev = get_playback_device()
+        if dev.restricted and dev.device_id and connect_available():
+            # Sonos S2 playing already: start the tag there through the
+            # Connect route (spotifactory/connect.py).
+            print(f"[home] {verb} {uri} on restricted {dev.name!r} via Connect", flush=True)
+            _play(dev.device_id, restricted=True)
+            return TagPlay()
+        if dev.restricted:
+            print(f"[home] device {dev.name!r} is restricted — pause only via SoCo", flush=True)
+            _soco_speaker = dev.name
+            return TagPlay(("Start in Spotify,", "tag removes pauses"))
+        if dev.device_id is None:
+            return TagPlay(("No speaker:", "Up > Choose Speaker"))
+        print(f"[home] {verb} {uri} on device {dev.device_id!r}", flush=True)
+        _play(dev.device_id)
+        return TagPlay()
+    except Exception as e:
+        _soco_speaker = None
+        reason = getattr(e, "reason", None)
+        if reason == "NO_ACTIVE_DEVICE" or "restricted device" in str(e).lower():
+            return TagPlay(("No speaker:", "Up > Choose Speaker"))
+        print(f"[home] start_playback error: {e}", flush=True)
+        return TagPlay(("Couldn't play", "try again"))
+
+
+def stop_tag() -> None:
+    global _soco_speaker
+    speaker, _soco_speaker = _soco_speaker, None
+    if speaker:
+        from spotifactory.hardware.sonos import pause_speaker
+        pause_speaker(speaker)
+        return
+    pause()
+
+
+def start_tag(uri: str) -> None:
+    from spotifactory.backend import NoSpeakerError
+    try:
+        start_playback(get_playback_device_id(), uri)
+    except spotipy.SpotifyException as e:
+        if "device" in str(e).lower() or "restricted" in str(e).lower():
+            raise NoSpeakerError(str(e)) from e
+        raise
+
+
+def pause_if_local() -> bool:
+    """Pause if it's playing on this box's Raspotify (the Pi Zero 2 W has one
+    radio for Wi-Fi and Bluetooth, so printing over Bluetooth while streaming
+    to the BT speaker stutters). Other speakers are left alone."""
+    sp = get_client()
+    playback = sp.current_playback()
+    device_name = ((playback or {}).get("device") or {}).get("name", "")
+    if playback and playback.get("is_playing") and device_name.lower().startswith("spotifactory"):
+        sp.pause_playback()
+        return True
+    return False
+
+
+def resume() -> None:
+    get_client().start_playback()
+
+
+def _sonos_speakers(listed: list[dict]) -> list[dict]:
+    """Sonos rooms Spotify didn't list (it hides them while idle), when the
+    Connect helper is installed to play them (spotifactory/connect.py)."""
+    from spotifactory import connect
+    if not connect.available():
+        return []
+    try:
+        from spotifactory.hardware.sonos import connect_speakers
+        found = connect_speakers()
+    except Exception as e:
+        print(f"[speaker] Sonos discovery failed: {e}", flush=True)
+        return []
+    ids = {d.get("id") for d in listed}
+    return [d for d in found if d["id"] not in ids]
+
+
+def list_speakers() -> list[dict]:
+    devices = get_devices()
+    return devices + _sonos_speakers(devices)
+
+
+def choose_speaker(device: dict) -> None:
+    # Save first: the choice stands even if the speaker is asleep right now
+    # (idle Echos are listed but return 404 until something wakes them).
+    restricted = bool(device.get("is_restricted"))
+    set_active_device(device["id"], device.get("name", ""), restricted=restricted)
+    transfer_playback(device["id"], restricted=restricted)

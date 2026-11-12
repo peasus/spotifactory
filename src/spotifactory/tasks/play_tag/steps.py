@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import spotipy
-
 from spotifactory.tasks.base import Continue, Done, Step, StepOutcome, TaskContext
 
 
@@ -25,7 +23,12 @@ class ScanStep(Step):
         if not card or "uri" not in card:
             self.show_for("No URI on tag", 3.0)
             return Done()
-        ctx.data["uri"] = card["uri"]
+        from spotifactory import backend
+        uri = backend.pick_uri(card.get("uris") or [card["uri"]])
+        if not uri:
+            self.show_for(f"No {backend.label()} link", 3.0)
+            return Done()
+        ctx.data["uri"] = uri
         return Continue()
 
 
@@ -33,14 +36,11 @@ class PlayStep(Step):
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Starting playback..."
         uri = ctx.data["uri"]
+        from spotifactory import backend
         try:
-            from spotifactory.spotify import get_playback_device_id, start_playback
-            start_playback(get_playback_device_id(), uri)
-        except spotipy.SpotifyException as e:
-            if "device" in str(e).lower() or "restricted" in str(e).lower():
-                self.show_for("Choose Speaker first", 3.0)
-            else:
-                self.show_for("Spotify error", 3.0)
+            backend.start_tag(uri)
+        except backend.NoSpeakerError:
+            self.show_for("Choose Speaker first", 3.0)
             return Done()
         except Exception as e:
             self.show_for(f"Error: {str(e)[:20]}", 3.0)

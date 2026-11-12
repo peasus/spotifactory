@@ -78,6 +78,7 @@ class Runner:
         dry_run: bool = True,
         printer_dry_run: bool = False,
         home_task_class: Optional[Type[Task]] = None,
+        first_task_class: Optional[Type[Task]] = None,
     ) -> None:
         self.display = display
         self.menus = menus
@@ -110,7 +111,12 @@ class Runner:
         self._seek_sending = False
         self._note_recent_update()
 
-        if home_task_class is not None:
+        if first_task_class is not None:
+            # First boot with no login: the login screen comes up first, and
+            # the home screen follows it (see startup.py).
+            print(f"[runner] starting first task: {first_task_class.__name__}", flush=True)
+            self._start_task(first_task_class)
+        elif home_task_class is not None:
             print(f"[runner] starting home task: {home_task_class.__name__}", flush=True)
             self._start_task(home_task_class)
             print(f"[runner] home task started, task={self._task}", flush=True)
@@ -229,7 +235,7 @@ class Runner:
         step = self._task.current_step if self._in_home_scan() else None
         sent, sent_at = None, 0.0
         try:
-            from spotifactory.spotify import seek
+            from spotifactory.backend import seek
             while True:
                 with self._seek_lock:
                     target, released = self._seek_target, self._seek_released
@@ -307,7 +313,7 @@ class Runner:
 
     def _send_volume(self) -> None:
         try:
-            from spotifactory.spotify import get_volume, set_volume
+            from spotifactory.backend import get_volume, set_volume
             volume = self._volume
             if volume is None or time.monotonic() - self._volume_at > _VOLUME_FRESH_SECS:
                 volume = get_volume()
@@ -363,7 +369,7 @@ class Runner:
 
         def work() -> None:
             try:
-                from spotifactory.spotify import play_pause
+                from spotifactory.backend import play_pause
                 playing = play_pause()
             except Exception as e:
                 print(f"[runner] play/pause: {e}", flush=True)
@@ -602,14 +608,14 @@ class Runner:
 
     def _prev_track(self) -> None:
         try:
-            from spotifactory.spotify import prev_track
+            from spotifactory.backend import prev_track
             prev_track()
         except Exception:
             pass
 
     def _next_track(self) -> None:
         try:
-            from spotifactory.spotify import next_track
+            from spotifactory.backend import next_track
             next_track()
         except Exception:
             pass
@@ -625,7 +631,7 @@ class Runner:
 
         def work() -> None:
             try:
-                from spotifactory.spotify import toggle_shuffle
+                from spotifactory.backend import toggle_shuffle
                 confirmed = toggle_shuffle()
             except Exception as e:
                 print(f"[runner] toggle_shuffle failed: {e}", flush=True)
@@ -648,7 +654,7 @@ class Runner:
 
         def work() -> None:
             try:
-                from spotifactory.spotify import set_repeat
+                from spotifactory.backend import set_repeat
                 set_repeat(state)
             except Exception as e:
                 print(f"[runner] repeat: {e}", flush=True)
@@ -704,7 +710,10 @@ class Runner:
             if self._pushed_menu is not None:
                 self.nav.pop()
                 self._pushed_menu = None
-            self._return_home()
+            if getattr(self._task, "cancel_to_menu", False):
+                self._task = None            # the main menu shows
+            else:
+                self._return_home()
 
     def _render_qr_auth(self) -> None:
         step = self._task.current_step
