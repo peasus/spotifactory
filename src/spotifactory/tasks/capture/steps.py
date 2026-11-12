@@ -39,9 +39,9 @@ class FetchInfoStep(Step):
         self.artist: str = ""
 
     def run(self, ctx: TaskContext) -> StepOutcome:
-        from spotifactory.spotify import get_now_playing
-        self.status = "Checking Spotify..."
-        info = get_now_playing()
+        from spotifactory import backend
+        self.status = f"Checking {backend.label()}..."
+        info = backend.get_now_playing()
         if info is None:
             self.show_for("Nothing playing", 2.0)
             return Done()
@@ -99,21 +99,15 @@ class FetchArtStep(Step):
 
 
 def _pause_local_playback() -> bool:
-    """Pause Spotify if it's playing on this device's Raspotify.
+    """Pause if it's playing on this box's own speaker.
 
     The Pi Zero 2W has one radio for WiFi and Bluetooth, so streaming to the BT
     speaker while uploading to the Instax over Bluetooth makes the audio stutter.
     Music on other devices (Sonos, phone) is left alone. Returns True if paused.
     """
     try:
-        from spotifactory.spotify import get_client
-        sp = get_client()
-        playback = sp.current_playback()
-        device_name = ((playback or {}).get("device") or {}).get("name", "")
-        is_local = device_name.lower().startswith("spotifactory")
-        if playback and playback.get("is_playing") and is_local:
-            sp.pause_playback()
-            return True
+        from spotifactory import backend
+        return backend.pause_if_local()
     except Exception as e:
         print(f"[print] couldn't pause playback: {e}", flush=True)
     return False
@@ -121,8 +115,8 @@ def _pause_local_playback() -> bool:
 
 def _resume_playback() -> None:
     try:
-        from spotifactory.spotify import get_client
-        get_client().start_playback()
+        from spotifactory import backend
+        backend.resume()
     except Exception as e:
         print(f"[print] couldn't resume playback: {e}", flush=True)
 
@@ -281,8 +275,8 @@ def _describe(uri: str) -> str:
     if not uri.startswith("spotify:"):
         return "something else"
     try:
-        from spotifactory.spotify import uri_name
-        return uri_name(uri)
+        from spotifactory import backend
+        return backend.uri_name(uri)
     except Exception:
         return "another " + uri.split(":")[1]
 
@@ -307,6 +301,7 @@ class DoneStep(Step):
 # ---------------------------------------------------------------------------
 
 class FetchPlaylistInfoStep(Step):
+    # Spotify-only for now: reads the playlist straight from the Web API.
     def run(self, ctx: TaskContext) -> StepOutcome:
         self.status = "Checking Spotify..."
         try:
@@ -454,6 +449,7 @@ def _target_menu(targets: list[dict]):
 
 
 class ChooseTagTargetStep(Step):
+    # Spotify-only for now: reads the playing context straight from the Web API.
     """What's playing: its album, and its playlist if it's playing from one."""
 
     def run(self, ctx: TaskContext) -> StepOutcome:

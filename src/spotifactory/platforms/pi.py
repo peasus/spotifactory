@@ -7,10 +7,11 @@ from spotifactory.runner import Runner
 from spotifactory.tasks.home import HomeTask
 
 
-def main() -> None:
-    display = DisplayOLED()
+def main(display=None, first_task_class=None) -> None:
+    display = display or DisplayOLED()
     buttons = ButtonInput()
-    runner = Runner(display, MENUS, dry_run=False, home_task_class=HomeTask)
+    runner = Runner(display, MENUS, dry_run=False, home_task_class=HomeTask,
+                    first_task_class=first_task_class)
 
     while True:
         action = buttons.read()

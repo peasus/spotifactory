@@ -216,26 +216,16 @@ class TestStartupMain:
             startup.main()
         m["run_platform"].assert_not_called()
 
-    def test_launches_pkce_auth_when_no_token(self):
+    def test_opens_on_the_login_when_no_token(self):
+        """No login: the app starts anyway, on the login screen, instead of
+        waiting in startup where no button works."""
         from spotifactory import startup
+        from spotifactory.tasks.reauth import FirstBootLoginTask
         stack, m = self._patches(token_valid=False)
         with stack:
             startup.main()
-        m["auth"].assert_called_once()
-
-    def test_retries_auth_when_relay_unreachable(self):
-        """A bad RELAY_URL or a relay outage shows a message and retries, not crash-loops."""
-        import urllib.error
-        from spotifactory import startup
-        stack, m = self._patches(token_valid=False)
-        m["auth"].side_effect = [urllib.error.URLError("Name or service not known"), True]
-        with stack, patch.dict("os.environ", {"RELAY_URL": "https://auth.example.co"}), \
-             patch("spotifactory.startup._RELAY_RETRY_SECS", 0.0), \
-             patch("spotifactory.startup._show") as show:
-            startup.main()
-        assert m["auth"].call_count == 2
-        show.assert_any_call(ANY, "Can't reach login", "auth.example.co")
-        m["run_platform"].assert_called_once()
+        m["auth"].assert_not_called()
+        m["run_platform"].assert_called_once_with(ANY, FirstBootLoginTask)
 
     def test_skips_auth_when_token_present(self):
         from spotifactory import startup
@@ -243,6 +233,7 @@ class TestStartupMain:
         with stack:
             startup.main()
         m["auth"].assert_not_called()
+        m["run_platform"].assert_called_once_with(ANY, None)
 
 
 # ---------------------------------------------------------------------------

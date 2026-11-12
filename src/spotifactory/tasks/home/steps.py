@@ -175,7 +175,6 @@ class HomeScanStep(Step):
             carry_until = float("inf")         # the wait starts once the reader is watching
 
         _active_uri: str | None = None
-        _soco_speaker: str | None = None  # set when active device is Sonos (restricted)
         last_poll = 0.0
         playlog = PlaybackLog()
 
@@ -189,8 +188,8 @@ class HomeScanStep(Step):
                 return
             last_poll = now
             try:
-                from spotifactory.spotify import get_now_playing
-                info = get_now_playing(include_paused=True)
+                from spotifactory import backend
+                info = backend.get_now_playing(include_paused=True)
                 if info:
                     playlog.update(info)
                     self.is_playing = info.is_playing
@@ -202,10 +201,9 @@ class HomeScanStep(Step):
                     self.album_name = info.album_name
                     if info.album_uri != self.album_uri:
                         self.album_uri, self.album_length_ms = info.album_uri, None
-                        if info.album_uri and info.album_uri.startswith("spotify:album:"):
+                        if info.album_uri:
                             try:
-                                from spotifactory.spotify import album_length_ms
-                                self.album_length_ms = album_length_ms(info.album_uri)
+                                self.album_length_ms = backend.album_length_ms(info.album_uri)
                             except Exception as e:
                                 print(f"[home] album length: {e}", flush=True)
                 else:
@@ -228,9 +226,13 @@ class HomeScanStep(Step):
                 playlog.error(e)
 
         def on_place(card: dict) -> None:
-            nonlocal _active_uri, _soco_speaker, last_poll, carry_until
-            uri = card.get("uri")
+            nonlocal _active_uri, last_poll, carry_until
+            from spotifactory import backend
+            uri = backend.pick_uri(card.get("uris") or ([card["uri"]] if card.get("uri") else []))
             if not uri:
+                if card.get("uri"):
+                    print(f"[home] tag {card['uid']} has no {backend.label()} link: {card.get('uris')}", flush=True)
+                    self.status, self.artist = f"No {backend.label()} link", "on this tag"
                 return
             print(f"[home] tag placed {card['uid']} → {uri}", flush=True)
             _active_uri = uri  # set regardless so on_remove can pause if needed
@@ -249,124 +251,28 @@ class HomeScanStep(Step):
             if ctx.dry_run:
                 print(f"[home] dry_run: would start_playback {uri}", flush=True)
                 return
-            try:
-                import spotipy
-
-                from spotifactory.connect import ConnectError
-                from spotifactory.connect import available as connect_available
-                from spotifactory.spotify import (
-                    find_device_by_name,
-                    get_active_device,
-                    get_client,
-                    get_current_context,
-                    get_playback_device,
-                    resolve_chosen_device,
-                    start_playback,
-                )
-
-                # Check if we're already in this album context (even if paused).
-                # If so, resume rather than restart from track 1.
-                _ctx_uri, _alb_uri = get_current_context()
-                _in_context = (_ctx_uri == uri or _alb_uri == uri)
-
-                def _play(device_id: str, restricted: bool | None = None) -> None:
-                    start_playback(device_id, None if _in_context else uri, restricted=restricted)
-
-                verb = "resume" if _in_context else "start"
-
-                # Tier 1: the speaker last picked in Choose Speaker (persisted).
-                # No silent fallback — playing in a different room would be worse
-                # than saying the chosen speaker isn't reachable.
-                chosen = get_active_device()
-                if chosen is not None:
-                    label = chosen.name or "Chosen speaker"
-                    dev_id = resolve_chosen_device(chosen)
-                    if dev_id is None:
-                        print(f"[home] chosen device {label!r} not listed by Spotify", flush=True)
-                        self.status = label
-                        self.artist = "not available"
-                        return
-                    print(f"[home] {verb} {uri} on chosen device {label!r} ({dev_id})", flush=True)
-                    try:
-                        _play(dev_id)
-                    except (spotipy.SpotifyException, ConnectError) as e:
-                        # Idle Echos stay listed but 404 until woken; a Sonos
-                        # can refuse the Connect route the same way.
-                        print(f"[home] chosen device {label!r} didn't respond: {e}", flush=True)
-                        self.status = label
-                        self.artist = "not responding"
-                    _soco_speaker = None
-                    return
-
-                # Tier 2: Default to local Raspotify instance
-                raspotify = find_device_by_name("Spotifactory")
-                if raspotify:
-                    dev_id = raspotify["id"]
-                    print(f"[home] {verb} {uri} on Raspotify {dev_id!r}", flush=True)
-                    try:
-                        get_client().transfer_playback(dev_id, force_play=False)
-                    except Exception:
-                        pass
-                    _play(dev_id)
-                    _soco_speaker = None
-                    return
-
-                # Tier 3: Fall back to active Spotify device (Raspotify not yet auth'd)
-                dev = get_playback_device()
-                if dev.restricted and dev.device_id and connect_available():
-                    # Sonos S2 playing already: start the tag there through the
-                    # Connect route (spotifactory/connect.py).
-                    print(f"[home] {verb} {uri} on restricted {dev.name!r} via Connect", flush=True)
-                    _play(dev.device_id, restricted=True)
-                    _soco_speaker = None
-                    return
-                if dev.restricted:
-                    # Sonos S2: programmatic play not supported (see docs/sonos.md).
-                    print(f"[home] device {dev.name!r} is restricted — pause only via SoCo", flush=True)
-                    _soco_speaker = dev.name
-                    self.status = "Start in Spotify,"
-                    self.artist = "tag removes pauses"
-                    return
-                if dev.device_id is None:
-                    self.status = "No speaker:"
-                    self.artist = "Up > Choose Speaker"
-                    return
-                print(f"[home] {verb} {uri} on device {dev.device_id!r}", flush=True)
-                _play(dev.device_id)
-                _soco_speaker = None
-            except Exception as e:
-                reason = getattr(e, "reason", None)
-                if reason == "NO_ACTIVE_DEVICE" or "restricted device" in str(e).lower():
-                    self.status = "No speaker:"
-                    self.artist = "Up > Choose Speaker"
-                else:
-                    print(f"[home] start_playback error: {e}", flush=True)
-                    self.status = "Couldn't play"
-                    self.artist = "try again"
-                _soco_speaker = None
+            result = backend.play_tag(uri)
+            if result.message:
+                self.status, self.artist = result.message
 
         def on_remove(card: dict) -> None:
-            nonlocal _active_uri, _soco_speaker
+            nonlocal _active_uri
             if not _active_uri:
+                if not self.tag_active:       # clear "No Spotify link"
+                    self.status, self.artist = "Place tag...", ""
                 return
             if self._cancel.is_set():
                 # user navigated away — nfcpy fires on_release as it exits, ignore it
                 _active_uri = None
-                _soco_speaker = None
                 return
             print(f"[home] tag removed {card['uid']}", flush=True)
             if not ctx.dry_run:
-                if _soco_speaker:
-                    from spotifactory.hardware.sonos import pause_speaker
-                    pause_speaker(_soco_speaker)
-                else:
-                    try:
-                        from spotifactory.spotify import pause
-                        pause()
-                    except Exception as e:
-                        print(f"[home] pause_playback error: {e}", flush=True)
+                try:
+                    from spotifactory import backend
+                    backend.stop_tag()
+                except Exception as e:
+                    print(f"[home] pause_playback error: {e}", flush=True)
             _active_uri = None
-            _soco_speaker = None
             self.tag_active = False
             self.tag_uri = None
             self.status = "Place tag..."
