@@ -467,6 +467,17 @@ def has_login() -> bool:
 _SHARE_LINK = re.compile(r"^https?://open\.spotify\.com/(?:intl-[\w-]+/)?(album|playlist|artist|show|track)/([A-Za-z0-9]+)")
 
 
+_SPOTIFY_URI = re.compile(r"^spotify:(album|playlist|artist|show|track):([A-Za-z0-9]+)$")
+
+
+def share_link(uri: str) -> str:
+    """The open.spotify.com link for a spotify: URI (anything else as it is).
+    Tags get this form: phones only open web links from a tag (iPhones
+    ignore spotify: links), and pick_uri plays either form."""
+    m = _SPOTIFY_URI.match(uri)
+    return f"https://open.spotify.com/{m.group(1)}/{m.group(2)}" if m else uri
+
+
 def pick_uri(uris: list[str]) -> str | None:
     """The first Spotify link on a tag, as a spotify: URI. Tags can carry other
     services' links too (an Apple Music one, or one printed in another mode),

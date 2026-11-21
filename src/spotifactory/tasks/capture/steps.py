@@ -215,7 +215,8 @@ class _WriteTagStep(Step):
         def stop() -> bool:
             return self._cancel.is_set() or time.monotonic() >= deadline
 
-        uri = self._uri(ctx)
+        from spotifactory.spotify import share_link
+        uri = share_link(self._uri(ctx))
         again = Continue(next_step=self.step_name)
         try:
             offered = ctx.data.pop("tag_offered", None)
@@ -240,6 +241,11 @@ class _WriteTagStep(Step):
                 self.artist = ""
                 self.show_for("Tag already set", 1.5)
                 return Continue()
+            if has and _same_link(has, uri):
+                # This album written the old way (spotify:, which phones
+                # don't open): rewrite it, keeping the tag's other links.
+                extra = self._extra(ctx) or (card.get("uris") or [])[1:]
+                return self._write(uri, card["uid"], stop, extra)
             if has:
                 ctx.data["tag_offered"] = card
                 return PushMenu(menu=_overwrite_menu(_describe(has)), on_confirm=again, on_cancel=again)
@@ -290,9 +296,18 @@ def _fit(uri: str, extra) -> list[str]:
     return kept
 
 
+def _same_link(a: str, b: str) -> bool:
+    """Two links to the same Spotify item (a spotify: URI and its web link)."""
+    from spotifactory.spotify import pick_uri
+    return pick_uri([a]) is not None and pick_uri([a]) == pick_uri([b])
+
+
 def _describe(uri: str) -> str:
     """What a tag holds, for the overwrite question."""
     from spotifactory import backend
+    if not backend.is_music_assistant():
+        from spotifactory.spotify import pick_uri
+        uri = pick_uri([uri]) or uri          # a web link: name it like a spotify: one
     if not backend.is_music_assistant() and not uri.startswith("spotify:"):
         return "something else"
     try:
