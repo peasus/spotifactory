@@ -222,7 +222,7 @@ class TestWriteTagStep:
         with reader.patch():
             assert isinstance(step.run(ctx), Continue)
         assert reader.lift_asked
-        assert reader.writes == [("spotify:album:x", "NEW")]   # only the new tag
+        assert reader.writes == [("https://open.spotify.com/album/x", "NEW")]   # only the new tag
 
     def test_a_tag_with_something_else_asks_first_no_by_default(self):
         step, ctx = self._step()
@@ -234,7 +234,7 @@ class TestWriteTagStep:
             assert reader.writes == []
             ctx.data["selected"] = "overwrite"              # Yes
             assert isinstance(step.run(ctx), Continue)
-        assert reader.writes == [("spotify:album:x", "T")]
+        assert reader.writes == [("https://open.spotify.com/album/x", "T")]
 
     def test_saying_no_to_overwrite_wants_it_lifted_off(self):
         step, ctx = self._step()
@@ -248,10 +248,18 @@ class TestWriteTagStep:
 
     def test_tag_already_right_is_left_alone(self):
         step, ctx = self._step()
-        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x"}])
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "https://open.spotify.com/album/x"}])
         with reader.patch():
             assert isinstance(step.run(ctx), Continue)
         assert reader.writes == [] and step.status == "Tag already set"
+
+    def test_same_album_written_the_old_way_is_rewritten_without_asking(self):
+        """Old tags hold spotify:album:x, which phones don't open."""
+        step, ctx = self._step()
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x"}])
+        with reader.patch():
+            assert isinstance(step.run(ctx), Continue)
+        assert reader.writes == [("https://open.spotify.com/album/x", "T")]
 
     def test_back_asks_before_skipping_no_by_default(self):
         step, ctx = self._step()
@@ -276,9 +284,30 @@ class TestWriteTagStep:
         assert step.artist == "Not NDEF formatted"
 
 
+class TestPhoneReadableLinks:
+    """Tags get open.spotify.com links, which phones open in Spotify."""
+
+    def test_spotify_uris_become_web_links(self):
+        from spotifactory.spotify import share_link, pick_uri
+        assert share_link("spotify:album:x") == "https://open.spotify.com/album/x"
+        assert share_link("spotify:playlist:p") == "https://open.spotify.com/playlist/p"
+        assert share_link("https://music.apple.com/album/1") == "https://music.apple.com/album/1"
+        assert pick_uri([share_link("spotify:album:x")]) == "spotify:album:x"   # still plays
+
+    def test_a_web_link_tag_for_another_album_is_named(self):
+        from spotifactory.tasks.capture.steps import ScanStep
+        step = ScanStep()
+        ctx = TaskContext(data={"info": MagicMock(album_uri="spotify:album:x")})
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "https://open.spotify.com/album/other"}])
+        with reader.patch(), patch("spotifactory.backend.is_music_assistant", return_value=False):
+            out = step.run(ctx)
+        assert out.menu.title == "Overwrite tag?" and out.menu.subtitle == "Has Other Album"
+
+
 class TestNoAppleMusicLinkOnTags:
     """Album tags get the Spotify link only. Tags written earlier with an
-    Apple Music link after it still count as this album and are left alone."""
+    Apple Music link after it still count as this album: only the Spotify
+    link is updated to the web form, and the Apple one is kept."""
 
     APPLE = "https://music.apple.com/album/1440892370"
 
@@ -291,12 +320,20 @@ class TestNoAppleMusicLinkOnTags:
         reader = _FakeReader(placed=[{"uid": "T"}])
         with reader.patch():
             assert isinstance(step.run(ctx), Continue)
-        assert reader.writes == [("spotify:album:x", "T")] and reader.extras == [[]]
+        assert reader.writes == [("https://open.spotify.com/album/x", "T")] and reader.extras == [[]]
 
-    def test_same_album_with_an_old_apple_link_is_left_alone(self):
+    def test_same_album_with_an_old_apple_link_keeps_it(self):
         step, ctx = self._step()
         reader = _FakeReader(placed=[{"uid": "T", "uri": "spotify:album:x",
                                       "uris": ["spotify:album:x", self.APPLE]}])
+        with reader.patch():
+            step.run(ctx)
+        assert reader.writes == [("https://open.spotify.com/album/x", "T")] and reader.extras == [[self.APPLE]]
+
+    def test_web_link_with_an_old_apple_link_is_left_alone(self):
+        step, ctx = self._step()
+        reader = _FakeReader(placed=[{"uid": "T", "uri": "https://open.spotify.com/album/x",
+                                      "uris": ["https://open.spotify.com/album/x", self.APPLE]}])
         with reader.patch():
             step.run(ctx)
         assert reader.writes == [] and step.status == "Tag already set"
@@ -328,7 +365,7 @@ class TestWriteTagFromMenu:
             assert out.menu.title == "Overwrite tag?"
             ctx.data["selected"] = "overwrite"                # the answer replaces the choice...
             assert isinstance(step.run(ctx), Continue)
-        assert reader.writes == [("spotify:album:a", "T")]   # ...but the target was kept
+        assert reader.writes == [("https://open.spotify.com/album/a", "T")]   # ...but the target was kept
 
 
 # ---------------------------------------------------------------------------
