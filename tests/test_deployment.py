@@ -196,9 +196,34 @@ class TestStartupMain:
         with stack, patch("spotifactory.startup._has_network", return_value=True):
             startup.main()
         cmd = m["subprocess"].call_args[0][0]
-        assert cmd[0] == "wifi-connect"
+        assert any(c.endswith("wifi-connect") for c in cmd)
         assert "--portal-ssid" in cmd
         m["run_platform"].assert_called_once()
+
+    def test_wifi_connect_runs_through_sudo_when_not_root(self):
+        """WiFi Connect exits at once without root, so the app (a normal
+        user) must start it with sudo -n, at the path sudoers.sh allows."""
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=True), \
+             patch("os.geteuid", return_value=1000):
+            startup.main()
+        cmd = m["subprocess"].call_args[0][0]
+        assert cmd[:3] == ["sudo", "-n", "/usr/local/sbin/wifi-connect"]
+
+    def test_wifi_connect_runs_directly_as_root(self):
+        from spotifactory import startup
+        stack, m = self._patches(network_up=False)
+        with stack, patch("spotifactory.startup._has_network", return_value=True), \
+             patch("os.geteuid", return_value=0):
+            startup.main()
+        cmd = m["subprocess"].call_args[0][0]
+        assert cmd[0] == "/usr/local/sbin/wifi-connect"
+
+    def test_sudoers_allows_the_wifi_connect_path(self):
+        from spotifactory import startup
+        sudoers = (Path(__file__).resolve().parents[1] / "deploy" / "sudoers.sh").read_text()
+        assert f'"{startup._WIFI_CONNECT}"' in sudoers
 
     def test_wifi_connect_uses_spotifactory_portal_page(self):
         from spotifactory import startup
