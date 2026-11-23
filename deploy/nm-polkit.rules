@@ -1,0 +1,10 @@
+// Spotifactory: let the app's user drive NetworkManager (scan, join a
+// network, run the "Spotifactory" setup hotspot). The app runs as a system
+// service with no login session, which NetworkManager otherwise refuses.
+// upgrade.sh installs this with the box's user in place of "spotifactory".
+polkit.addRule(function (action, subject) {
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 &&
+      subject.user === "spotifactory") {
+    return polkit.Result.YES;
+  }
+});

@@ -11,8 +11,7 @@ SUDOERS_FILE=/etc/sudoers.d/spotifactory-service
 # Without a password, this user may: start/stop/restart only this service, so
 # updates can be deployed over SSH (git pull + restart); and reboot or power
 # off, for the Reboot and Shutdown menu items; and run the updater, for
-# "Check for Updates"; and start WiFi Connect, which needs root, for the setup
-# hotspot when the box can't reach a known network.
+# "Check for Updates".
 COMMANDS=(
   "/usr/bin/systemctl start spotifactory"
   "/usr/bin/systemctl stop spotifactory"
@@ -20,7 +19,6 @@ COMMANDS=(
   "/usr/bin/systemctl reboot"
   "/usr/bin/systemctl poweroff"
   "/usr/bin/systemctl start spotifactory-update"
-  "/usr/local/sbin/wifi-connect"
 )
 RULE="$USER ALL=(root) NOPASSWD: $(IFS=,; echo "${COMMANDS[*]}" | sed 's/,/, /g')"
 

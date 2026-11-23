@@ -9,6 +9,7 @@ from spotifactory.tasks.music_source import (
 )
 from spotifactory.tasks.reauth import ReAuthTask
 from spotifactory.tasks.speaker import SpeakerTask
+from spotifactory.tasks.wifi_setup import WifiSetupTask
 
 MENUS: dict[str, MenuDef] = {
     "main": MenuDef("Main Menu", [
@@ -21,6 +22,7 @@ MENUS: dict[str, MenuDef] = {
         ItemDef("Music Source",   submenu="music_source"),
         ItemDef("Scan Tag",       action="home"),
         ItemDef("Check for Updates", action="update"),
+        ItemDef("WiFi Setup",     task=WifiSetupTask),
         ItemDef("Write Tag",      task=WriteTagTask),     # fixing a tag: rarely needed
         ItemDef("Reboot",         submenu="confirm_reboot"),
         ItemDef("Shutdown",       submenu="confirm_shutdown"),

@@ -19,6 +19,12 @@ class TestHasNetwork:
         with patch("socket.create_connection"):
             assert _has_network() is True
 
+    def test_true_when_only_some_probes_work(self):
+        """8.8.8.8 is blocked on some networks; any probe getting through counts."""
+        from spotifactory.startup import _has_network
+        with patch("socket.create_connection", side_effect=[OSError, OSError, MagicMock()]):
+            assert _has_network() is True
+
     def test_false_on_oserror(self):
         from spotifactory.startup import _has_network
         with patch("socket.create_connection", side_effect=OSError):
@@ -190,57 +196,20 @@ class TestStartupMain:
         m["auth"].assert_not_called()
         m["subprocess"].assert_not_called()
 
-    def test_launches_wifi_connect_when_offline(self):
+    def test_opens_on_wifi_setup_when_offline(self):
+        """Offline: the app starts on WiFi setup instead of blocking (or
+        exiting and restarting forever), so Menu works."""
         from spotifactory import startup
+        from spotifactory.tasks.wifi_setup import WifiSetupTask
         stack, m = self._patches(network_up=False)
-        with stack, patch("spotifactory.startup._has_network", return_value=True):
+        with stack:
             startup.main()
-        cmd = m["subprocess"].call_args[0][0]
-        assert any(c.endswith("wifi-connect") for c in cmd)
-        assert "--portal-ssid" in cmd
-        m["run_platform"].assert_called_once()
+        m["run_platform"].assert_called_once_with(ANY, WifiSetupTask)
+        m["subprocess"].assert_not_called()
 
-    def test_wifi_connect_runs_through_sudo_when_not_root(self):
-        """WiFi Connect exits at once without root, so the app (a normal
-        user) must start it with sudo -n, at the path sudoers.sh allows."""
-        from spotifactory import startup
-        stack, m = self._patches(network_up=False)
-        with stack, patch("spotifactory.startup._has_network", return_value=True), \
-             patch("os.geteuid", return_value=1000):
-            startup.main()
-        cmd = m["subprocess"].call_args[0][0]
-        assert cmd[:3] == ["sudo", "-n", "/usr/local/sbin/wifi-connect"]
-
-    def test_wifi_connect_runs_directly_as_root(self):
-        from spotifactory import startup
-        stack, m = self._patches(network_up=False)
-        with stack, patch("spotifactory.startup._has_network", return_value=True), \
-             patch("os.geteuid", return_value=0):
-            startup.main()
-        cmd = m["subprocess"].call_args[0][0]
-        assert cmd[0] == "/usr/local/sbin/wifi-connect"
-
-    def test_sudoers_allows_the_wifi_connect_path(self):
-        from spotifactory import startup
-        sudoers = (Path(__file__).resolve().parents[1] / "deploy" / "sudoers.sh").read_text()
-        assert f'"{startup._WIFI_CONNECT}"' in sudoers
-
-    def test_wifi_connect_uses_spotifactory_portal_page(self):
-        from spotifactory import startup
-        stack, m = self._patches(network_up=False)
-        with stack, patch("spotifactory.startup._has_network", return_value=True):
-            startup.main()
-        cmd = m["subprocess"].call_args[0][0]
-        ui_dir = Path(cmd[cmd.index("--ui-directory") + 1])
-        assert (ui_dir / "index.html").exists()
-
-    def test_exits_if_still_offline_after_wifi_connect(self):
-        from spotifactory import startup
-        stack, m = self._patches(network_up=False)
-        with stack, patch("spotifactory.startup._has_network", return_value=False), \
-             pytest.raises(SystemExit):
-            startup.main()
-        m["run_platform"].assert_not_called()
+    def test_wifi_setup_leaves_to_the_menu(self):
+        from spotifactory.tasks.wifi_setup import WifiSetupTask
+        assert WifiSetupTask.cancel_to_menu is True
 
     def test_opens_on_the_login_when_no_token(self):
         """No login: the app starts anyway, on the login screen, instead of

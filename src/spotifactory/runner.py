@@ -719,7 +719,12 @@ class Runner:
         step = self._task.current_step
         self.display.clear()
 
-        if getattr(step, "_show_url", False):
+        text_lines = getattr(step, "text_lines", None)
+        if getattr(step, "_show_url", False) and text_lines:
+            # Words in place of the code (WiFi setup)
+            for i, line in enumerate(text_lines[:5]):
+                self.display.draw_text(2, 2 + i * 12, line)
+        elif getattr(step, "_show_url", False):
             # URL text view — full URL split across lines
             url = step.session_url.replace("https://", "").replace("http://", "")
             self.display.draw_text(2, 0, "Visit:")
@@ -732,9 +737,15 @@ class Runner:
             qr = step.qr_image
             self.display.draw_image(0, 3, qr)
             x = qr.width + 4
-            self.display.draw_text(x, 8, "Scan Code")
-            self.display.draw_text(x, 36, "> View URL")
-            self.display.draw_text(x, 50, "< Cancel")
+            lines = getattr(step, "qr_lines", None)
+            if lines:
+                for i, line in enumerate(lines[:3]):
+                    self.display.draw_text(x, 8 + i * 14, line)
+                self.display.draw_text(x, 52, "> Help")
+            else:
+                self.display.draw_text(x, 8, "Scan Code")
+                self.display.draw_text(x, 36, "> View URL")
+                self.display.draw_text(x, 50, "< Cancel")
 
         self.display.update()
 
