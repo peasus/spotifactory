@@ -536,8 +536,8 @@ def play_tag(uri: str) -> TagPlay:
 
         raspotify = find_device_by_name("Spotifactory")
         if raspotify:
-            from spotifactory import owntone
-            owntone.route_audio()       # a Cast/AirPlay speaker, if one is chosen
+            from spotifactory import network_speakers
+            network_speakers.route_audio()     # a Cast/AirPlay speaker, if one is chosen
             dev_id = raspotify["id"]
             print(f"[home] {verb} {uri} on Raspotify {dev_id!r}", flush=True)
             try:
@@ -545,6 +545,7 @@ def play_tag(uri: str) -> TagPlay:
             except Exception:
                 pass
             _play(dev_id)
+            network_speakers.after_play()
             return TagPlay()
 
         # Raspotify not logged in yet: whatever Spotify is playing on.
@@ -627,12 +628,12 @@ def _sonos_speakers(listed: list[dict]) -> list[dict]:
 
 
 def _network_speakers(listed: list[dict]) -> list[dict]:
-    """Cast and AirPlay speakers found by OwnTone on the box (spotifactory/
-    owntone.py), minus any Spotify lists itself: a Cast speaker someone is
-    casting to from the Spotify app is better played directly."""
-    from spotifactory import owntone
+    """Cast and AirPlay speakers the box can stream to itself (spotifactory/
+    network_speakers.py), minus any Spotify lists itself: a Cast speaker
+    someone is casting to from the Spotify app is better played directly."""
+    from spotifactory import network_speakers
     try:
-        found = owntone.speakers()
+        found = network_speakers.speakers()
     except Exception as e:
         print(f"[speaker] network speaker discovery failed: {e}", flush=True)
         return []
@@ -644,8 +645,8 @@ def _network_speakers(listed: list[dict]) -> list[dict]:
 
 def list_speakers() -> list[dict]:
     devices = get_devices()
-    from spotifactory import owntone
-    if owntone.chosen() is not None:
+    from spotifactory import network_speakers
+    if network_speakers.chosen() is not None:
         # The box's own device plays for the network speaker, so it isn't
         # what's "active" from the box's point of view.
         devices = [dict(d, is_active=False) if _is_raspotify(d) else d for d in devices]
@@ -658,11 +659,11 @@ def _is_raspotify(device: dict) -> bool:
 
 
 def choose_speaker(device: dict) -> None:
-    from spotifactory import owntone
-    if owntone.is_network_id(device.get("id")):
+    from spotifactory import network_speakers
+    if network_speakers.is_network_id(device.get("id")):
         _choose_network_speaker(device)
         return
-    owntone.release()       # back to the box's own speaker if one was in use
+    network_speakers.release()     # back to the box's own speaker if one was in use
     # Save first: the choice stands even if the speaker is asleep right now
     # (idle Echos are listed but return 404 until something wakes them).
     restricted = bool(device.get("is_restricted"))
@@ -671,17 +672,19 @@ def choose_speaker(device: dict) -> None:
 
 
 def _choose_network_speaker(device: dict) -> None:
-    """A Cast or AirPlay speaker: the box's own Raspotify plays, and OwnTone
-    streams its audio on (spotifactory/owntone.py). Tags then go to Raspotify,
-    as they do with no speaker chosen."""
-    from spotifactory import owntone
+    """A Cast or AirPlay speaker: the box's own Raspotify plays and the audio
+    is streamed on (spotifactory/network_speakers.py). Tags then go to
+    Raspotify, as they do with no speaker chosen."""
+    from spotifactory import network_speakers
     if device.get("needs_pairing"):
-        raise owntone.OwnToneError("needs pairing (PIN), not supported yet")
+        raise network_speakers.NetworkSpeakerError("needs pairing (PIN), not supported yet")
     set_active_device("", "")
-    owntone.select(device)          # saved even if the speaker doesn't answer
     raspotify = find_device_by_name("Spotifactory")
-    if raspotify:
-        get_client().transfer_playback(raspotify["id"], force_play=False)
+    try:
+        network_speakers.select(device)     # saved even if the speaker doesn't answer
+    finally:
+        if raspotify:
+            get_client().transfer_playback(raspotify["id"], force_play=False)
 
 
 def tag_targets() -> list[dict]:

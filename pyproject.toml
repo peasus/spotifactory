@@ -19,6 +19,7 @@ dependencies = [
     "simplepyble>=0.7.0",
     "soco>=0.31.0",
     "websocket-client>=1.6",   # Music Assistant mode (music_assistant.py)
+    "pychromecast>=13.0",      # Cast speakers (cast_direct.py)
 ]
 
 [tool.setuptools.packages.find]
