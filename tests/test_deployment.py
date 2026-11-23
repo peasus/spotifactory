@@ -366,3 +366,19 @@ def test_provisioning_file_fills_env(tmp_path):
     assert "NFC_PORT=tty:USB1" in lines and "# NFC_PORT=tty:USB0" not in lines
     assert "KEEP=me" in lines and "# Spotify" in lines
     assert lines[-1] == "NEW_KEY=x=y"
+
+
+class TestPollForCode:
+    def test_keeps_polling_through_network_blips(self):
+        """DNS isn't always ready right after joining WiFi: a failed poll
+        must not end the login screen."""
+        import io
+        import urllib.error
+        from spotifactory import auth_server as mod
+        ok = MagicMock()
+        ok.read.return_value = b'{"code": "abc"}'
+        with patch("urllib.request.urlopen",
+                   side_effect=[urllib.error.URLError("Temporary failure in name resolution"),
+                                ConnectionResetError(), ok]), \
+             patch("time.sleep"):
+            assert mod._poll_for_code("https://relay", "s1", timeout=60) == "abc"
