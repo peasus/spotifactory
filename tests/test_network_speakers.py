@@ -9,7 +9,7 @@ import pytest
 
 OUTPUTS = {"outputs": [
     {"id": "111", "name": "Kitchen group", "type": "Chromecast", "selected": False},
-    {"id": "222", "name": "Living Room", "type": "AirPlay", "selected": False},
+    {"id": "222", "name": "Living Room", "type": "AirPlay 2", "selected": False},
     {"id": "333", "name": "Apple TV", "type": "AirPlay", "needs_auth_key": True},
     {"id": "0", "name": "Computer", "type": "ALSA"},
 ]}

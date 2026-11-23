@@ -31,8 +31,14 @@ SINK = "spotifactory_network"
 
 ID_PREFIX = "owntone:"
 # OwnTone also lists its own local outputs (ALSA, PulseAudio, fifo); only
-# speakers on the network belong in Choose Speaker.
-_NETWORK_TYPES = {"airplay": "AirPlay", "chromecast": "Cast"}
+# speakers on the network belong in Choose Speaker. Types are matched by
+# prefix: OwnTone says "AirPlay 2" for AirPlay 2 speakers.
+_NETWORK_TYPES = (("airplay", "AirPlay"), ("chromecast", "Cast"))
+
+
+def _kind(output_type) -> str | None:
+    t = str(output_type or "").lower()
+    return next((kind for prefix, kind in _NETWORK_TYPES if t.startswith(prefix)), None)
 _TIMEOUT = 3.0
 
 
@@ -74,7 +80,7 @@ def speakers(chosen_id: str | None = None) -> list[dict]:
         return []
     rows = []
     for out in outputs:
-        kind = _NETWORK_TYPES.get(str(out.get("type", "")).lower())
+        kind = _kind(out.get("type"))
         if not kind:
             continue
         row_id = ID_PREFIX + str(out.get("id"))
