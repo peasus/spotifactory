@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Spotifactory WiFi setup page, served by Balena WiFi Connect (--ui-directory).
+  Spotifactory WiFi setup page, served by the app (tasks/wifi_setup) on its hotspot.
   The phone has no internet while it's on the portal, so everything is inline.
   API: GET /networks -> [{ssid, security: none|wep|wpa|enterprise}]
+       GET /status -> {error}: why the last try failed, or ""
        POST /connect {ssid, identity, passphrase} (JSON) -> 200, then the AP drops.
 -->
 <html lang="en">
@@ -62,6 +63,7 @@
   </header>
 
   <section id="pick">
+    <p class="msg err" id="last-error" hidden></p>
     <h2>Choose your WiFi</h2>
     <ul id="networks"></ul>
     <p class="msg" id="status">Looking for networks…</p>
@@ -82,7 +84,8 @@
     <h2>Connecting to <span id="done-ssid"></span>…</h2>
     <p>This setup network will now disappear. Watch the screen on your Spotifactory:
        it moves on to the Spotify login once it's online.</p>
-    <p>If it can't connect, it restarts and this page comes back, so you can try again.</p>
+    <p>If it can't connect, the Spotifactory network comes back within a minute. Join it
+       again and this page says what went wrong, so you can try again.</p>
   </section>
 </main>
 <script>
@@ -97,6 +100,11 @@
     $("form").classList.add("open");
     (net.security === "enterprise" ? $("identity") : $("passphrase")).focus();
   }
+
+  fetch("/status")
+    .then((r) => r.json())
+    .then((s) => { if (s.error) { $("last-error").textContent = s.error + ". Try again."; $("last-error").hidden = false; } })
+    .catch(() => {});
 
   fetch("/networks")
     .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })

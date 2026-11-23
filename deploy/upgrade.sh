@@ -31,6 +31,22 @@ systemctl enable --quiet --now spotifactory-update.timer
 
 SUDO_USER="$APP_USER" bash "$REPO_DIR/deploy/sudoers.sh"
 
+# WiFi setup (tasks/wifi_setup): the app drives NetworkManager itself, and
+# its hotspot answers every DNS name so phones open the setup page.
+install -d /etc/polkit-1/rules.d /etc/NetworkManager/dnsmasq-shared.d
+PK_TMP="$(mktemp)"
+sed -e "s|subject.user === \"spotifactory\"|subject.user === \"$APP_USER\"|" \
+    "$REPO_DIR/deploy/nm-polkit.rules" > "$PK_TMP"
+install -m 644 "$PK_TMP" /etc/polkit-1/rules.d/50-spotifactory-networkmanager.rules
+rm -f "$PK_TMP"
+install -m 644 "$REPO_DIR/deploy/nm-captive-dns.conf" /etc/NetworkManager/dnsmasq-shared.d/spotifactory-captive.conf
+
+# Logs that survive a reboot, so a box that failed elsewhere can be diagnosed.
+install -d /etc/systemd/journald.conf.d /var/log/journal
+install -m 644 "$REPO_DIR/deploy/journald.conf" /etc/systemd/journald.conf.d/spotifactory.conf
+systemd-tmpfiles --create --prefix /var/log/journal > /dev/null 2>&1 || true
+systemctl restart systemd-journald || true
+
 # Squeezelite: the box's player in Music Assistant mode (advanced; Menu >
 # Music Source). Installed everywhere but off: the app turns it on and
 # Raspotify off when that mode is chosen. A failure here (no network for apt)
