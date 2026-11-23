@@ -61,6 +61,15 @@ if ! command -v squeezelite > /dev/null; then
   # runs in the PipeWire session instead.
   systemctl disable --now squeezelite > /dev/null 2>&1 || true
 fi
+# pactl: the app moves audio between the Bluetooth speaker and the Cast /
+# AirPlay pipe with it (PipeWire's PulseAudio commands; pipewire-pulse alone
+# doesn't include the command).
+if ! command -v pactl > /dev/null; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends pulseaudio-utils \
+    || { apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends pulseaudio-utils; } \
+    || echo "  WARNING: couldn't install pactl (pulseaudio-utils)"
+fi
+
 # OwnTone: streams the box's audio on to Google Cast and AirPlay speakers
 # (src/spotifactory/owntone.py), from its own apt repo. Like Squeezelite, a
 # failure here mustn't fail the update; it's tried again next time.
@@ -82,6 +91,12 @@ if ! command -v owntone > /dev/null; then
   fi
 fi
 if command -v owntone > /dev/null; then
+  # The Raspberry Pi package runs OwnTone as root; ours runs it as its own
+  # user (deploy/owntone.conf), which the package doesn't create.
+  id owntone > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin owntone
+  install -d -o owntone -g owntone /var/cache/owntone
+  chown -R owntone:owntone /var/cache/owntone
+  touch /var/log/owntone.log && chown owntone:owntone /var/log/owntone.log
   OWNTONE_RESTART=""
   if ! cmp -s "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf; then
     install -m 644 "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf
