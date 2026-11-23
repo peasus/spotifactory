@@ -111,6 +111,7 @@ if command -v owntone > /dev/null; then
   fi
   chown "$APP_USER:$APP_USER" /srv/music/spotifactory
   systemctl enable --quiet owntone
+  systemctl reset-failed owntone > /dev/null 2>&1 || true   # gave up after an earlier bad start
   # Restarted only for a new config, so a nightly update doesn't cut off music.
   if [ -n "$OWNTONE_RESTART" ]; then
     systemctl restart owntone || echo "  WARNING: OwnTone didn't start"
