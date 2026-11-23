@@ -61,6 +61,15 @@ if ! command -v squeezelite > /dev/null; then
   # runs in the PipeWire session instead.
   systemctl disable --now squeezelite > /dev/null 2>&1 || true
 fi
+# Wi-Fi power saving off (deploy/nm-wifi-powersave.conf): it drops the mDNS
+# multicast that Cast and AirPlay speakers are found by. Applied to the live
+# interface too, so it takes effect without reconnecting.
+WIFI_POWERSAVE_WAS_ON=""
+install -m 644 "$REPO_DIR/deploy/nm-wifi-powersave.conf" /etc/NetworkManager/conf.d/spotifactory-wifi-powersave.conf
+if command -v iw > /dev/null && iw dev wlan0 get power_save 2> /dev/null | grep -q ": on"; then
+  iw dev wlan0 set power_save off && WIFI_POWERSAVE_WAS_ON=1 && echo "==> Wi-Fi power saving off"
+fi
+
 # pactl: the app moves audio between the Bluetooth speaker and the Cast /
 # AirPlay pipe with it (PipeWire's PulseAudio commands; pipewire-pulse alone
 # doesn't include the command).
@@ -97,7 +106,8 @@ if command -v owntone > /dev/null; then
   install -d -o owntone -g owntone /var/cache/owntone
   chown -R owntone:owntone /var/cache/owntone
   touch /var/log/owntone.log && chown owntone:owntone /var/log/owntone.log
-  OWNTONE_RESTART=""
+  # Speakers missed while multicast was being dropped show up after a restart.
+  OWNTONE_RESTART="$WIFI_POWERSAVE_WAS_ON"
   if ! cmp -s "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf; then
     install -m 644 "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf
     OWNTONE_RESTART=1
