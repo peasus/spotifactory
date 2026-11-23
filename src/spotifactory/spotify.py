@@ -536,6 +536,8 @@ def play_tag(uri: str) -> TagPlay:
 
         raspotify = find_device_by_name("Spotifactory")
         if raspotify:
+            from spotifactory import owntone
+            owntone.route_audio()       # a Cast/AirPlay speaker, if one is chosen
             dev_id = raspotify["id"]
             print(f"[home] {verb} {uri} on Raspotify {dev_id!r}", flush=True)
             try:
@@ -624,17 +626,62 @@ def _sonos_speakers(listed: list[dict]) -> list[dict]:
     return [d for d in found if d["id"] not in ids]
 
 
+def _network_speakers(listed: list[dict]) -> list[dict]:
+    """Cast and AirPlay speakers found by OwnTone on the box (spotifactory/
+    owntone.py), minus any Spotify lists itself: a Cast speaker someone is
+    casting to from the Spotify app is better played directly."""
+    from spotifactory import owntone
+    try:
+        found = owntone.speakers()
+    except Exception as e:
+        print(f"[speaker] network speaker discovery failed: {e}", flush=True)
+        return []
+    names = {(d.get("name") or "").strip().lower() for d in listed}
+    # Speakers that want a PIN (Apple TV) are left out until the box can pair.
+    return [d for d in found
+            if d["name"].strip().lower() not in names and not d.get("needs_pairing")]
+
+
 def list_speakers() -> list[dict]:
     devices = get_devices()
-    return devices + _sonos_speakers(devices)
+    from spotifactory import owntone
+    if owntone.chosen() is not None:
+        # The box's own device plays for the network speaker, so it isn't
+        # what's "active" from the box's point of view.
+        devices = [dict(d, is_active=False) if _is_raspotify(d) else d for d in devices]
+    devices = devices + _sonos_speakers(devices)
+    return devices + _network_speakers(devices)
+
+
+def _is_raspotify(device: dict) -> bool:
+    return (device.get("name") or "").lower().startswith("spotifactory")
 
 
 def choose_speaker(device: dict) -> None:
+    from spotifactory import owntone
+    if owntone.is_network_id(device.get("id")):
+        _choose_network_speaker(device)
+        return
+    owntone.release()       # back to the box's own speaker if one was in use
     # Save first: the choice stands even if the speaker is asleep right now
     # (idle Echos are listed but return 404 until something wakes them).
     restricted = bool(device.get("is_restricted"))
     set_active_device(device["id"], device.get("name", ""), restricted=restricted)
     transfer_playback(device["id"], restricted=restricted)
+
+
+def _choose_network_speaker(device: dict) -> None:
+    """A Cast or AirPlay speaker: the box's own Raspotify plays, and OwnTone
+    streams its audio on (spotifactory/owntone.py). Tags then go to Raspotify,
+    as they do with no speaker chosen."""
+    from spotifactory import owntone
+    if device.get("needs_pairing"):
+        raise owntone.OwnToneError("needs pairing (PIN), not supported yet")
+    set_active_device("", "")
+    owntone.select(device)          # saved even if the speaker doesn't answer
+    raspotify = find_device_by_name("Spotifactory")
+    if raspotify:
+        get_client().transfer_playback(raspotify["id"], force_play=False)
 
 
 def tag_targets() -> list[dict]:

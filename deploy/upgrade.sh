@@ -61,6 +61,49 @@ if ! command -v squeezelite > /dev/null; then
   # runs in the PipeWire session instead.
   systemctl disable --now squeezelite > /dev/null 2>&1 || true
 fi
+# OwnTone: streams the box's audio on to Google Cast and AirPlay speakers
+# (src/spotifactory/owntone.py), from its own apt repo. Like Squeezelite, a
+# failure here mustn't fail the update; it's tried again next time.
+OWNTONE_LIST=/etc/apt/sources.list.d/owntone.list
+OWNTONE_KEY=/usr/share/keyrings/owntone-archive-keyring.gpg
+OWNTONE_REPO=https://raw.githubusercontent.com/owntone/owntone-apt/refs/heads/master/repo/rpi
+if ! command -v owntone > /dev/null; then
+  echo "==> Installing OwnTone (for Cast and AirPlay speakers)..."
+  CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+  command -v gpg > /dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q gnupg || true
+  if [ -n "$CODENAME" ] \
+     && curl -fsSL "$OWNTONE_REPO/owntone.gpg" | gpg --dearmor --yes --output "$OWNTONE_KEY" \
+     && curl -fsSL -o "$OWNTONE_LIST" "$OWNTONE_REPO/owntone-$CODENAME.list" \
+     && apt-get update -q \
+     && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends owntone; then
+    :
+  else
+    echo "  WARNING: couldn't install OwnTone; Cast and AirPlay speakers won't be listed yet"
+  fi
+fi
+if command -v owntone > /dev/null; then
+  OWNTONE_RESTART=""
+  if ! cmp -s "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf; then
+    install -m 644 "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf
+    OWNTONE_RESTART=1
+  fi
+  # The pipe the box's audio reaches OwnTone through: written by the app's
+  # PipeWire session, read by OwnTone's own user.
+  install -d -m 755 /srv/music
+  if [ ! -p /srv/music/spotifactory ]; then
+    rm -f /srv/music/spotifactory
+    mkfifo -m 644 /srv/music/spotifactory
+  fi
+  chown "$APP_USER:$APP_USER" /srv/music/spotifactory
+  systemctl enable --quiet owntone
+  # Restarted only for a new config, so a nightly update doesn't cut off music.
+  if [ -n "$OWNTONE_RESTART" ]; then
+    systemctl restart owntone || echo "  WARNING: OwnTone didn't start"
+  else
+    systemctl start owntone || echo "  WARNING: OwnTone didn't start"
+  fi
+fi
+
 USER_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 USER_UNITS="$USER_HOME/.config/systemd/user"
 install -d -o "$APP_USER" -g "$APP_USER" "$USER_HOME/.config" "$USER_HOME/.config/systemd" "$USER_UNITS"

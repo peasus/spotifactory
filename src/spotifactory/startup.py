@@ -80,6 +80,11 @@ def _run_platform(display, first_task_class=None):
     main(display=display, first_task_class=first_task_class)
 
 
+def _network_speaker_chosen() -> bool:
+    from spotifactory import owntone
+    return owntone.chosen() is not None
+
+
 def _bt_reconnect_loop(mac: str) -> None:
     """Background daemon thread: reconnect paired BT speaker whenever it's not connected.
 
@@ -107,6 +112,8 @@ def _bt_reconnect_loop(mac: str) -> None:
                 connected = is_connected(mac)
             if not connected:
                 routed = False
+            elif not routed and _network_speaker_chosen():
+                pass    # a Cast/AirPlay speaker has the audio (owntone.py)
             elif not routed:
                 print("[startup] BT speaker connected — redirecting audio", flush=True)
                 routed = set_bt_audio_output(mac)
@@ -160,6 +167,13 @@ def main() -> None:
         import threading as _threading
         _threading.Thread(target=_bt_reconnect_loop, args=(_mac,), daemon=True).start()
         time.sleep(1.5)
+
+    # ------------------------------------------- Cast / AirPlay speaker
+    if online and not backend.is_music_assistant() and _network_speaker_chosen():
+        import threading as _threading
+
+        from spotifactory import owntone
+        _threading.Thread(target=owntone.reselect, daemon=True).start()
 
     # -------------------------------------------------------------- Main app
     _show(display, "Ready!")
