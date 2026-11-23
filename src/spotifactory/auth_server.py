@@ -102,6 +102,11 @@ def _poll_for_code(
                 time.sleep(POLL_INTERVAL)
             else:
                 raise
+        except (OSError, ValueError) as e:
+            # A blip (DNS not ready just after joining WiFi, a dropped
+            # connection): keep the login screen up and try again.
+            print(f"[auth] poll failed, retrying: {e}", flush=True)
+            time.sleep(POLL_INTERVAL)
     return None
 
 
