@@ -63,7 +63,7 @@ merges it into each box's `.env`, so nothing needs editing on the Pi.
    cd ~/spotifactory && bash deploy/setup.sh
    ```
 4. Reboot, scan the QR code to log in, then in the Spotify app pick the
-   **Spotifactory** device once. Use **Pair Device** for the speaker and printer.
+   **Spotifactory** device once. Use **Bluetooth** to pair the speaker and printer, and to see, connect or forget paired devices.
 
 Logs: `journalctl -u spotifactory -f`.
 

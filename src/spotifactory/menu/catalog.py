@@ -17,7 +17,7 @@ MENUS: dict[str, MenuDef] = {
         ItemDef("Print Playlist", task=CapturePlaylistTask, backend="spotify"),
         ItemDef("Film Left",      task=FilmCountTask),
         ItemDef("Choose Speaker", task=SpeakerTask),
-        ItemDef("Pair Device",    task=BluetoothTask),
+        ItemDef("Bluetooth",      task=BluetoothTask),
         ItemDef("Connect Spotify", task=ReAuthTask, backend="spotify"),
         ItemDef("Music Source",   submenu="music_source"),
         ItemDef("Scan Tag",       action="home"),

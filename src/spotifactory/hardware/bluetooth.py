@@ -408,3 +408,51 @@ def move_sink_inputs(mac: str) -> None:
                 )
     except Exception as e:
         print(f"[bluetooth] move-sink-input: {e}", flush=True)
+
+
+def paired_devices() -> list[dict]:
+    """Paired devices, each {"mac", "name", "connected", "audio"}; audio is
+    True for speakers and headphones (they offer an Audio Sink)."""
+    try:
+        out = subprocess.run(["bluetoothctl", "devices", "Paired"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"[bluetooth] paired list: {e}", flush=True)
+        return []
+    devices = []
+    for line in out.splitlines():
+        m = re.match(r"Device ([0-9A-Fa-f:]{17}) ?(.*)", line.strip())
+        if not m:
+            continue
+        mac, name = m.group(1).upper(), m.group(2).strip() or m.group(1).upper()
+        try:
+            info = subprocess.run(["bluetoothctl", "info", mac],
+                                  capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            info = ""
+        devices.append({
+            "mac": mac,
+            "name": name,
+            "connected": "Connected: yes" in info,
+            "audio": "Audio Sink" in info,
+        })
+    return devices
+
+
+def disconnect(mac: str) -> None:
+    """Disconnect a device, keeping it paired. Does not raise."""
+    try:
+        subprocess.run(["bluetoothctl", "disconnect", mac], capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"[bluetooth] disconnect {mac}: {e}", flush=True)
+
+
+def forget(mac: str) -> bool:
+    """Unpair a device (bluetoothctl remove)."""
+    try:
+        result = subprocess.run(["bluetoothctl", "remove", mac],
+                                capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"[bluetooth] forget {mac}: {e}", flush=True)
+        return False
+    return result.returncode == 0
