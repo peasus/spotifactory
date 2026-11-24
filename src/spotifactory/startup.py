@@ -39,6 +39,17 @@ def _has_valid_token() -> bool:
     return backend.has_login()
 
 
+def _player_needs_login() -> bool:
+    """Raspotify has no saved login and can get one with a pairing code
+    (player_login.py). Boxes on older librespot keep relying on the app."""
+    try:
+        from spotifactory import player_login
+        return player_login.needs_pairing()
+    except Exception as e:
+        print(f"[startup] player login check failed: {e}", flush=True)
+        return False
+
+
 def _show(display, line1: str, line2: str = "") -> None:
     display.clear()
     display.draw_text(2, 8, line1)
@@ -158,6 +169,10 @@ def main() -> None:
         print("[startup] no valid Spotify token — opening Connect Spotify", flush=True)
         from spotifactory.tasks.reauth import FirstBootLoginTask
         first_task_class = FirstBootLoginTask
+    elif _player_needs_login():
+        print("[startup] the box's player has no Spotify login — showing its pairing code", flush=True)
+        from spotifactory.tasks.reauth import PlayerLoginTask
+        first_task_class = PlayerLoginTask
 
     # ---------------------------------------------------------- Bluetooth
     import os as _os

@@ -1,6 +1,6 @@
 from spotifactory.tasks.base import Task
 from spotifactory.tasks.music_source.steps import MAServerStep, MASetupStep, UseSpotifyStep
-from spotifactory.tasks.reauth.steps import QRAuthStep, ZeroconfPromptStep
+from spotifactory.tasks.reauth.steps import QRAuthStep, PlayerLoginStep
 
 
 class UseSpotifyTask(Task):
@@ -8,7 +8,7 @@ class UseSpotifyTask(Task):
     steps = [
         ("switch",          UseSpotifyStep),
         ("qr_auth",         QRAuthStep),
-        ("zeroconf_prompt", ZeroconfPromptStep),
+        ("player_login", PlayerLoginStep),
     ]
 
 

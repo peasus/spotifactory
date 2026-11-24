@@ -1,5 +1,5 @@
 from spotifactory.tasks.base import Task
-from spotifactory.tasks.reauth.steps import QRAuthStep, ZeroconfPromptStep
+from spotifactory.tasks.reauth.steps import QRAuthStep, PlayerLoginStep
 from spotifactory.tasks.wifi_setup.steps import WifiSetupStep
 
 
@@ -11,5 +11,5 @@ class WifiSetupTask(Task):
     steps = [
         ("wifi", WifiSetupStep),
         ("qr_auth", QRAuthStep),
-        ("zeroconf_prompt", ZeroconfPromptStep),
+        ("player_login", PlayerLoginStep),
     ]
