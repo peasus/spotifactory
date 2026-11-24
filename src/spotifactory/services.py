@@ -46,3 +46,8 @@ def apply(backend_name: str) -> None:
     else:
         _systemctl_user("disable", "--now", SQUEEZELITE)
         _systemctl_user("enable", "--now", RASPOTIFY)
+
+
+def restart_raspotify() -> bool:
+    """Restart the box's Spotify player, e.g. after it got a saved login."""
+    return _systemctl_user("restart", RASPOTIFY)

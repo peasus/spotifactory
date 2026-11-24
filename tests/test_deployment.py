@@ -79,8 +79,9 @@ class TestBtReconnectLoop:
                    **bt["set_out"]) as set_out, \
              patch("spotifactory.hardware.bluetooth.move_sink_inputs") as move, \
              patch("spotifactory.startup.time.sleep", side_effect=side), \
+             patch.dict("os.environ", {"SPOTIFACTORY_SPEAKER_MAC": "AA:BB:CC:DD:EE:FF"}), \
              pytest.raises(self._Stop):
-            _bt_reconnect_loop("AA:BB:CC:DD:EE:FF")
+            _bt_reconnect_loop()
         return set_out, move
 
     def test_routes_once_when_already_connected(self):
@@ -97,6 +98,19 @@ class TestBtReconnectLoop:
         )
         assert set_out.call_count == 2
         move.assert_called_once()
+
+
+    def test_lets_go_of_a_forgotten_speaker(self):
+        # Menu > Bluetooth > Forget clears the setting; the loop stops reconnecting.
+        from spotifactory.startup import _bt_reconnect_loop
+        with patch("spotifactory.hardware.bluetooth.is_connected", return_value=False) as conn, \
+             patch("spotifactory.hardware.bluetooth.reconnect") as reconnect, \
+             patch("spotifactory.startup.time.sleep", side_effect=[None, self._Stop()]), \
+             patch.dict("os.environ", {"SPOTIFACTORY_SPEAKER_MAC": ""}), \
+             pytest.raises(self._Stop):
+            _bt_reconnect_loop()
+        conn.assert_not_called()
+        reconnect.assert_not_called()
 
 
 class TestSplash:

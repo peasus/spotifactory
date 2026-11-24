@@ -43,7 +43,7 @@ sudo apt-get install -y \
   libusb-1.0-0-dev \
   i2c-tools \
   bluetooth bluez \
-  pipewire wireplumber libspa-0.2-bluetooth pipewire-alsa pipewire-pulse \
+  pipewire wireplumber libspa-0.2-bluetooth pipewire-alsa pipewire-pulse pulseaudio-utils \
   avahi-daemon \
   curl
 

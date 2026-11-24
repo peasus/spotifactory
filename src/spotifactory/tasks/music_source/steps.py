@@ -38,9 +38,10 @@ def _make_qr(url: str):
 
 
 def _switch_to_music_assistant() -> None:
-    from spotifactory import backend, services
+    from spotifactory import backend, network_speakers, services
     from spotifactory.settings import save_setting
     save_setting(backend.BACKEND_KEY, backend.MUSIC_ASSISTANT)
+    network_speakers.release()      # Music Assistant plays to Cast/AirPlay speakers itself
     services.apply(backend.MUSIC_ASSISTANT)
 
 

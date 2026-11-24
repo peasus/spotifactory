@@ -91,26 +91,64 @@ class QRAuthStep(Step):
         return Continue()
 
 
-class ZeroconfPromptStep(Step):
-    """Prompts the user to select Spotifactory in the Spotify app.
+class PlayerLoginStep(Step):
+    """Signs the box's own player (Raspotify) in to Spotify, so tags play
+    without a phone ever finding the box on the wifi (player_login.py).
 
-    This links Raspotify's audio stream to the same account just authenticated,
-    preventing a mismatch where the Web API controls one account but audio plays
-    on another. Back dismisses it, or it auto-advances after 30 seconds.
+    Shows a QR code for spotify.com/pair with the code in it, and the code
+    itself to type. Skipped when the player already has a saved login. A box
+    whose librespot is too old to pair asks for the Spotify app instead, as
+    before. Back skips it.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self._cancel = threading.Event()
+        self._show_url: bool = False
+        self.qr_image = None       # read by the runner, as for the Spotify login
+        self.session_url: str = ""
+        self.qr_lines: list[str] = []
+        self.text_lines: list[str] = []
         self.artist: str = ""
         self.detail: str = ""
 
     def cancel(self) -> None:
         self._cancel.set()
 
+    def toggle_url(self) -> None:
+        self._show_url = not self._show_url
+
+    def _show_code(self, url: str, code: str) -> None:
+        self.session_url = url
+        self.qr_lines = ["Scan so box", "can play", code or "Spotify"]
+        self.text_lines = ["Let this box play:", "spotify.com/pair",
+                           f"Code: {code}" if code else "", "", "< Skip  > QR Code"]
+        self.qr_image = _make_qr(url)
+
     def run(self, ctx: TaskContext) -> StepOutcome:
+        from spotifactory import player_login
+        if player_login.has_login():
+            return Done()
+        if not player_login.can_pair():
+            return self._ask_for_app()
+        self.status = "Getting a code..."
+        ok = player_login.pair(self._show_code, self._cancel.is_set)
+        self.qr_image = None
+        if ok:
+            self.show_for("Box can play now!", 2.0)
+        elif not self._cancel.is_set():
+            self.show_for("Code ran out", 2.0)
+        return Done()
+
+    def _ask_for_app(self) -> StepOutcome:
+        """librespot older than 0.7: only the Spotify app can sign it in.
+        Linking it to the account just signed in avoids the Web API
+        controlling one account while audio plays on another."""
         self.status = "Open Spotify app:"
         self.artist = "tap Spotifactory"
         self.detail = "< when done"
         self._cancel.wait(timeout=30.0)
         return Done()
+
+
+ZeroconfPromptStep = PlayerLoginStep       # older name, used by the setup tasks

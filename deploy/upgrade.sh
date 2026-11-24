@@ -61,6 +61,75 @@ if ! command -v squeezelite > /dev/null; then
   # runs in the PipeWire session instead.
   systemctl disable --now squeezelite > /dev/null 2>&1 || true
 fi
+# Wi-Fi power saving off (deploy/nm-wifi-powersave.conf): it drops the mDNS
+# multicast that Cast and AirPlay speakers are found by. Applied to the live
+# interface too, so it takes effect without reconnecting.
+WIFI_POWERSAVE_WAS_ON=""
+install -m 644 "$REPO_DIR/deploy/nm-wifi-powersave.conf" /etc/NetworkManager/conf.d/spotifactory-wifi-powersave.conf
+if command -v iw > /dev/null && iw dev wlan0 get power_save 2> /dev/null | grep -q ": on"; then
+  iw dev wlan0 set power_save off && WIFI_POWERSAVE_WAS_ON=1 && echo "==> Wi-Fi power saving off"
+fi
+
+# pactl: the app moves audio between the Bluetooth speaker and the Cast /
+# AirPlay pipe with it (PipeWire's PulseAudio commands; pipewire-pulse alone
+# doesn't include the command).
+if ! command -v pactl > /dev/null; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends pulseaudio-utils \
+    || { apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends pulseaudio-utils; } \
+    || echo "  WARNING: couldn't install pactl (pulseaudio-utils)"
+fi
+
+# OwnTone: streams the box's audio on to Google Cast and AirPlay speakers
+# (src/spotifactory/owntone.py), from its own apt repo. Like Squeezelite, a
+# failure here mustn't fail the update; it's tried again next time.
+OWNTONE_LIST=/etc/apt/sources.list.d/owntone.list
+OWNTONE_KEY=/usr/share/keyrings/owntone-archive-keyring.gpg
+OWNTONE_REPO=https://raw.githubusercontent.com/owntone/owntone-apt/refs/heads/master/repo/rpi
+if ! command -v owntone > /dev/null; then
+  echo "==> Installing OwnTone (for Cast and AirPlay speakers)..."
+  CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+  command -v gpg > /dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q gnupg || true
+  if [ -n "$CODENAME" ] \
+     && curl -fsSL "$OWNTONE_REPO/owntone.gpg" | gpg --dearmor --yes --output "$OWNTONE_KEY" \
+     && curl -fsSL -o "$OWNTONE_LIST" "$OWNTONE_REPO/owntone-$CODENAME.list" \
+     && apt-get update -q \
+     && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends owntone; then
+    :
+  else
+    echo "  WARNING: couldn't install OwnTone; Cast and AirPlay speakers won't be listed yet"
+  fi
+fi
+if command -v owntone > /dev/null; then
+  # The Raspberry Pi package runs OwnTone as root; ours runs it as its own
+  # user (deploy/owntone.conf), which the package doesn't create.
+  id owntone > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin owntone
+  install -d -o owntone -g owntone /var/cache/owntone
+  chown -R owntone:owntone /var/cache/owntone
+  touch /var/log/owntone.log && chown owntone:owntone /var/log/owntone.log
+  # Speakers missed while multicast was being dropped show up after a restart.
+  OWNTONE_RESTART="$WIFI_POWERSAVE_WAS_ON"
+  if ! cmp -s "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf; then
+    install -m 644 "$REPO_DIR/deploy/owntone.conf" /etc/owntone.conf
+    OWNTONE_RESTART=1
+  fi
+  # The pipe the box's audio reaches OwnTone through: written by the app's
+  # PipeWire session, read by OwnTone's own user.
+  install -d -m 755 /srv/music
+  if [ ! -p /srv/music/spotifactory ]; then
+    rm -f /srv/music/spotifactory
+    mkfifo -m 644 /srv/music/spotifactory
+  fi
+  chown "$APP_USER:$APP_USER" /srv/music/spotifactory
+  systemctl enable --quiet owntone
+  systemctl reset-failed owntone > /dev/null 2>&1 || true   # gave up after an earlier bad start
+  # Restarted only for a new config, so a nightly update doesn't cut off music.
+  if [ -n "$OWNTONE_RESTART" ]; then
+    systemctl restart owntone || echo "  WARNING: OwnTone didn't start"
+  else
+    systemctl start owntone || echo "  WARNING: OwnTone didn't start"
+  fi
+fi
+
 USER_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 USER_UNITS="$USER_HOME/.config/systemd/user"
 install -d -o "$APP_USER" -g "$APP_USER" "$USER_HOME/.config" "$USER_HOME/.config/systemd" "$USER_UNITS"
