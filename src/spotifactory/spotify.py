@@ -496,21 +496,39 @@ def pick_uri(uris: list[str]) -> str | None:
 _soco_speaker: str | None = None
 
 
+# The tag this box last played, so re-placing it during the autoplay that
+# followed its album carries on with the autoplay.
+_last_tag_uri: str | None = None
+
+
+def _autoplay_after(uri: str, ctx_uri: str | None, alb_uri: str | None) -> bool:
+    """Whether Spotify is on autoplay that followed `uri`, the last tag played:
+    something is loaded and it isn't another album the listener picked."""
+    if uri != _last_tag_uri or (ctx_uri is None and alb_uri is None):
+        return False
+    return not (ctx_uri or "").startswith("spotify:album:")
+
+
 def play_tag(uri: str) -> TagPlay:
     """Start (or resume) `uri` for a tag just placed, picking the speaker:
     1. the one chosen in Choose Speaker, with no silent fallback;
     2. this box's own Raspotify;
     3. whatever Spotify is already playing on."""
-    global _soco_speaker
+    global _soco_speaker, _last_tag_uri
     _soco_speaker = None
     try:
         from spotifactory.connect import ConnectError
         from spotifactory.connect import available as connect_available
 
-        # Already in this album or playlist (even paused)? Resume rather than
-        # restart from track 1.
+        # Resume rather than restart from track 1 when the tag is what's
+        # already loaded (even paused): its album or playlist is the playback
+        # context, or it's the tag this box last played and Spotify's autoplay
+        # has carried on from it. Not when only the current track's album
+        # matches: a tag just printed for an autoplay track's album starts
+        # that album.
         ctx_uri, alb_uri = get_current_context()
-        in_context = (ctx_uri == uri or alb_uri == uri)
+        in_context = ctx_uri == uri or _autoplay_after(uri, ctx_uri, alb_uri)
+        _last_tag_uri = uri
 
         def _play(device_id: str, restricted: bool | None = None) -> None:
             start_playback(device_id, None if in_context else uri, restricted=restricted)
@@ -585,7 +603,9 @@ def stop_tag() -> None:
 
 
 def start_tag(uri: str) -> None:
+    global _last_tag_uri
     from spotifactory.backend import NoSpeakerError
+    _last_tag_uri = uri
     try:
         start_playback(get_playback_device_id(), uri)
     except spotipy.SpotifyException as e:
