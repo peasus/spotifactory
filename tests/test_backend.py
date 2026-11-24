@@ -134,6 +134,18 @@ class TestSpotifyPlayTag:
             assert spotify.play_tag("spotify:album:a").message is None
         start.assert_called_once_with("box", None, restricted=None)
 
+    def test_starts_the_album_when_autoplay_is_on_one_of_its_tracks(self):
+        from spotifactory import spotify
+        # Autoplay after another album: the track is from album b, the context isn't.
+        for ctx in (None, "spotify:album:previous", "spotify:station:radio"):
+            with patch.object(spotify, "get_current_context", return_value=(ctx, "spotify:album:b")), \
+                 patch.object(spotify, "get_active_device", return_value=None), \
+                 patch.object(spotify, "find_device_by_name", return_value={"id": "box"}), \
+                 patch.object(spotify, "get_client"), \
+                 patch.object(spotify, "start_playback") as start:
+                assert spotify.play_tag("spotify:album:b").message is None
+            start.assert_called_once_with("box", "spotify:album:b", restricted=None)
+
     def test_chosen_speaker_not_listed(self):
         from spotifactory import spotify
         chosen = spotify.ChosenDevice("echo", "Kitchen Echo")

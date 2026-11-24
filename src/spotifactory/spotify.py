@@ -507,10 +507,13 @@ def play_tag(uri: str) -> TagPlay:
         from spotifactory.connect import ConnectError
         from spotifactory.connect import available as connect_available
 
-        # Already in this album or playlist (even paused)? Resume rather than
-        # restart from track 1.
-        ctx_uri, alb_uri = get_current_context()
-        in_context = (ctx_uri == uri or alb_uri == uri)
+        # Already playing this album or playlist (even paused)? Resume rather
+        # than restart from track 1. Only the playback context counts, not the
+        # current track's album: once an album ends, Spotify's autoplay plays
+        # loose tracks, and a tag printed for one of their albums must start
+        # that album rather than resume the autoplay.
+        ctx_uri, _ = get_current_context()
+        in_context = ctx_uri == uri
 
         def _play(device_id: str, restricted: bool | None = None) -> None:
             start_playback(device_id, None if in_context else uri, restricted=restricted)
