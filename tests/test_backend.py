@@ -134,17 +134,39 @@ class TestSpotifyPlayTag:
             assert spotify.play_tag("spotify:album:a").message is None
         start.assert_called_once_with("box", None, restricted=None)
 
-    def test_starts_the_album_when_autoplay_is_on_one_of_its_tracks(self):
+    def _play(self, spotify, ctx, alb, uri):
+        with patch.object(spotify, "get_current_context", return_value=(ctx, alb)), \
+             patch.object(spotify, "get_active_device", return_value=None), \
+             patch.object(spotify, "find_device_by_name", return_value={"id": "box"}), \
+             patch.object(spotify, "get_client"), \
+             patch.object(spotify, "start_playback") as start:
+            assert spotify.play_tag(uri).message is None
+        return start.call_args.args[1]
+
+    def test_new_tag_starts_its_album_during_autoplay(self):
         from spotifactory import spotify
-        # Autoplay after another album: the track is from album b, the context isn't.
-        for ctx in (None, "spotify:album:previous", "spotify:station:radio"):
-            with patch.object(spotify, "get_current_context", return_value=(ctx, "spotify:album:b")), \
-                 patch.object(spotify, "get_active_device", return_value=None), \
-                 patch.object(spotify, "find_device_by_name", return_value={"id": "box"}), \
-                 patch.object(spotify, "get_client"), \
-                 patch.object(spotify, "start_playback") as start:
-                assert spotify.play_tag("spotify:album:b").message is None
-            start.assert_called_once_with("box", "spotify:album:b", restricted=None)
+        # Tag a's album ended; autoplay is on a track from album b.
+        for ctx in (None, "spotify:album:a", "spotify:station:radio"):
+            spotify._last_tag_uri = "spotify:album:a"
+            assert self._play(spotify, ctx, "spotify:album:b", "spotify:album:b") == "spotify:album:b"
+            # Lifted and put back: now it's b that's loaded.
+            assert self._play(spotify, "spotify:album:b", "spotify:album:b", "spotify:album:b") is None
+
+    def test_replacing_the_original_tag_carries_on_with_autoplay(self):
+        from spotifactory import spotify
+        for ctx in (None, "spotify:station:radio", "spotify:playlist:radio"):
+            spotify._last_tag_uri = "spotify:album:a"
+            assert self._play(spotify, ctx, "spotify:album:b", "spotify:album:a") is None
+
+    def test_original_tag_restarts_if_another_album_was_picked_meanwhile(self):
+        from spotifactory import spotify
+        spotify._last_tag_uri = "spotify:album:a"
+        assert self._play(spotify, "spotify:album:c", "spotify:album:c", "spotify:album:a") == "spotify:album:a"
+
+    def test_tag_not_played_last_starts_even_with_autoplay(self):
+        from spotifactory import spotify
+        spotify._last_tag_uri = None    # e.g. the box restarted
+        assert self._play(spotify, None, "spotify:album:b", "spotify:album:a") == "spotify:album:a"
 
     def test_chosen_speaker_not_listed(self):
         from spotifactory import spotify
