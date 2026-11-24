@@ -251,3 +251,22 @@ def test_tag_reroutes_audio_and_rechecks_the_speaker(env):
     assert pactl.default == "spotifactory_network"
     sp.start_playback.assert_called_once_with(context_uri="spotify:album:abc", device_id="rasp")
     after.assert_called_once()
+
+
+def test_discovery_also_asks_every_address_on_the_network():
+    from spotifactory import cast_direct
+    ip_out = MagicMock(stdout="3: wlan0    inet 192.168.86.229/24 brd 192.168.86.255 scope global wlan0\n")
+    with patch("subprocess.run", return_value=ip_out):
+        hosts = cast_direct._local_hosts()
+    assert len(hosts) == 253 and "192.168.86.27" in hosts and "192.168.86.229" not in hosts
+
+    sent = []
+    sock = MagicMock()
+    sock.sendto.side_effect = lambda data, target: sent.append(target)
+    sock.recvfrom.side_effect = lambda n: ((cast_answer(fn="Ceiling speakers"), ("192.168.86.27", 5353))
+                                           if len(sent) < 600 else (_ for _ in ()).throw(socket.timeout()))
+    with patch("socket.socket", return_value=sock), \
+         patch.object(cast_direct, "_local_hosts", return_value=["192.168.86.27", "192.168.86.30"]):
+        found = cast_direct.discover(timeout=0.3)
+    assert ("192.168.86.27", 5353) in sent and cast_direct.MDNS_ADDR in sent
+    assert [d["name"] for d in found] == ["Ceiling speakers"]

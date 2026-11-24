@@ -13,7 +13,9 @@ ordinary port, which speakers answer straight back to the sender (RFC 6762
 section 6.7). Ordinary mDNS waits for multicast answers, and some networks
 never deliver those to the Pi (a friend's Google Wifi: the 2.4 GHz-only Pi
 Zero 2 W heard nothing, yet the same speakers answered a direct query).
-Nothing is announced on the network.
+Mesh routers can also keep multicast to one radio band, so the query is
+sent to every address on the box's network as well (a few hundred tiny
+packets). Nothing is announced on the network.
 """
 from __future__ import annotations
 
@@ -119,19 +121,55 @@ def parse_answer(data: bytes, sender_ip: str) -> list[dict]:
     return found
 
 
-def discover(timeout: float = 3.0) -> list[dict]:
-    """Cast speakers and groups that answer a direct query, each once."""
+def _local_hosts(limit: int = 1024) -> list[str]:
+    """Every other address on the box's own IPv4 networks (up to `limit`).
+    Mesh routers often keep multicast to one radio, so speakers on another
+    band never hear a multicast query; one sent to their address works."""
+    import ipaddress
+    import subprocess
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show", "scope", "global"],
+                             capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    hosts: list[str] = []
+    for line in out.splitlines():
+        parts = line.split()
+        if "inet" not in parts:
+            continue
+        iface = ipaddress.ip_interface(parts[parts.index("inet") + 1])
+        net = iface.network
+        if net.num_addresses > limit + 2:          # too big to sweep: its /24
+            net = ipaddress.ip_network(f"{iface.ip}/24", strict=False)
+        hosts += [str(h) for h in net.hosts() if h != iface.ip]
+    return hosts[:limit]
+
+
+def _ask(sock: socket.socket, hosts: list[str]) -> None:
+    query = _query(CAST_SERVICE)
+    for target in [MDNS_ADDR] + [(h, 5353) for h in hosts]:
+        try:
+            sock.sendto(query, target)
+        except OSError:
+            pass                                    # e.g. a host route that's down
+
+
+def discover(timeout: float = 3.0, sweep: bool = True) -> list[dict]:
+    """Cast speakers and groups that answer a direct query, each once. The
+    query goes to the multicast group and (sweep) to every address on the
+    box's network, so speakers the multicast never reaches answer too."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     try:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
-        sock.settimeout(0.5)
-        sock.sendto(_query(CAST_SERVICE), MDNS_ADDR)
+        sock.settimeout(0.2)
+        hosts = _local_hosts() if sweep else []
+        _ask(sock, hosts)
         found: dict[str, dict] = {}
         resent = False
         end = time.monotonic() + timeout
         while time.monotonic() < end:
             if not resent and time.monotonic() > end - timeout / 2:
-                sock.sendto(_query(CAST_SERVICE), MDNS_ADDR)   # UDP: ask twice
+                _ask(sock, hosts)                   # UDP: ask twice
                 resent = True
             try:
                 data, (ip, _) = sock.recvfrom(9000)

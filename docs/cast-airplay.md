@@ -31,7 +31,11 @@ Why direct queries for Cast: ordinary mDNS waits for *multicast* answers, and
 some networks never deliver those to the Pi. On a friend's Google Wifi the
 2.4 GHz-only Pi Zero 2 W heard no multicast from any speaker (Wi-Fi power
 saving off), yet a Cast and an AirPlay speaker both answered a direct query.
-Routers that separate the 2.4 and 5 GHz bands are a known cause. OwnTone (via
+Routers that separate the 2.4 and 5 GHz bands are a known cause. There, even
+the multicast *query* only reached a speaker on the box's own radio; two others
+answered only when asked at their own address. So the box also sends its
+query to every address on its network (a /24 at most, twice, ~500 tiny UDP
+packets per scan). OwnTone (via
 Avahi) can only use multicast, so AirPlay speakers on such networks aren't
 found yet; relaying direct answers into Avahi is the next step.
 
