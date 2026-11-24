@@ -80,7 +80,7 @@ def _run_platform(display, first_task_class=None):
     main(display=display, first_task_class=first_task_class)
 
 
-def _bt_reconnect_loop(mac: str) -> None:
+def _bt_reconnect_loop() -> None:
     """Background daemon thread: reconnect paired BT speaker whenever it's not connected.
 
     Runs for the lifetime of the app. Checks every 30 s and reconnects if needed,
@@ -89,7 +89,12 @@ def _bt_reconnect_loop(mac: str) -> None:
     Audio is (re)routed whenever the speaker is connected but not yet routed —
     whether we reconnected it or BlueZ auto-reconnected it — and retried on the
     next pass if PipeWire wasn't reachable yet (e.g. early in boot).
+
+    Follows the saved speaker (SPOTIFACTORY_SPEAKER_MAC) on every pass, so a
+    speaker paired, chosen or forgotten in Menu > Bluetooth takes effect
+    without a restart.
     """
+    import os
     from spotifactory.hardware.bluetooth import (
         is_connected,
         move_sink_inputs,
@@ -97,8 +102,14 @@ def _bt_reconnect_loop(mac: str) -> None:
         set_bt_audio_output,
     )
 
-    routed = False
+    routed, last = False, None
     while True:
+        mac = os.environ.get("SPOTIFACTORY_SPEAKER_MAC", "").strip()
+        if mac != last:
+            routed, last = False, mac
+        if not mac:
+            time.sleep(30)
+            continue
         try:
             connected = is_connected(mac)
             if not connected:
@@ -133,7 +144,7 @@ def main() -> None:
 
     # ---------------------------------------------------------- Login
     # No working login: the app opens on the Connect Spotify QR code instead of
-    # waiting here, so Menu still works (Reboot, Pair Device, and later the
+    # waiting here, so Menu still works (Reboot, Bluetooth, and later the
     # choice of music service).
     # Music Assistant mode never needs a Spotify login.
     from spotifactory import backend, services
@@ -155,10 +166,10 @@ def main() -> None:
     # ---------------------------------------------------------- Bluetooth
     import os as _os
     _mac = _os.environ.get("SPOTIFACTORY_SPEAKER_MAC", "").strip()
+    import threading as _threading
+    _threading.Thread(target=_bt_reconnect_loop, daemon=True).start()
     if _mac:
         _show(display, "Connecting BT...", _mac[-8:])
-        import threading as _threading
-        _threading.Thread(target=_bt_reconnect_loop, args=(_mac,), daemon=True).start()
         time.sleep(1.5)
 
     # -------------------------------------------------------------- Main app
