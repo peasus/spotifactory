@@ -39,6 +39,14 @@ packets per scan). OwnTone (via
 Avahi) can only use multicast, so AirPlay speakers on such networks aren't
 found yet; relaying direct answers into Avahi is the next step.
 
+## Status
+
+On a real box, OwnTone installs and lists AirPlay speakers in Choose Speaker,
+and direct discovery finds Cast speakers on a Google Wifi mesh. Playing music
+to a Cast speaker or group, end to end, hasn't been confirmed yet. Which
+speakers to use, for people setting up a box, is on the
+[setup guide](https://spotifactory.com/setup#speaker).
+
 ## Install (`deploy/upgrade.sh`)
 
 - OwnTone from its Raspberry Pi apt repo, run as its own `owntone` user,

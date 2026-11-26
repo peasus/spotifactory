@@ -1,10 +1,29 @@
 # spotifactory.com
 
 The website is the static pages in `site/`: the home page (`index.html`),
-`why-spotify.html` (served at /why-spotify), `build.html` (served at /build)
-and their shared `style.css`, plus the favicon, the link-preview image
-(`og.png`) and the setup-portal screenshot. There is no build step: Cloudflare
-Pages serves `/build` from `build.html` on its own.
+`why-spotify.html` (served at /why-spotify), `build.html` (served at /build),
+`setup.html` (/setup, the guide for whoever receives a box), `gallery.html`
+(/gallery) and their shared `style.css`, plus the favicon, the link-preview
+image (`og.png`), the setup-portal screenshot and the printable setup sheet
+(`setup-sheet.pdf`). There is no build step: Cloudflare Pages serves `/build`
+from `build.html` (and so on) on its own.
+
+The brand colour is avocado green, `#A9C23F` (`--green` in `style.css`); the
+logo is the "instant" photo mark, also used on the box's boot splash and the
+WiFi setup page.
+
+## Setup guide and sheet
+
+`site/setup.html` walks through the box's buttons, the **Spotifactory** setup
+WiFi, the two Spotify QR codes (Connect Spotify, then the spotify.com/pair
+code for the box's player), pairing the printer and a speaker, the first
+photo, and troubleshooting. Its screen images (`site/img/setup-*.png`) are
+drawn with the app's own render code, with the Spotify QR codes scrambled so
+they don't open dead links; redo them if those screens change.
+
+`site/setup-sheet.pdf` is the same steps on one US Letter page, for the box.
+Its source is `docs/setup-sheet/sheet.html`; rebuild the PDF with
+`node docs/setup-sheet/make-pdf.js`.
 
 ## Case files and screen images
 
@@ -35,7 +54,7 @@ files). Unlike the STLs they are committed, so rerun it if the case changes:
 
 The pages link `/style.css?v=<hash>` so browsers (iPhone Safari especially)
 never pair a new page with an old cached stylesheet. After changing
-`site/style.css`, update the hash in all three pages:
+`site/style.css`, update the hash in every page:
 
 ```sh
 H=$(sha1sum site/style.css | cut -c1-8)

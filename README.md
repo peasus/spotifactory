@@ -1,30 +1,69 @@
 # Spotifactory
 
-[spotifactory.com](https://spotifactory.com) · website source in `site/` (see `docs/website.md`)
+[spotifactory.com](https://spotifactory.com) · [setup guide](https://spotifactory.com/setup) · [build guide](https://spotifactory.com/build) · [gallery](https://spotifactory.com/gallery) · website source in `site/` (see `docs/website.md`)
 
 A Raspberry Pi music box that plays albums from instant photos. Print an
 album's cover on an Instax Square printer, stick an NFC tag on the back, and
 from then on standing that photo on Spotifactory plays the album; lifting it
 off pauses.
 
+Setting up a finished box (WiFi, Spotify, printer, speakers, first photo) is
+covered step by step on the [setup guide](https://spotifactory.com/setup),
+which also comes as a one-page sheet to print and put in the box
+(`site/setup-sheet.pdf`). This README is for building and developing one.
+
 ## How it works
 
 - **Raspberry Pi Zero 2 W** with a **SeenGreat 1.3" OLED HAT** ([this one](https://a.co/d/09jW1LQh); SH1106 screen,
   5-way joystick) runs the app (`spotifactory.startup`) as a systemd service.
 - A **PN532 NFC reader** (USB-C, CH340 serial; [this one](https://a.co/d/0b7JEN1F)) behind the photo reads the
-  tag's `spotify:album:` / `spotify:playlist:` URI and starts playback through
-  the Spotify Web API.
+  tag's album or playlist link and starts playback through the Spotify Web API.
+- New tags hold an `https://open.spotify.com/...` link, so tapping one with a
+  phone opens the album in Spotify too. Older tags with a `spotify:` URI still
+  play on the box, and printing that album again rewrites them in the new form.
+  (Phone tapping hasn't been tried on a real tag yet.)
 - Music plays on whichever speaker you pick in **Choose Speaker** (remembered
-  across restarts), or by default on the Pi itself via **Raspotify**
-  (librespot, shown in the Spotify app as "Spotifactory") and a paired
-  Bluetooth speaker.
+  across restarts). That can be:
+  - the box itself, via **Raspotify** (librespot, shown in the Spotify app as
+    "Spotifactory") and a paired **Bluetooth** speaker;
+  - anything the Spotify app lists for your account (phones, computers,
+    Spotify Connect speakers);
+  - **Sonos** rooms (experimental, not yet tried on a real Sonos; see
+    `docs/sonos.md`);
+  - **Google Cast** speakers and groups, and **AirPlay 2** speakers, which the
+    box finds on the network itself and streams to through OwnTone (see
+    `docs/cast-airplay.md`). AirPlay speakers have been seen in the list on a
+    real box; playing to a Cast speaker hasn't been confirmed yet.
+
+  Which speakers work, and how to pick one, is on the setup guide's
+  [speaker section](https://spotifactory.com/setup#speaker).
 - **Print Album / Print Playlist** prints the current artwork on a paired
   **Instax Square Link** and then writes the tag. **Film Left** asks the
-  printer how many shots are left in the pack (and its battery).
-- First-run setup needs no keyboard: a Spotifactory-branded captive portal
-  (Balena WiFi Connect serving `deploy/portal/`) for WiFi, then a QR code that logs in to Spotify through a small Cloudflare
-  Worker relay (`deploy/relay/`, PKCE — no client secret on the device).
-  The menu button leaves the QR code for the main menu.
+  printer how many shots are left in the pack (and its battery). Only the
+  Square Link is supported for now; Mini and Wide printers are in progress in
+  an open pull request.
+- **Bluetooth** lists paired devices (speaker, printer, which is connected),
+  connects or forgets them, and pairs new ones.
+- First-run setup needs no keyboard:
+  - **WiFi:** with no known network the box opens its own open hotspot,
+    **Spotifactory**, and shows a QR code to join it. Phones then open the setup
+    page by themselves (`deploy/portal/`, served by the app at `10.42.0.1`).
+    Pick your network (WPA2 and WPA3 work), and if it fails the screen and the
+    page say why. Menu still works throughout, and **WiFi Setup** in the menu
+    brings it back later. The app does this itself through NetworkManager
+    (`src/spotifactory/wifi.py`, `tasks/wifi_setup/`); it no longer uses
+    Balena WiFi Connect.
+  - **Spotify:** a QR code logs in to Spotify through a small Cloudflare Worker
+    relay at `auth.spotifactory.com` (`deploy/relay/`, PKCE: no client secret
+    on the device). The old `auth.spotifactory.workers.dev` address stays live
+    for boxes set up with it.
+  - **The box's own player:** a second screen shows a
+    [spotify.com/pair](https://spotify.com/pair) code that signs Raspotify in
+    (`player_login.py`), so the box can play without a phone ever finding it on
+    the WiFi (mesh routers often hide it). It saves the login, so this happens
+    once.
+
+  The menu button leaves the QR codes for the main menu.
 
 ## Controls
 
@@ -62,14 +101,24 @@ merges it into each box's `.env`, so nothing needs editing on the Pi.
    git clone https://github.com/peasus/spotifactory.git ~/spotifactory
    cd ~/spotifactory && bash deploy/setup.sh
    ```
-4. Reboot, scan the QR code to log in, then in the Spotify app pick the
-   **Spotifactory** device once. Use **Bluetooth** to pair the speaker and printer, and to see, connect or forget paired devices.
+4. Reboot, scan the QR code to log in, then enter the pairing code at
+   spotify.com/pair to sign in the box's player. Use **Bluetooth** to pair the
+   speaker and printer, and to see, connect or forget paired devices. The rest
+   is the same as for anyone receiving a box: see the
+   [setup guide](https://spotifactory.com/setup).
 
-Logs: `journalctl -u spotifactory -f`.
+Taking a box somewhere new (a gift, a friend's house)? Run **Check for
+Updates** first while it's still on your WiFi, so it has the current WiFi
+setup. On its new network it opens the **Spotifactory** hotspot by itself.
+
+Logs: `journalctl -u spotifactory -f`. They're kept across reboots
+(`deploy/journald.conf`), so a box that failed elsewhere still has them when
+it comes back.
 
 ### Music Assistant (advanced)
 
-If you run your own [Music Assistant](https://music-assistant.io) server,
+Not yet tried against a real Music Assistant server. If you run your own
+[Music Assistant](https://music-assistant.io) server,
 **Menu > Music Source > Music Assistant** switches the box over to it. The box
 shows a QR code for a page it serves on your network (port 8080), where you
 enter the server address and a long-lived access token (made under your user profile in Music
@@ -219,15 +268,22 @@ print's top edge (`TOP_BORDER`); if yours differs, change it and re-run.
 | Path | What |
 |---|---|
 | `src/spotifactory/runner.py` | Platform-independent UI loop: input, tasks, rendering |
-| `src/spotifactory/tasks/` | Home screen, printing, speakers, Bluetooth pairing, Spotify login |
+| `src/spotifactory/tasks/` | Home screen, printing, speakers, Bluetooth, WiFi setup, Spotify login, music source |
 | `src/spotifactory/backend/` | The music service the UI talks to (`spotify.py` or `music_assistant.py`, chosen by `MUSIC_BACKEND`); never import either from the UI |
 | `src/spotifactory/services.py` | Swaps the box's receiver: Raspotify (Spotify) or Squeezelite (Music Assistant) |
+| `src/spotifactory/wifi.py` | NetworkManager: the setup hotspot, scanning and joining |
+| `src/spotifactory/player_login.py` | Signs Raspotify in with a spotify.com/pair code |
+| `src/spotifactory/network_speakers.py` | Cast (`cast_direct.py`) and AirPlay (`owntone.py`) speakers for Choose Speaker; `audio_route.py` points the box's audio at them |
 | `src/spotifactory/hardware/` | NFC reader, Instax printer, Bluetooth, Sonos |
 | `src/spotifactory/platforms/` | SeenGreat HAT, Adafruit OLED and simulator front ends |
-| `deploy/` | Pi setup script, systemd unit, auth relay Worker |
+| `deploy/` | Pi setup and update scripts, systemd units, WiFi setup page (`portal/`), auth relay Worker (`relay/`), OwnTone config |
+| `site/` | spotifactory.com: home, build guide, setup guide and sheet, gallery, why Spotify |
 | `enclosure/` | Case model, checks and parts list |
 | `connect-helper/` | Rust helper that plays Spotify on Sonos speakers (experimental) |
 | `docs/sonos.md` | What does and doesn't work with Sonos speakers |
+| `docs/cast-airplay.md` | How Cast and AirPlay speakers work, limits, debugging |
+| `docs/website.md` | How the website is laid out and hosted |
+| `docs/setup-sheet/` | Source of the printable setup sheet (`node docs/setup-sheet/make-pdf.js`) |
 
 ## License
 
