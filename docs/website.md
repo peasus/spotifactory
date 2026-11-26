@@ -70,3 +70,12 @@ and each pull request gets its own preview URL.
 
 Ink `#191414` and avocado chartreuse `#A9C23F` (on light backgrounds
 `#5C6B1C`). The accent was moved off Spotify's brand green on purpose.
+
+## Setup guide and printable sheet
+
+`site/setup.html` is the end-user setup guide (WiFi, the two Spotify codes,
+printer, Bluetooth speaker). Its screen pictures (`site/img/setup-*.png`)
+are drawn with the app's own `Runner` render code, so re-render them when
+those screens change. `site/setup-sheet.pdf` is the one-page version to put
+in the box; edit `docs/setup-sheet/sheet.html` and run
+`node docs/setup-sheet/make-pdf.js` to rebuild it.

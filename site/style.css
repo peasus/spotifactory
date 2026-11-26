@@ -433,3 +433,10 @@ td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
   .lb-prev, .lb-next { top: auto; bottom: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .shot img { transition: none; } }
+
+/* ---------- setup guide ---------- */
+.page-hero .lede-link { color: var(--green); text-underline-offset: 3px; }
+.screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 260px)); gap: 16px; margin: 0; }
+.screens figure { margin: 0; display: grid; gap: 8px; }
+.screens img { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #000; border-radius: 8px; padding: 10px; box-shadow: inset 0 0 0 1px var(--ink-3); box-sizing: border-box; }
+.screens figcaption { font: 400 .78rem/1.4 var(--f-mono); color: var(--muted); }
