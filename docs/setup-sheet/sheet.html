@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Spotifactory setup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+@page { size: Letter; margin: 0; }
+:root { --ink: #191414; --muted: #5a5250; --green: #A9C23F; --green-deep: #5C6B1C; --paper: #f7f4ef; --line: #ddd5c9; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body { width: 8.5in; height: 11in; padding: 0.4in 0.45in 0.35in; font: 400 8.7pt/1.32 "DM Sans", system-ui, sans-serif; color: var(--ink); display: flex; flex-direction: column; gap: 0.12in; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+b, strong { font-weight: 700; }
+h1, h2 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; letter-spacing: -0.02em; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 0.3in; padding-bottom: 0.14in; border-bottom: 3px solid var(--green); }
+.top img { height: 0.44in; }
+.top .t { text-align: right; }
+.top h1 { font-size: 20pt; font-weight: 800; line-height: 1; }
+.top p { color: var(--muted); margin-top: 4px; font-size: 9pt; }
+.need { display: flex; gap: 0.08in; flex-wrap: nowrap; font-size: 7.8pt; white-space: nowrap; }
+.need span { background: var(--paper); border: 1px solid var(--line); border-radius: 99px; padding: 2px 8px; }
+.need span::before { content: "\2713"; color: var(--green-deep); font-weight: 700; margin-right: 5px; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 0.2in; align-items: center; background: var(--paper); border-radius: 10px; padding: 0.08in 0.16in; }
+.face { display: flex; align-items: center; gap: 9px; }
+.joy { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, #3a3333 0 50%, var(--ink) 52%); }
+.scr { width: 64px; height: 32px; background: #000; border-radius: 3px; }
+.btns { display: grid; gap: 4px; }
+.btns i { display: block; width: 16px; height: 8px; border-radius: 2px; background: var(--ink); }
+.keys dl { display: grid; grid-template-columns: auto 1fr auto auto; gap: 1px 10px; font-size: 8.2pt; }
+.keys dt { font: 500 8pt/1.5 "DM Mono", monospace; color: var(--green-deep); white-space: nowrap; }
+.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1in 0.16in; flex: 1; }
+.step { border: 1px solid var(--line); border-radius: 10px; padding: 0.09in 0.13in; display: flex; flex-direction: column; gap: 4px; }
+.step h2 { font-size: 11.5pt; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+.step h2 .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: var(--ink); font: 700 10pt/1 "DM Sans", sans-serif; flex: none; transform: translateY(-1px); }
+.step h2 small { font: 400 8.5pt "DM Sans", sans-serif; color: var(--muted); letter-spacing: 0; }
+.step ol { padding-left: 1.15em; display: grid; gap: 2px; }
+.step li::marker { color: var(--green-deep); font-weight: 700; }
+.shots { display: flex; gap: 6px; align-items: flex-end; }
+.shots img { width: 1.12in; image-rendering: pixelated; border-radius: 4px; display: block; }
+.qr { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 7.8pt; color: var(--muted); max-width: 1.5in; line-height: 1.25; }
+.qr img { width: 0.62in; height: 0.62in; flex: none; }
+.note { font-size: 7.9pt; line-height: 1.28; color: var(--muted); }
+code { font: 500 8.6pt "DM Mono", monospace; background: var(--paper); padding: 0 3px; border-radius: 3px; }
+.foot { display: grid; grid-template-columns: 1fr auto; gap: 0.25in; align-items: center; border-top: 1px solid var(--line); padding-top: 0.12in; }
+.foot h2 { font-size: 10.5pt; margin-bottom: 3px; }
+.foot ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 1px 0.2in; font-size: 7.9pt; color: var(--muted); }
+.foot ul b { color: var(--ink); font-weight: 500; }
+.foot .qr { max-width: none; white-space: nowrap; }
+</style></head><body>
+
+<header class="top">
+  <img src="logo.svg" alt="Spotifactory">
+  <div class="t"><h1>Setup guide</h1><p>About 10 minutes, with your phone.</p></div>
+</header>
+
+<div class="need">
+  <span>Spotify Premium</span><span>Your WiFi name and password</span><span>A phone with a camera</span><span>Instax Link printer, with film</span><span>A Bluetooth speaker</span>
+</div>
+
+<section class="keys">
+  <div class="face"><span class="joy"></span><span class="scr"></span><span class="btns"><i></i><i></i><i></i></span></div>
+  <dl>
+    <dt>Joystick</dt><dd>Up/down to move, press in to choose, left to go back.</dd>
+    <dt>Top button</dt><dd>Volume up</dd>
+    <dt>On a QR screen</dt><dd>Push <b>right</b> to see it in words instead.</dd>
+    <dt>Middle button</dt><dd>Volume down</dd>
+    <dt></dt><dd></dd>
+    <dt>Bottom button</dt><dd><b>Menu</b></dd>
+  </dl>
+</section>
+
+<main class="steps">
+  <section class="step">
+    <h2><span class="n">1</span>Join your WiFi</h2>
+    <div class="shots"><img src="../../site/img/setup-wifi.png" alt=""><div class="qr"><img src="wifi-qr.svg" alt="">Or scan this to join the setup WiFi</div></div>
+    <ol>
+      <li>Plug the box in. After the logo it shows <b>Join WiFi Spotifactory for setup</b>.</li>
+      <li>Scan the screen's code (or the one above) with your phone camera and tap <b>Join</b>. Or pick WiFi <b>Spotifactory</b> in your phone's settings. No password.</li>
+      <li>A setup page opens. If not, browse to <code>10.42.0.1</code>.</li>
+      <li>Pick your WiFi, type its password, tap <b>Connect</b>. Wait for <b>WiFi connected!</b></li>
+    </ol>
+    <p class="note">Didn't connect? The Spotifactory WiFi comes back within a minute. Join it again to see why.</p>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">2</span>Connect Spotify <small>first code</small></h2>
+    <div class="shots"><img src="../../site/img/setup-login.png" alt=""></div>
+    <ol>
+      <li>The box shows a code with <b>Scan Code</b> next to it.</li>
+      <li>Scan it and open the link.</li>
+      <li>Log in to Spotify and tap <b>Agree</b>.</li>
+      <li>The box says <b>Spotify connected!</b> and shows the second code.</li>
+    </ol>
+    <p class="note">This lets the box see what's playing, start albums and pick speakers.</p>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">3</span>Let the box play <small>second code</small></h2>
+    <div class="shots"><img src="../../site/img/setup-pair.png" alt=""></div>
+    <ol>
+      <li>The box shows <b>Scan so box can play</b> and a short code.</li>
+      <li>Scan it to open <b>spotify.com/pair</b>, or type the code there on any device.</li>
+      <li>Use the <b>same Spotify account</b> as step 2, and approve.</li>
+      <li>The box says <b>Box can play now!</b></li>
+    </ol>
+    <p class="note">Codes last a few minutes. A new one appears by itself.</p>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">4</span>Pair the printer</h2>
+    <div class="shots"><img src="../../site/img/setup-bt-pair-new.png" alt=""><img src="../../site/img/setup-bt-instax.png" alt=""></div>
+    <ol>
+      <li>Turn the printer on. Close the Instax app on your phone.</li>
+      <li>Press <b>Menu</b>, choose <b>Bluetooth</b>, then <b>+ Pair new device</b>.</li>
+      <li>After about 10 seconds, choose <b>INSTAX-</b>&hellip; from the list.</li>
+      <li>The box says <b>Printer ready!</b> Check with <b>Menu &rsaquo; Film Left</b>.</li>
+    </ol>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">5</span>Pair a Bluetooth speaker</h2>
+    <div class="shots"><img src="../../site/img/setup-bt-speaker.png" alt=""><img src="../../site/img/setup-speaker-paired.png" alt=""></div>
+    <ol>
+      <li>Put the speaker in pairing mode (usually hold its Bluetooth button until the light flashes).</li>
+      <li>Press <b>Menu</b>, choose <b>Bluetooth</b>, then <b>+ Pair new device</b>.</li>
+      <li>Choose your speaker. The box says <b>Paired!</b></li>
+    </ol>
+    <p class="note">It reconnects whenever the speaker is on. WiFi speakers (Sonos, Chromecast, AirPlay): <b>Menu &rsaquo; Choose Speaker</b>.</p>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">6</span>Make your first photo</h2>
+    <ol>
+      <li>Play an album in the Spotify app on <b>Spotifactory</b>.</li>
+      <li>Press <b>Menu</b>, choose <b>Print Album</b>, then <b>Yes</b>.</li>
+      <li>Stick an NFC tag on the back of the photo.</li>
+      <li>When the box says <b>Place tag to write</b>, stand the photo on it until <b>Album ready!</b></li>
+    </ol>
+    <p class="note">From then on, stand the photo on the box to play the album.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <div>
+    <h2>If something goes wrong</h2>
+    <ul>
+      <li><b>New WiFi?</b> The box opens WiFi setup by itself, or use Menu &rsaquo; WiFi Setup.</li>
+      <li><b>"Can't reach login"?</b> Check the WiFi, then Menu &rsaquo; Connect Spotify.</li>
+      <li><b>Spotify won't let you log in?</b> Ask whoever built the box to add your Spotify email.</li>
+      <li><b>"Printer Off?"</b> Turn the printer on and choose Retry.</li>
+    </ul>
+  </div>
+  <div class="qr"><img src="guide-qr.svg" alt=""><span>Full guide, with pictures:<br><b style="color:var(--ink);font-size:9pt">spotifactory.com/setup</b></span></div>
+</footer>
+</body></html>
