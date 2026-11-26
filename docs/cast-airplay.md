@@ -45,7 +45,7 @@ On a real box, OwnTone installs and lists AirPlay speakers in Choose Speaker,
 and direct discovery finds Cast speakers on a Google Wifi mesh. Playing music
 to a Cast speaker or group, end to end, hasn't been confirmed yet. Which
 speakers to use, for people setting up a box, is on the
-[setup guide](https://spotifactory.com/setup#speaker).
+[setup guide](https://spotifactory.com/setup#speakers).
 
 ## Install (`deploy/upgrade.sh`)
 

@@ -28,15 +28,14 @@ which also comes as a one-page sheet to print and put in the box
     "Spotifactory") and a paired **Bluetooth** speaker;
   - anything the Spotify app lists for your account (phones, computers,
     Spotify Connect speakers);
-  - **Sonos** rooms (experimental, not yet tried on a real Sonos; see
-    `docs/sonos.md`);
+  - **Sonos** rooms (see `docs/sonos.md`);
   - **Google Cast** speakers and groups, and **AirPlay 2** speakers, which the
     box finds on the network itself and streams to through OwnTone (see
     `docs/cast-airplay.md`). AirPlay speakers have been seen in the list on a
     real box; playing to a Cast speaker hasn't been confirmed yet.
 
-  Which speakers work, and how to pick one, is on the setup guide's
-  [speaker section](https://spotifactory.com/setup#speaker).
+  Which speakers work, and how well tested each is, is in the setup guide's
+  [supported speakers](https://spotifactory.com/setup#speakers) list.
 - **Print Album / Print Playlist** prints the current artwork on a paired
   **Instax Square Link** and then writes the tag. **Film Left** asks the
   printer how many shots are left in the pack (and its battery). Only the
